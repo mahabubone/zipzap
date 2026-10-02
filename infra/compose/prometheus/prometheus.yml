@@ -1,0 +1,30 @@
+# Scrapes the three backend entrypoints. Docs: docs/operations/observability.md
+#
+# The /metrics endpoint does not exist yet — it arrives with the first instrumented route.
+# Until then this file is correct but silent, which is the honest state.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: zipzap-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          entrypoint: api
+
+  - job_name: zipzap-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          entrypoint: worker
+
+  - job_name: zipzap-publisher
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          entrypoint: publisher

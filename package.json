@@ -1,0 +1,28 @@
+{
+  "name": "zipzap",
+  "private": true,
+  "packageManager": "pnpm@11.5.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "verify": "pnpm format:check && pnpm typecheck && pnpm test",
+    "infra:up": "docker compose --env-file .env -f infra/compose/docker-compose.yml up -d",
+    "infra:down": "docker compose --env-file .env -f infra/compose/docker-compose.yml down",
+    "infra:logs": "docker compose --env-file .env -f infra/compose/docker-compose.yml logs -f",
+    "db:migrate": "pnpm --filter @zipzap/backend db:migrate",
+    "db:revert": "pnpm --filter @zipzap/backend db:revert",
+    "db:seed": "pnpm --filter @zipzap/backend db:seed",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "prettier": "3.9.9",
+    "turbo": "2.11.6",
+    "typescript": "6.0.3"
+  }
+}

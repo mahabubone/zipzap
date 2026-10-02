@@ -1,0 +1,88 @@
+# Local infrastructure. Never used in production — see docs/operations/deployment.md.
+#
+#   pnpm infra:up      pnpm infra:logs      pnpm infra:down
+#
+# Host ports are overridable via .env so this can coexist with another stack on the same
+# machine. Defaults are the conventional ports; override when 5432/6379/4222 are taken.
+#
+# Postgres is PostGIS because coverage, service areas and rider routing are spatial
+# (docs/ADR/0011-postgis.md).
+
+name: zipzap
+
+services:
+  postgres:
+    image: postgis/postgis:18-3.6
+    environment:
+      POSTGRES_USER: zipzap
+      POSTGRES_PASSWORD: zipzap
+      POSTGRES_DB: zipzap
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # Runs a real spatial query, so the container is only healthy once PostGIS works —
+      # not merely once Postgres accepts connections.
+      test: ['CMD-SHELL', 'psql -U zipzap -d zipzap -c "SELECT postgis_version();"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    command: ['redis-server', '--appendonly', 'no', '--save', '']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  nats:
+    image: nats:2.11-alpine
+    ports:
+      - '${NATS_PORT:-4222}:4222'
+      - '${NATS_MONITOR_PORT:-8222}:8222'
+    # JetStream is required: the outbox publisher needs durable, replayable subjects
+    # (docs/ADR/0006-nats-jetstream.md). No clustering — one node is enough here.
+    command: ['-js', '-sd', '/data', '-m', '8222']
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8222/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prometheus:
+    image: prom/prometheus:v3
+    ports:
+      - '${PROMETHEUS_PORT:-9090}:9090'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    profiles: ['observability']
+
+  grafana:
+    image: grafana/grafana:13.2
+    ports:
+      - '${GRAFANA_PORT:-3001}:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana-data:/var/lib/grafana
+    profiles: ['observability']
+
+volumes:
+  postgres-data:
+  nats-data:
+  prometheus-data:
+  grafana-data:

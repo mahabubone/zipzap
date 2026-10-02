@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+export/
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Test output
+coverage/
+
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local database volumes
+infra/compose/**/data/
+
+# Repository Custom needs
+prompt.txt

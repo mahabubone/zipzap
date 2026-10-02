@@ -1,0 +1,4 @@
+{
+  "//": "Scoped to tests so node:test can run TypeScript natively as ESM, without forcing the CommonJS Nest build into type:module.",
+  "type": "module"
+}

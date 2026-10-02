@@ -1,0 +1,119 @@
+# Authentication
+
+Two principals, two mechanisms, never interchangeable.
+
+|            | Human                      | Machine               |
+| ---------- | -------------------------- | --------------------- |
+| Credential | session cookie / JWT       | API key + secret      |
+| Used by    | every console, rider app   | merchant integrations |
+| Stored     | hashed password (argon2id) | hashed secret         |
+| Scoped to  | roles → permissions        | a merchant + scopes   |
+
+A merchant API key must never open a browser session, and a support agent's session must never
+work as an integration credential. Separate mechanisms, separate storage, separate revocation.
+
+---
+
+## API keys
+
+```
+Authorization: ApiKey <key_id>.<secret>
+```
+
+Split on the dot. `key_id` selects the row — it is an identifier and is safe to log. The secret
+is verified against a hash and **never logged, never stored raw, never returned again**.
+
+```
+key_id:  ak_live_9f2c1e4a
+secret:  shown once at creation, never retrievable
+```
+
+Store both a hash (to verify) and an encrypted copy (to display once, immediately after
+creation, if the merchant did not save it). Rotate and revoke independently.
+
+### Rotation
+
+Two keys may be active at once. That is the point — rotation without overlap forces a merchant
+to deploy and rotate in the same instant, and they will get it wrong.
+
+```
+1. merchant creates key B
+2. B is active, A still works
+3. merchant deploys with B
+4. merchant confirms B is receiving traffic
+5. merchant revokes A
+```
+
+`last_used_at` on every key, so step 4 is evidence-based rather than a guess.
+
+### Revocation
+
+Immediate, audited, terminal. There is no un-revoke, by design.
+
+Every rotation and revocation is an audit event. See [../domains/merchant.md](../domains/merchant.md).
+
+---
+
+## Scopes
+
+```
+shipments:read    shipments:write    tracking:read
+returns:write     settlements:read   webhooks:manage
+```
+
+Scope is checked per route. A credential with `shipments:write` cannot read settlements, and
+cannot delete a webhook.
+
+Scope without tenant scope is a data breach waiting for a missing `WHERE`. The merchant is
+derived from the credential, never from the request body — a client-supplied `merchantId` is
+ignored, not trusted.
+
+---
+
+## Sessions
+
+Opaque server-side sessions in Postgres, referenced by an `HttpOnly`, `Secure`, `SameSite=Lax`
+cookie. The session id is the only thing in the cookie; nothing is encoded in it that could be
+tampered with.
+
+Rotate on privilege change. A role change invalidates existing sessions — otherwise a demoted
+admin keeps admin until logout.
+
+Store a session fingerprint (user agent, IP range). A session from a different fingerprint is
+suspicious and worth re-authenticating.
+
+---
+
+## Webhook authentication
+
+Outbound deliveries are signed, not authenticated with the key:
+
+```
+ZipZap-Signature: t=1759387200,v1=<hmac-sha256>
+ZipZap-Delivery:  <delivery_id>
+```
+
+HMAC-SHA256 over `{timestamp}.{raw_body}` with the endpoint's signing secret. Receivers verify:
+
+1. the timestamp is within tolerance (reject replays)
+2. the signature matches, comparing in constant time
+3. `ZipZap-Delivery` is deduplicated — deliveries are retried, so the same `delivery_id` arrives
+   more than once
+
+The signature covers the **raw** body. Re-serialising the parsed JSON to verify will fail,
+because key order and whitespace change. This is the most common webhook bug, and it is ours to
+document clearly.
+
+---
+
+## Never logged
+
+Passwords · API secrets · session tokens · webhook signing secrets · full payment credentials.
+
+Not at debug level, not in error reports, not in traces. Redact at the serialiser, so the value
+cannot leak through a new call site you forgot.
+
+---
+
+Related: [../domains/identity.md](../domains/identity.md) ·
+[../domains/merchant.md](../domains/merchant.md) · [webhooks.md](webhooks.md)
