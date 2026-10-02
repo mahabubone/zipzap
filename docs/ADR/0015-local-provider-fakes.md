@@ -5,7 +5,7 @@
 ## Context
 
 ZipZap integrates with payment gateways (PayStation, Moneybag), domestic SMS providers
-(sms.net.bd, mimsms), email, and object storage. Every one of them is outside our control:
+(MiMSMS), email, and object storage. Every one of them is outside our control:
 
 - **Sandbox access requires a merchant application.** PayStation's sandbox exists but needs an
   account; Moneybag's is behind onboarding.
@@ -40,13 +40,31 @@ A fake that returns `200 OK` tests nothing. The failure paths are where this pro
 
 ### Fidelity is labelled per provider, not assumed
 
-| Provider      | Status                                                            |
-| ------------- | ----------------------------------------------------------------- |
-| PayStation    | **verified** against published documentation                      |
-| Moneybag, SMS | **⚠️ shape-accurate only** — no public API reference is reachable |
+| Provider   | Status                                                             |
+| ---------- | ------------------------------------------------------------------ |
+| PayStation | **verified** against published documentation                       |
+| MiMSMS     | **verified** against a published Postman collection (SMS API v2.1) |
+| Moneybag   | **⚠️ shape-accurate only** — no public API reference is reachable  |
 
 Unverified shapes are marked in the source file, in `infra/fakes/README.md`, and in the
 service's own index response.
+
+### What verification actually bought us
+
+Two of the three providers turned out to contradict assumptions that a guessed fake would have
+locked in:
+
+- **MiMSMS rejects `+8801844909020`.** It wants `8801XXXXXXXXX`, no plus and no leading zero. The
+  "normalise everything to E.164" reflex — which most integrations reach for automatically —
+  is _wrong for this provider_. A guessed fake built on E.164 would have passed every test and
+  failed on the first real send.
+- **MiMSMS publishes the carrier's own retry policy per DLR code.** The most common real
+  failure, `Absent subscriber for SM`, carries retry policy `3` — the carrier will retry. A fake
+  that only reported "failed" would have hidden a rule that changes when we dead-letter.
+
+Neither was findable by reasoning about what a bulk SMS API plausibly looks like. Both came from
+reading the provider's own documentation. That is the argument for paying the cost of
+retrieving it.
 
 **This is the part that matters.** A fake that looks authoritative but is invented is worse
 than no fake: it passes CI, and the first real integration fails on a field name nobody

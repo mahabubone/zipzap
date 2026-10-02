@@ -1,8 +1,9 @@
 /**
  * Local provider stand-ins. Dev and CI only — this is never deployed.
  *
- * PayStation is reproduced from its published documentation. Moneybag and the SMS provider
- * are shape-accurate only; see infra/fakes/README.md for what is verified and what is not.
+ * PayStation and MiMSMS are reproduced from their published documentation. Moneybag is a
+ * shape-accurate stand-in with no reachable public reference, and is labelled as such.
+ * See infra/fakes/README.md for the full verification table.
  */
 
 import { serve } from '@hono/node-server';
@@ -31,13 +32,26 @@ export function createApp(): Hono {
     c.json({
       service: 'zipzap fakes',
       note: 'Local stand-ins for external providers. No real provider is contacted.',
-      control: ['/_calls', '/_script', '/_reset', '/_ipn-log', '/_ipn-config'],
+      control: ['/_calls', '/_script', '/_reset', '/_ipn-log', '/_ipn-config', '/_sms/records'],
       providers: {
-        paystation:
-          '/paystation/initiate-payment · /paystation/transaction-status · /paystation/v2/transaction-status · /paystation/checkout/:trxId/:token',
-        moneybag:
-          '/moneybag/v1/charges · /moneybag/checkout/:chargeId  (shape-accurate, unverified)',
-        sms: '/sms/v1/send · /sms/v1/bulk  (shape-accurate, unverified)',
+        paystation: {
+          fidelity: 'contract-verified',
+          source: 'https://paystation.com.bd/documentation',
+          routes:
+            '/paystation/initiate-payment · /paystation/transaction-status · /paystation/v2/transaction-status · /paystation/checkout/:trxId/:token',
+        },
+        mimsms: {
+          fidelity: 'contract-verified',
+          source: 'https://apidoc.mimsms.com',
+          note: 'Bulk SMS API v2.1. Numbers are 8801XXXXXXXXX with no + and no leading 0.',
+          routes:
+            '/api/V2/SMS · /api/V2/Send · /api/V2/OneToMany · /api/V2/DSMS · /api/V2/Schedule · /api/V2/DlrApi · /api/V2/BalanceCheck',
+        },
+        moneybag: {
+          fidelity:
+            '⚠️ SHAPE-ACCURATE, UNVERIFIED — no public API reference is reachable; field names are ours',
+          routes: '/moneybag/v1/charges · /moneybag/checkout/:chargeId',
+        },
       },
     }),
   );

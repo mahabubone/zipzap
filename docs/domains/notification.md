@@ -55,6 +55,35 @@ appear — a misconfigured trigger can cost real money at national volume in min
 Cap sends per event type. A retry loop that re-enqueues a notification without a dedupe key is a
 billing incident.
 
+## Delivery failure is usually the carrier's to retry
+
+MiMSMS publishes a DLR table where every failure carries the **operator's** retry count. The
+common failures — `Absent subscriber for SM`, `Subscriber Busy`, `System failure` — all carry
+**retry policy 3**, meaning the carrier will retry the handset itself.
+
+`Absent subscriber for SM` means the phone was switched off or out of coverage. It is the single
+most common real failure, and it is **not** a permanent failure.
+
+**So a first-attempt delivery failure must not dead-letter.** Retry policy `0` —
+`Barred subscriber`, `Undelivered`, `Illegal subscriber` — is the only genuine
+permanent-failure signal. Dead-lettering everything that is not `Delivered` discards messages
+the carrier was about to retry, which for a parcel notification means a customer is never told
+their parcel arrived.
+
+Our own ladder still applies on top: it exists for the case where the carrier has exhausted its
+retries and _we_ try later, not as a replacement for them.
+
+## Transactional, not promotional
+
+Every parcel notification is sent as MiMSMS `transactionType: "T"`:
+
+- `"T"` allows **exactly one** recipient and ignores DND
+- `"P"` allows up to 1000 and is DND-restricted
+
+Never batch parcel notifications into one promotional call. Per-recipient personalisation goes
+through the provider's dynamic-SMS endpoint, which is a different path with different semantics.
+See [../architecture/provider-adapters.md](../architecture/provider-adapters.md).
+
 ## Must not touch
 
 Every other schema. It holds identifiers and its own delivery records. The notification is a

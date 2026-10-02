@@ -318,23 +318,30 @@ describe('fault injection', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        provider: 'sms',
+        provider: 'mimsms',
         operation: 'send',
         times: 2,
         outcome: { kind: 'httpError', status: 503 },
       }),
     });
 
-    const send = async (to: string): Promise<Response> =>
-      app.request('/sms/v1/send', {
+    const send = async (): Promise<Response> =>
+      app.request('/api/V2/SMS', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ to, body: 'test' }),
+        body: JSON.stringify({
+          apiKey: 'J6J68SNLDYG1SVS',
+          userName: 'demo@mimsms.com',
+          senderName: '8809612444598',
+          transactionType: 'T',
+          mobileNumber: '8801844909020',
+          message: 'test',
+        }),
       });
 
-    assert.equal((await send('+8801700000001')).status, 503);
-    assert.equal((await send('+8801700000002')).status, 503);
-    assert.equal((await send('+8801700000003')).status, 202);
+    assert.equal(((await (await send()).json()) as Record<string, unknown>).statusCode, '503');
+    assert.equal(((await (await send()).json()) as Record<string, unknown>).statusCode, '503');
+    assert.equal(((await (await send()).json()) as Record<string, unknown>).statusCode, '200');
   });
 
   test('a field matcher narrows to one specific invoice', async () => {
@@ -364,61 +371,284 @@ describe('fault injection', () => {
   });
 });
 
-describe('SMS (shape-accurate, unverified)', () => {
-  const send = async (payload: Record<string, unknown>): Promise<Response> =>
-    app.request('/sms/v1/send', {
+describe('MiMSMS send — contract-verified', () => {
+  const AUTH = { apiKey: 'J6J68SNLDYG1SVS', userName: 'demo@mimsms.com' };
+
+  const post = async (path: string, payload: Record<string, unknown>): Promise<Response> =>
+    app.request(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
-  test('rejects a local-format number rather than guessing', async () => {
-    const response = await send({ to: '01700000000', body: 'hello' });
-    assert.equal(response.status, 422);
-    assert.equal(((await response.json()) as Record<string, unknown>).error, 'invalid_msisdn');
-  });
+  const send = async (overrides: Record<string, unknown> = {}): Promise<Response> =>
+    post('/api/V2/SMS', {
+      ...AUTH,
+      senderName: '8809612444598',
+      transactionType: 'T',
+      mobileNumber: '8801844909020',
+      message: 'Your parcel is out for delivery',
+      ...overrides,
+    });
 
-  test('accepts international format and reports segments', async () => {
-    const response = await send({ to: '+8801700000000', body: 'Your parcel is out for delivery' });
-    assert.equal(response.status, 202);
+  test('returns the documented envelope, with statusCode as a STRING', async () => {
+    const response = await send();
     const body = (await response.json()) as Record<string, unknown>;
-    assert.match(String(body.id), /^sms_\d{6}$/);
+    for (const field of ['statusCode', 'status', 'trxnId', 'message', 'data']) {
+      assert.ok(field in body, `response is missing documented field "${field}"`);
+    }
+    assert.equal(body.statusCode, '200');
+    assert.equal(body.status, 'Success');
+    assert.equal(typeof body.statusCode, 'string', 'statusCode is documented as a string');
+    assert.match(String(body.trxnId), /^TRX/);
   });
 
-  test('segment counting: one Bangla character halves the per-segment limit', async () => {
-    const segmentsFor = async (body: string): Promise<number> =>
-      Number(
-        ((await (await send({ to: '+8801700000000', body })).json()) as Record<string, unknown>)
-          .segments,
-      );
+  test('numbers are 8801XXXXXXXXX — a + prefix is rejected', async () => {
+    // Their spec shows no plus and no leading zero. The "normalise to E.164" reflex is wrong
+    // for this provider, which is exactly the bug this assertion exists to catch.
+    const bad = await send({ mobileNumber: '+8801844909020' });
+    assert.equal(((await bad.json()) as Record<string, unknown>).statusCode, '400');
 
-    // GSM-7: 160 characters per segment.
-    assert.equal(await segmentsFor('a'.repeat(160)), 1);
-    assert.equal(await segmentsFor('a'.repeat(161)), 2);
-
-    // UCS-2 (Bangla): 70 per segment. Under-counting this bills the merchant for the wrong
-    // number of messages, so the boundary is asserted rather than assumed.
-    assert.equal(await segmentsFor('আ'.repeat(70)), 1);
-    assert.equal(await segmentsFor('আ'.repeat(71)), 2);
-
-    // One Bangla character is enough to drop the whole message to the UCS-2 limit.
-    assert.equal(await segmentsFor('a'.repeat(69) + 'আ'), 1);
-    assert.equal(await segmentsFor('a'.repeat(70) + 'আ'), 2);
+    const good = await send({ mobileNumber: '8801844909020' });
+    assert.equal(((await good.json()) as Record<string, unknown>).statusCode, '200');
   });
 
-  test('bulk reports per recipient so one bad number does not fail the batch', async () => {
-    const response = await app.request('/sms/v1/bulk', {
+  test('transactional (T) allows exactly one recipient', async () => {
+    const ok = await send({ transactionType: 'T', mobileNumber: '8801844909020,8801713537347' });
+    assert.equal(((await ok.json()) as Record<string, unknown>).statusCode, '400');
+
+    const single = await send({ transactionType: 'T', mobileNumber: '8801844909020' });
+    assert.equal(((await single.json()) as Record<string, unknown>).statusCode, '200');
+  });
+
+  test('promotional (P) accepts a comma-separated list', async () => {
+    const response = await send({
+      transactionType: 'P',
+      mobileNumber: '8801844909020,8801713537347',
+    });
+    const body = (await response.json()) as { statusCode: string; data: unknown[] };
+    assert.equal(body.statusCode, '200');
+    assert.equal(body.data.length, 2);
+  });
+
+  test('rejects an unknown transactionType', async () => {
+    const response = await send({ transactionType: 'X' });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '400');
+  });
+
+  test('bad credentials fail with an in-band code', async () => {
+    const response = await send({ apiKey: 'wrong' });
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.status, 'Failed');
+    assert.equal(body.statusCode, '400');
+  });
+
+  test('an un-whitelisted caller is refused', async () => {
+    // Their spec requires IP and domain whitelisting before any call is accepted.
+    await post('/_sms/access', { whitelisted: false });
+    const response = await send();
+    assert.match(
+      String(((await response.json()) as Record<string, unknown>).message),
+      /whitelist/i,
+    );
+    await post('/_sms/access', { whitelisted: true });
+  });
+
+  test('an un-activated API key is refused', async () => {
+    await post('/_sms/access', { keyActivated: false });
+    const response = await send();
+    assert.match(
+      String(((await response.json()) as Record<string, unknown>).message),
+      /activated/i,
+    );
+    await post('/_sms/access', { keyActivated: true });
+  });
+});
+
+describe('MiMSMS bulk and dynamic — contract-verified', () => {
+  const AUTH = {
+    apiKey: 'J6J68SNLDYG1SVS',
+    userName: 'demo@mimsms.com',
+    senderName: '8809612444598',
+  };
+
+  const post = async (path: string, payload: Record<string, unknown>): Promise<Response> =>
+    app.request(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+  test('OneToMany broadcasts one message to an smsData array', async () => {
+    const response = await post('/api/V2/OneToMany', {
+      ...AUTH,
+      message: 'Out for delivery',
+      smsData: [{ mobNumber: '8801844909020' }, { mobNumber: '8801713537347' }],
+    });
+    const body = (await response.json()) as { statusCode: string; data: { count: number }[] };
+    assert.equal(body.statusCode, '200');
+    assert.equal(body.data[0]?.count, 2);
+  });
+
+  test('DSMS sends a different message per recipient', async () => {
+    const response = await post('/api/V2/DSMS', {
+      ...AUTH,
+      smsData: [
+        { mobNumber: '8801844909020', message: 'Your parcel A' },
+        { mobNumber: '8801713537347', message: 'Your parcel B' },
+      ],
+    });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '200');
+    const records = (await (await app.request('/_sms/records')).json()) as { message: string }[];
+    assert.ok(records.some((r) => r.message === 'Your parcel A'));
+    assert.ok(records.some((r) => r.message === 'Your parcel B'));
+  });
+
+  test('enforces the documented 1000-recipient ceiling', async () => {
+    const smsData = Array.from({ length: 1001 }, (_, i) => ({
+      mobNumber: `88018449090${String(i).padStart(2, '0')}`,
+    }));
+    const response = await post('/api/V2/OneToMany', { ...AUTH, message: 'x', smsData });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '400');
+  });
+});
+
+describe('MiMSMS schedule — contract-verified', () => {
+  const AUTH = {
+    apiKey: 'J6J68SNLDYG1SVS',
+    userName: 'demo@mimsms.com',
+    senderName: '8809612444598',
+  };
+  const post = async (payload: Record<string, unknown>): Promise<Response> =>
+    app.request('/api/V2/Schedule', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...AUTH, transactionType: 'T', ...payload }),
+    });
+
+  test('accepts ISO 8601 on a 30-minute interval', async () => {
+    const response = await post({
+      scheduleTime: '2026-06-03T15:30:00',
+      smsData: [{ mobNumber: '8801844909020', message: 'Scheduled' }],
+    });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '200');
+  });
+
+  test('rejects a time that is not on a 30-minute interval', async () => {
+    const response = await post({
+      scheduleTime: '2026-06-03T15:17:00',
+      smsData: [{ mobNumber: '8801844909020', message: 'Scheduled' }],
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.statusCode, '400');
+    assert.match(String(body.message), /30-minute/);
+  });
+
+  test('rejects a non-ISO scheduleTime', async () => {
+    const response = await post({
+      scheduleTime: '03/06/2026 15:30',
+      smsData: [{ mobNumber: '8801844909020', message: 'x' }],
+    });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '400');
+  });
+});
+
+describe('MiMSMS delivery report — contract-verified', () => {
+  const AUTH = {
+    apiKey: 'J6J68SNLDYG1SVS',
+    userName: 'demo@mimsms.com',
+    senderName: '8809612444598',
+  };
+  const post = async (path: string, payload: Record<string, unknown>): Promise<Response> =>
+    app.request(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+  test('a DLR carries the operator retry policy, which is not ours', async () => {
+    await post('/api/V2/SMS', {
+      ...AUTH,
+      transactionType: 'T',
+      mobileNumber: '8801844909020',
+      message: 'Out for delivery',
+    });
+    const trackingId = (
+      (await (await app.request('/_sms/records')).json()) as { trackingId: string }[]
+    ).at(-1)!.trackingId;
+
+    // Retry policy 3 means the CARRIER will retry the handset. Dead-lettering on first
+    // failure would discard a message that was about to be delivered.
+    await app.request(`/_sms/${trackingId}/dlr?name=Absent%20subscriber%20for%20SM`, {
+      method: 'POST',
+    });
+    const response = await post('/api/V2/DlrApi', {
+      ...AUTH,
+      mobileNumber: '8801844909020',
+      trackingId,
+    });
+    const body = (await response.json()) as { data: { dlrName: string; retryPolicy: number }[] };
+    assert.equal(body.data[0]?.dlrName, 'Absent subscriber for SM');
+    assert.equal(body.data[0]?.retryPolicy, 3);
+  });
+
+  test('an unknown trackingId is a failure', async () => {
+    const response = await post('/api/V2/DlrApi', {
+      ...AUTH,
+      mobileNumber: '8801844909020',
+      trackingId: 'TRXnope',
+    });
+    assert.equal(((await response.json()) as Record<string, unknown>).statusCode, '400');
+  });
+
+  test('publishes the full documented DLR table', async () => {
+    const codes = (await (await app.request('/_sms/dlr-codes')).json()) as {
+      name: string;
+      retryPolicy: number;
+    }[];
+    assert.ok(codes.length >= 10, 'the published table has at least ten codes');
+    assert.ok(codes.some((code) => code.name === 'Delivered' && code.retryPolicy === 0));
+    assert.ok(codes.some((code) => code.retryPolicy === 3));
+  });
+});
+
+describe('MiMSMS balance — contract-verified response fields', () => {
+  test('returns balance and the expair_Date spelling their docs use', async () => {
+    const response = await app.request('/api/V2/BalanceCheck', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ apiKey: 'J6J68SNLDYG1SVS', userName: 'demo@mimsms.com' }),
+    });
+    const body = (await response.json()) as { data: Record<string, unknown>[] };
+    assert.equal(body.data[0]?.balance, '1250.55');
+    // Their typo. Normalising it would break against the real API.
+    assert.ok('expair_Date' in body.data[0]!);
+  });
+});
+
+describe('MiMSMS segment counting', () => {
+  const segmentsFor = async (message: string): Promise<number> => {
+    const response = await app.request('/api/V2/SMS', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        to: ['+8801700000000', '01700000000', '+8801800000000'],
-        body: 'Out for delivery',
+        apiKey: 'J6J68SNLDYG1SVS',
+        userName: 'demo@mimsms.com',
+        senderName: '8809612444598',
+        transactionType: 'P',
+        mobileNumber: '8801844909020',
+        message,
       }),
     });
-    assert.equal(response.status, 202);
-    const body = (await response.json()) as { accepted: number; rejected: number };
-    assert.equal(body.accepted, 2);
-    assert.equal(body.rejected, 1);
+    const body = (await response.json()) as { data: { segments: number }[] };
+    return body.data[0]!.segments;
+  };
+
+  test('GSM-7 is 160 per segment, one Bangla character halves it', async () => {
+    assert.equal(await segmentsFor('a'.repeat(160)), 1);
+    assert.equal(await segmentsFor('a'.repeat(161)), 2);
+    assert.equal(await segmentsFor('আ'.repeat(70)), 1);
+    assert.equal(await segmentsFor('আ'.repeat(71)), 2);
   });
 });
 

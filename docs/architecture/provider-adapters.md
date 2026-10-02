@@ -139,17 +139,89 @@ the HTTP status will report successful payments that were rejected.
 
 ## What is verified, and what is not
 
-| Adapter                      | Contract status | Source                                                                                           |
-| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
-| PayStation                   | **verified**    | [paystation.com.bd/documentation](https://paystation.com.bd/documentation), retrieved 2026-10-02 |
-| Moneybag                     | **⚠️ assumed**  | no public API reference reachable; shape is ours                                                 |
-| SMS (`sms.net.bd`, `mimsms`) | **⚠️ assumed**  | `developer.sms.net.bd` inactive; no public reference                                             |
-| Email                        | real            | Mailpit (SMTP) locally, a provider adapter later                                                 |
-| Object storage               | real            | MinIO (S3-compatible) locally, a provider adapter later                                          |
+| Adapter        | Contract status | Source                                                                                                  |
+| -------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
+| PayStation     | **verified**    | [paystation.com.bd/documentation](https://paystation.com.bd/documentation), retrieved 2026-10-02        |
+| MiMSMS         | **verified**    | [apidoc.mimsms.com](https://apidoc.mimsms.com), retrieved 2026-10-02 — Postman collection, SMS API v2.1 |
+| Moneybag       | **⚠️ assumed**  | no public API reference reachable; shape is ours                                                        |
+| Email          | real            | Mailpit (SMTP) locally, a provider adapter later                                                        |
+| Object storage | real            | MinIO (S3-compatible) locally, a provider adapter later                                                 |
 
 Email and object storage are _real_ implementations running locally, not fakes — Mailpit and
 MinIO are genuine SMTP and S3 servers. Only the payment and SMS surfaces are simulated, because
 those are the two where a public sandbox either costs money or does not exist.
+
+---
+
+## Phone number formats are not interchangeable
+
+The single most likely integration bug, and **our two verified providers disagree with each
+other**.
+
+```
+MiMSMS     8801844909020        no plus, no leading zero
+E.164      +8801844909020       the international standard
+```
+
+MiMSMS's published spec is explicit: `mobileNumber` is `8801XXXXXXXXX`. Sending `+8801...` is
+rejected.
+
+So **"always normalise to E.164" is a harmful reflex here.** We store E.164 internally — see
+[domains/customer.md](../domains/customer.md) — and the _adapter_ converts back to whatever the
+provider expects. That conversion belongs in the adapter for exactly the same reason the money
+conversion does: it is provider-specific, and getting it wrong is invisible until messages
+silently fail.
+
+```ts
+// notification/infrastructure/provider/mimsms.adapter.ts
+function toProviderMsisdn(stored: E164Phone): string {
+  // +8801844909020 -> 8801844909020. MiMSMS rejects the plus sign.
+  return stored.replace(/^\+/, '');
+}
+```
+
+Normalising a number **for our records** and formatting one **for a provider** are two different
+operations. Conflating them lets one provider's convention leak into the domain.
+
+## Transactional vs promotional is a product decision, not a transport detail
+
+MiMSMS's `transactionType` changes the rules, not just a label:
+
+| Type                | Recipients    | DND                                   |
+| ------------------- | ------------- | ------------------------------------- |
+| `"T"` transactional | **exactly 1** | ignored — delivered regardless of DND |
+| `"P"` promotional   | up to 1000    | restricted                            |
+
+Every parcel notification is `"T"`. Two consequences:
+
+- **Never batch parcel notifications into one `"P"` call.** DND restrictions would silently
+  delay them, and per-recipient personalisation (`/api/V2/DSMS`) is a different endpoint.
+- **The one-recipient limit is enforced by the gateway**, so a batching bug surfaces as a
+  rejected request rather than a partial send. That is worth knowing: it fails loudly.
+
+## The operator's retry policy is not ours
+
+MiMSMS publishes a DLR table where each failure carries the **carrier's** retry count:
+
+| DLR                                                                | Carrier retry policy |
+| ------------------------------------------------------------------ | -------------------- |
+| `Delivered`                                                        | 0                    |
+| `Absent subscriber for SM`                                         | **3**                |
+| `Subscriber Busy`                                                  | **3**                |
+| `System failure` · `SMS Failed (SMSC link)` · `SMSC Timeout-abort` | **3**                |
+| `Undelivered` · `Barred subscriber` · `Illegal subscriber`         | 0                    |
+
+`Absent subscriber for SM` — the phone was switched off — is the most common real failure, and
+the carrier will retry it **three times**.
+
+**So a first-attempt delivery failure is not a permanent failure.** Retry policy `0` is the
+only genuine permanent signal. Dead-lettering on the first failure discards messages that were
+about to be delivered, which for a parcel notification means a customer who is never told their
+parcel arrived.
+
+`NotificationChannel.send()` returns a receipt; whether that receipt dead-letters must depend on
+the carrier's retry policy, not on our optimism. See
+[domains/notification.md](../domains/notification.md).
 
 See [`infra/fakes/README.md`](../../infra/fakes/README.md) for the full verification table.
 

@@ -15,12 +15,12 @@ import { allCalls, callsSince, cursor, reset, type ProviderName } from './record
 import { resetRules, script, scriptedRules, type Outcome } from './script.ts';
 
 function provider(name: string): ProviderName | undefined {
-  return name === 'paystation' || name === 'moneybag' || name === 'sms' ? name : undefined;
+  return name === 'paystation' || name === 'mimsms' || name === 'moneybag' ? name : undefined;
 }
 
 export function register(app: Hono): void {
   app.get('/_healthz', (c) =>
-    c.json({ status: 'ok', providers: ['paystation', 'moneybag', 'sms'] }),
+    c.json({ status: 'ok', providers: ['paystation', 'mimsms', 'moneybag'] }),
   );
 
   // --- what we received ------------------------------------------------------------
@@ -69,7 +69,7 @@ export function register(app: Hono): void {
     };
 
     const name = body.provider ? provider(body.provider) : undefined;
-    if (!name) return c.json({ error: 'provider must be paystation | moneybag | sms' }, 400);
+    if (!name) return c.json({ error: 'provider must be paystation | mimsms | moneybag' }, 400);
     if (!body.outcome?.kind) return c.json({ error: 'outcome is required' }, 400);
 
     const rule = script({
@@ -118,7 +118,16 @@ export function register(app: Hono): void {
 
   app.get('/_paystation', (c) => c.json(paystation.allTransactions()));
   app.get('/_moneybag', (c) => c.json(moneybag.allCharges()));
-  app.get('/sms-messages', (c) => c.json(sms.allMessages()));
+  app.get('/sms-messages', (c) => c.json(sms.allRecords()));
+  app.get('/_sms/dlr', (c) => c.json(sms.DLR_CODES));
+  app.post('/_sms/access', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      whitelisted?: boolean;
+      keyActivated?: boolean;
+    };
+    sms.setAccess(body);
+    return c.json(sms.access());
+  });
 
   // --- IPN inspection ---------------------------------------------------------------
   app.get('/_ipn-log', (c) => c.json(ipn.allDeliveries()));
