@@ -152,12 +152,13 @@ Pinned 2026-10-02, with rationale per choice in [../ADR/](../ADR/).
 
 ## Where to read next
 
-| Question                        | File                                         |
-| ------------------------------- | -------------------------------------------- |
-| What may touch what?            | [module-boundaries.md](module-boundaries.md) |
-| What are the schemas and rules? | [database.md](database.md)                   |
-| What happens on a state change? | [eventing.md](eventing.md)                   |
-| What are the legal transitions? | [state-machines.md](state-machines.md)       |
-| How is money represented?       | [money-and-ledger.md](money-and-ledger.md)   |
-| How does this become services?  | [extraction.md](extraction.md)               |
-| What does each domain own?      | [../domains/_index.md](../domains/_index.md) |
+| Question                         | File                                         |
+| -------------------------------- | -------------------------------------------- |
+| What may touch what?             | [module-boundaries.md](module-boundaries.md) |
+| What are the schemas and rules?  | [database.md](database.md)                   |
+| What happens on a state change?  | [eventing.md](eventing.md)                   |
+| What are the legal transitions?  | [state-machines.md](state-machines.md)       |
+| How is money represented?        | [money-and-ledger.md](money-and-ledger.md)   |
+| How do we call payment/SMS/mail? | [provider-adapters.md](provider-adapters.md) |
+| How does this become services?   | [extraction.md](extraction.md)               |
+| What does each domain own?       | [../domains/_index.md](../domains/_index.md) |

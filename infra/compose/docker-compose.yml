@@ -60,6 +60,45 @@ services:
       timeout: 3s
       retries: 20
 
+  # Local provider stand-ins: PayStation, Moneybag, SMS. Dev/CI only, never deployed.
+  # Fidelity is per-provider and labelled — see infra/fakes/README.md before trusting it.
+  fakes:
+    build:
+      context: ../fakes
+    environment:
+      FAKES_PORT: '4010'
+    ports:
+      - '${FAKES_PORT:-4010}:4010'
+    profiles: ['fakes']
+
+  # Real SMTP, not a fake. Mailpit is a genuine SMTP server; the notification module talks to
+  # it exactly as it would to a provider adapter.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1026}:1025'
+      - '${MAILPIT_UI_PORT:-8026}:8025'
+    profiles: ['fakes']
+
+  # Real S3-compatible object storage for proof-of-delivery media, labels and reports.
+  minio:
+    image: minio/minio:latest
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: zipzap
+      MINIO_ROOT_PASSWORD: zipzap-dev-secret
+    ports:
+      - '${MINIO_API_PORT:-9002}:9000'
+      - '${MINIO_CONSOLE_PORT:-9003}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    profiles: ['fakes']
+
   prometheus:
     image: prom/prometheus:v3
     ports:
@@ -84,5 +123,6 @@ services:
 volumes:
   postgres-data:
   nats-data:
+  minio-data:
   prometheus-data:
   grafana-data:

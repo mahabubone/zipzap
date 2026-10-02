@@ -2,6 +2,8 @@ packages:
   - apps/*
   - apps/frontends/*
   - packages/*
+  # Local provider stand-ins. Dev and CI only — never deployed. See infra/fakes/README.md.
+  - infra/fakes
 
 # pnpm >= 10 blocks lifecycle scripts unless each package is listed explicitly here.
 # true = run its install script, false = declined.

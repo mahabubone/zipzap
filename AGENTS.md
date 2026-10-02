@@ -46,13 +46,12 @@ Testing     node:test (no test framework) · Testcontainers when integration tes
   `columnName()` gained a third `embeddedPrefixes` argument. Most tutorials and AI priors
   describe 0.3.x. Read the installed `.d.ts` before trusting an example.
 - **`pg`'s `getTypeParser` override is global.** Returning a parser unconditionally replaces
-  *every* type parser — it broke `SELECT version()`. Only override the OID you mean
+  _every_ type parser — it broke `SELECT version()`. Only override the OID you mean
   (`src/database/pg-types.ts`).
 - **Node's test runner cannot load decorators.** `node --test` runs `.ts` directly, so
   unit tests can only reach framework-free code. That is the architecture working, not a
   limitation to work around. Tests run with `--experimental-transform-types` because
   strip-only mode rejects parameter properties.
-
 
 ## Layout
 
@@ -68,6 +67,7 @@ packages/{tsconfig,eslint,tailwind}-config
 docs/                           product · architecture · domains · api
                                 operations · development · testing · ADR
 infra/compose                   postgres · redis · nats · prometheus · grafana
+infra/fakes                    @zipzap/fakes       local provider stand-ins (never deployed)
 ```
 
 Three backend entrypoints, one module graph (`src/main.ts` API · `src/worker.ts` BullMQ +
@@ -97,6 +97,8 @@ process — import it.
 9. **`Idempotency-Key` is mandatory** on: shipment create, bulk import, COD collect, delivery
    confirm, settlement approve, rider offline sync. The server must reject duplicates.
 10. **Never log**: password, API secret, token, webhook signing secret, full payment credential.
+11. **A provider's wire format never leaves `infrastructure/provider/`.** No `'status_code'` or
+    `'1250.50'` in a domain, application, or transport file. See docs/architecture/provider-adapters.md.
 
 ## Conventions
 

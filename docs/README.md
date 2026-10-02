@@ -22,5 +22,7 @@ Build order and phase gates: [`../ROADMAP.md`](../ROADMAP.md).
 1. [architecture/overview.md](architecture/overview.md) — how the pieces fit
 2. [architecture/module-boundaries.md](architecture/module-boundaries.md) — the one rule that shapes everything
 3. [domains/_index.md](domains/_index.md) — the eighteen domains
-4. [ADR/](ADR/) — the decisions behind it
-5. Everything else, on demand
+4. [architecture/provider-adapters.md](architecture/provider-adapters.md) — the seam every
+   external service sits behind, and what is verified about each
+5. [ADR/](ADR/) — the decisions behind it
+6. Everything else, on demand
