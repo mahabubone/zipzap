@@ -77,8 +77,14 @@ export class AssignPickupService {
       const row = await this.pickups.findByIdForUpdate(manager, command.pickupId);
       if (!row) throw new PickupNotFoundError();
 
-      // SCHEDULED (or REQUESTED, for a same-call fast path) -> ASSIGNED, validated.
-      const from = row.status as PickupStatus;
+      // Walk the machine edge by edge: REQUESTED -> SCHEDULED -> ASSIGNED. Scheduling is
+      // automatic here (no separate dispatch step exists yet), but the machine stays the
+      // authority — both edges are asserted, so an illegal source state still 409s.
+      let from = row.status as PickupStatus;
+      if (from === 'REQUESTED') {
+        assertTransition(from, 'SCHEDULED');
+        from = 'SCHEDULED';
+      }
       assertTransition(from, 'ASSIGNED');
 
       // The injected contract: rider picks and locks; we record the id it returns.

@@ -10,7 +10,7 @@ import {
   validateBatch,
   type PickupStatus,
 } from './pickup.ts';
-import { InvalidTransitionError } from '../../../common/domain-error.ts';
+import { InvalidBatchError, InvalidTransitionError } from '../../../common/domain-error.ts';
 
 describe('pickup state machine — exhaustive', () => {
   for (const from of PICKUP_STATUSES) {
@@ -29,23 +29,34 @@ describe('pickup state machine — exhaustive', () => {
 });
 
 describe('pickup batch bounds', () => {
-  it('rejects an empty batch', () => {
+  it('rejects an empty batch with a mapped 422, not a 500', () => {
     expect(() => validateBatch({ shipmentIds: [], totalWeightGrams: 1000 })).toThrow(
-      /at least one shipment/,
+      InvalidBatchError,
     );
   });
 
   it('rejects a batch over the parcel count', () => {
     const ids = Array.from({ length: MAX_BATCH_PARCELS + 1 }, (_, i) => `s-${i}`);
     expect(() => validateBatch({ shipmentIds: ids, totalWeightGrams: 1000 })).toThrow(
-      new RegExp(String(MAX_BATCH_PARCELS)),
+      InvalidBatchError,
     );
   });
 
   it('rejects a batch over the weight limit', () => {
     expect(() =>
       validateBatch({ shipmentIds: ['s-1'], totalWeightGrams: MAX_BATCH_WEIGHT_GRAMS + 1 }),
-    ).toThrow(/weight/);
+    ).toThrow(InvalidBatchError);
+  });
+
+  it('carries the 422 code the envelope will use', () => {
+    try {
+      validateBatch({ shipmentIds: [], totalWeightGrams: 1000 });
+      assert.fail('should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof InvalidBatchError);
+      assert.equal(error.spec.code, 'INVALID_BATCH');
+      assert.equal(error.spec.status, 422);
+    }
   });
 
   it('accepts a batch exactly at both limits', () => {

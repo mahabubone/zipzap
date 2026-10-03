@@ -79,6 +79,18 @@ export class PickupNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class InvalidBatchError extends DomainError {
+  readonly spec = {
+    code: 'INVALID_BATCH',
+    status: 422,
+    title: 'Invalid pickup batch',
+  } satisfies DomainErrorSpec;
+
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
 // --- conflicts and business rules ---------------------------------------------
 
 export class DuplicateRequestError extends DomainError {
@@ -163,6 +175,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [ResourceNotFoundError, new ResourceNotFoundError().spec],
   [ShipmentNotFoundError, new ShipmentNotFoundError().spec],
   [PickupNotFoundError, new PickupNotFoundError().spec],
+  [InvalidBatchError, new InvalidBatchError('reason').spec],
   [DuplicateRequestError, new DuplicateRequestError().spec],
   [InvalidIdempotencyKeyError, new InvalidIdempotencyKeyError().spec],
   [InvalidTransitionError, new InvalidTransitionError('A', 'B').spec],

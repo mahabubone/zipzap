@@ -7,7 +7,7 @@
  * into an in-flight job.
  */
 
-import { InvalidTransitionError } from '../../../common/domain-error.ts';
+import { InvalidBatchError, InvalidTransitionError } from '../../../common/domain-error.ts';
 
 export const PICKUP_STATUSES = [
   'REQUESTED',
@@ -55,14 +55,14 @@ export interface PickupBatchInput {
 
 export function validateBatch(input: PickupBatchInput): void {
   if (input.shipmentIds.length === 0) {
-    throw new Error('A batch must contain at least one shipment.');
+    throw new InvalidBatchError('A batch must contain at least one shipment.');
   }
   if (input.shipmentIds.length > MAX_BATCH_PARCELS) {
-    throw new Error(
+    throw new InvalidBatchError(
       `Batch of ${input.shipmentIds.length} exceeds the maximum of ${MAX_BATCH_PARCELS}.`,
     );
   }
   if (input.totalWeightGrams > MAX_BATCH_WEIGHT_GRAMS) {
-    throw new Error(`Batch weight ${input.totalWeightGrams}g exceeds the maximum.`);
+    throw new InvalidBatchError(`Batch weight ${input.totalWeightGrams}g exceeds the maximum.`);
   }
 }
