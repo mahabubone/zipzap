@@ -19,11 +19,15 @@ const merchantId = randomUUID();
 const keyId = generateKeyId();
 const secret = `sk_${createHash('sha256').update(String(Date.now())).digest('base64url').slice(0, 32)}`;
 
+const runTag = Date.now().toString(36);
+const merchantName = `Ayesha Fashion Ltd (${runTag})`;
+const contactEmail = `ops+${runTag}@ayesha.test`;
+
 await client.query('BEGIN');
 await client.query(
   `INSERT INTO merchant.merchants (id, name, status, contact_email)
    VALUES ($1, $2, 'ACTIVE', $3)`,
-  [merchantId, 'Ayesha Fashion Ltd', 'ops@ayesha.test'],
+  [merchantId, merchantName, contactEmail],
 );
 await client.query(
   `INSERT INTO merchant.api_credentials (id, merchant_id, key_id, secret_hash, scopes)

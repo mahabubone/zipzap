@@ -71,6 +71,14 @@ export class ShipmentNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class PickupNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'PICKUP_NOT_FOUND',
+    status: 404,
+    title: 'Pickup not found',
+  } satisfies DomainErrorSpec;
+}
+
 // --- conflicts and business rules ---------------------------------------------
 
 export class DuplicateRequestError extends DomainError {
@@ -154,6 +162,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [PermissionDeniedError, new PermissionDeniedError().spec],
   [ResourceNotFoundError, new ResourceNotFoundError().spec],
   [ShipmentNotFoundError, new ShipmentNotFoundError().spec],
+  [PickupNotFoundError, new PickupNotFoundError().spec],
   [DuplicateRequestError, new DuplicateRequestError().spec],
   [InvalidIdempotencyKeyError, new InvalidIdempotencyKeyError().spec],
   [InvalidTransitionError, new InvalidTransitionError('A', 'B').spec],

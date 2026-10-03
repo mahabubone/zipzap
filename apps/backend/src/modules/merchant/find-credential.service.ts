@@ -28,7 +28,9 @@ export interface FoundCredential {
 export class FindCredentialService {
   constructor(@InjectDataSource('merchant') private readonly merchant: DataSource) {}
 
-  /** Own schema only. No JOIN across a boundary — see ADR-0002. */
+  /** Own schema only. Table names are schema-qualified because TypeORM's `schema` option
+   * sets search_path for the query builder, not for raw SQL — an unqualified name resolves
+   * against whatever search_path the session happens to have. See module-connection.ts. */
   async findByKeyId(keyId: string): Promise<FoundCredential | null> {
     const rows = await this.merchant.query(
       `SELECT c.id,
@@ -38,8 +40,8 @@ export class FindCredentialService {
               c.revoked_at,
               m.name       AS merchant_name,
               m.status     AS merchant_status
-         FROM api_credentials c
-         JOIN merchants m ON m.id = c.merchant_id
+         FROM merchant.api_credentials c
+         JOIN merchant.merchants m ON m.id = c.merchant_id
         WHERE c.key_id = $1`,
       [keyId],
     );
@@ -59,8 +61,9 @@ export class FindCredentialService {
   }
 
   async touchLastUsed(credentialId: string): Promise<void> {
-    await this.merchant.query(`UPDATE api_credentials SET last_used_at = now() WHERE id = $1`, [
-      credentialId,
-    ]);
+    await this.merchant.query(
+      `UPDATE merchant.api_credentials SET last_used_at = now() WHERE id = $1`,
+      [credentialId],
+    );
   }
 }
