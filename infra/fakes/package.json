@@ -2,7 +2,7 @@
   "name": "@zipzap/fakes",
   "version": "0.1.0",
   "private": true,
-  "description": "Local stand-ins for PayStation, Moneybag and domestic SMS providers. Never deployed.",
+  "description": "Local stand-ins for PayStation and MiMSMS. Never deployed.",
   "license": "MIT",
   "type": "module",
   "scripts": {

@@ -6,19 +6,21 @@
     "node": ">=22"
   },
   "scripts": {
+    "boundaries:check": "node scripts/check-boundaries.mjs",
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "verify": "pnpm format:check && pnpm typecheck && pnpm test",
-    "infra:up": "docker compose --env-file .env -f infra/compose/docker-compose.yml up -d",
-    "infra:down": "docker compose --env-file .env -f infra/compose/docker-compose.yml down",
-    "infra:logs": "docker compose --env-file .env -f infra/compose/docker-compose.yml logs -f",
     "db:migrate": "pnpm --filter @zipzap/backend db:migrate",
     "db:revert": "pnpm --filter @zipzap/backend db:revert",
     "db:seed": "pnpm --filter @zipzap/backend db:seed",
+    "dev": "turbo run dev",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "infra:down": "docker compose --env-file .env -f infra/compose/docker-compose.yml down",
+    "infra:logs": "docker compose --env-file .env -f infra/compose/docker-compose.yml logs -f",
+    "infra:up": "docker compose --env-file .env -f infra/compose/docker-compose.yml up -d",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "typecheck": "turbo run typecheck",
+    "verify": "pnpm boundaries:check && pnpm format:check && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "prettier": "3.9.9",

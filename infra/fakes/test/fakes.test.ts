@@ -652,29 +652,6 @@ describe('MiMSMS segment counting', () => {
   });
 });
 
-describe('Moneybag (shape-accurate, unverified)', () => {
-  test('rejects a float amount — money is integer minor units', async () => {
-    const response = await app.request('/moneybag/v1/charges', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orderId: 'O-1', amountMinor: 1250.5 }),
-    });
-    assert.equal(response.status, 422);
-  });
-
-  test('creates a charge and returns a checkout URL', async () => {
-    const response = await app.request('/moneybag/v1/charges', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orderId: 'O-1', amountMinor: 125050 }),
-    });
-    assert.equal(response.status, 201);
-    const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.currency, 'BDT');
-    assert.match(String(body.checkoutUrl), /moneybag\/checkout/);
-  });
-});
-
 /** Minimal HTTP receiver, so retry behaviour is exercised against a real socket. */
 async function startReceiver(handler: (request: Request) => number): Promise<{
   url: string;

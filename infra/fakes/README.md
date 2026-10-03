@@ -11,39 +11,49 @@ pnpm --filter @zipzap/fakes test
 
 ---
 
-## Read this first: what is verified and what is not
+## Both providers are contract-verified
 
-This is the most important thing in this directory. **Two** providers are reproduced from
-published documentation. **One is an invented shape**, labelled as such in code, here, and in
-the provider's own index response at `/`.
+Two providers, two published specifications. Nothing in this directory is invented.
 
-| Provider       | Status                            | Basis                                                                                                                                                                               |
-| -------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PayStation** | **Contract-verified**             | [paystation.com.bd/documentation](https://paystation.com.bd/documentation), retrieved 2026-10-02. Endpoint paths, parameter names, error codes and response shapes are theirs.      |
-| **MiMSMS**     | **Contract-verified**             | [apidoc.mimsms.com](https://apidoc.mimsms.com), retrieved 2026-10-02 — a Postman collection for **Bulk SMS API v2.1**. Endpoints, field names, limits and the DLR table are theirs. |
-| **Moneybag**   | **⚠️ Shape-accurate, unverified** | Their site links an API reference that is not publicly reachable. Field and route names here are **ours**.                                                                          |
+| Provider       | Source                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| **PayStation** | [paystation.com.bd/documentation](https://paystation.com.bd/documentation)                   |
+| **MiMSMS**     | [apidoc.mimsms.com](https://apidoc.mimsms.com) — a Postman collection, **Bulk SMS API v2.1** |
 
-Verified on 2026-10-02:
+Both retrieved 2026-10-02. Endpoint paths, parameter names, error codes, recipient limits and the
+DLR table are theirs, not ours. Where a provider documents less than we need — MiMSMS specifies
+response fields only for `BalanceCheck` — the gap is called out in the source file rather than
+filled with a plausible invention.
 
-| URL                               | Result                                                          |
-| --------------------------------- | --------------------------------------------------------------- |
-| `paystation.com.bd/documentation` | reachable, full API reference                                   |
-| `apidoc.mimsms.com`               | reachable — Postman collection, full v2.1 spec extractable      |
-| `moneybag.com.bd/documentation`   | **404**                                                         |
-| `moneybag.com.bd/developers`      | reachable, but renders client-side; no API spec extractable     |
-| `developer.sms.net.bd`            | reachable, states the site is inactive (a _different_ provider) |
-| `mimsms.com`                      | reachable marketing site; specs live on `apidoc.mimsms.com`     |
+**This is a deliberate constraint, not luck.** A fake that looks authoritative but is invented is
+worse than no fake: it passes CI, and the first real integration fails on a field name nobody
+checked. Verification paid for itself twice over — see
+[What verification bought us](#what-verification-bought-us).
 
-**Why the distinction matters.** A fake that looks authoritative but is invented is worse than
-no fake: it will pass CI, and then the first real integration will fail on field names nobody
-checked. Anything unverified here is marked `⚠️` in the source file, in this table, and in the
-provider's own index response at `/`.
-
-When a real reference becomes available, **only that provider's file changes.** The product
-talks to `PaymentProvider` and `NotificationChannel`, not to PayStation, MiMSMS or Moneybag — see
-[../../docs/architecture/provider-adapters.md](../../docs/architecture/provider-adapters.md).
+The product talks to `PaymentProvider` and `NotificationChannel`, not to PayStation or MiMSMS —
+see [../../docs/architecture/provider-adapters.md](../../docs/architecture/provider-adapters.md).
+Swapping either provider is a one-line binding change.
 
 ---
+
+## What verification bought us
+
+Two places where the real specifications contradicted what a plausible-looking guess would have
+been. Both would have passed every test against an invented fake, and both would have failed on
+the first real request.
+
+**MiMSMS rejects `+8801844909020`.** Its spec is explicit that `mobileNumber` is
+`8801XXXXXXXXX`. The "always normalise to E.164" reflex — which most integrations reach for
+automatically — is _wrong for this provider_. Our guess had it backwards.
+
+**MiMSMS publishes the carrier's retry policy per DLR code.** The most common real failure,
+`Absent subscriber for SM`, means the phone was off, and it carries retry policy `3`: the carrier
+will retry the handset itself. A fake reporting only `failed` would have hidden a rule that
+decides when we dead-letter. Only retry policy `0` is genuinely permanent.
+
+Neither was findable by reasoning about what a bulk SMS API plausibly looks like. Both came from
+reading the provider's own documentation — which is the whole argument for insisting on
+verification rather than a labelled guess.
 
 ## Why a fake that can fail
 
@@ -126,25 +136,6 @@ Their receiver obligations, which are our contract to satisfy:
 The default retry ladder here is `[0, 200, 500, 1000]ms` so a test finishes in seconds. Real
 gating and backoff are the product's responsibility; the fake only needs to be able to
 misbehave on demand.
-
----
-
-## Moneybag (⚠️ unverified)
-
-Models the shape every Bangladeshi gateway shares: create a charge → receive a hosted URL →
-customer completes → async callback.
-
-```
-POST /moneybag/v1/charges          create; returns checkoutUrl
-GET  /moneybag/v1/charges/:id      status
-GET  /moneybag/checkout/:id        stand-in checkout page
-```
-
-Amounts are passed as **integer minor units** (`amountMinor`), matching our own
-[Money](../../docs/architecture/money-and-ledger.md) convention rather than the decimal-major
-convention their real API is more likely to use. That divergence is deliberate and documented
-at the adapter boundary — see
-[provider-adapters.md](../../docs/architecture/provider-adapters.md).
 
 ---
 
@@ -251,18 +242,20 @@ curl -X POST 'localhost:4010/_sms/TRX.../dlr?name=Absent%20subscriber%20for%20SM
 
 Everything lives under `/_` so it cannot collide with a provider route.
 
-| Route                                               | Purpose                                      |
-| --------------------------------------------------- | -------------------------------------------- |
-| `GET /_calls?provider=&operation=&since=`           | what the product sent, with raw bodies       |
-| `GET /_cursor`                                      | current sequence, for `since`                |
-| `POST /_reset`                                      | return the whole process to a known state    |
-| `POST /_script`                                     | add a fault rule                             |
-| `GET /_rules`                                       | list rules and how many times each has fired |
-| `POST /_paystation/:invoice/complete`               | drive a payment, fires the IPN               |
-| `POST /_paystation/:invoice/refund`                 | move a transaction to `refund`               |
-| `GET /_ipn-log`                                     | every IPN attempt, with status codes         |
-| `POST /_ipn-config`                                 | set the IPN destination and retry ladder     |
-| `GET /_paystation` · `/_moneybag` · `/sms-messages` | current state                                |
+| Route                                     | Purpose                                      |
+| ----------------------------------------- | -------------------------------------------- |
+| `GET /_calls?provider=&operation=&since=` | what the product sent, with raw bodies       |
+| `GET /_cursor`                            | current sequence, for `since`                |
+| `POST /_reset`                            | return the whole process to a known state    |
+| `POST /_script`                           | add a fault rule                             |
+| `GET /_rules`                             | list rules and how many times each has fired |
+| `POST /_paystation/:invoice/complete`     | drive a payment, fires the IPN               |
+| `POST /_paystation/:invoice/refund`       | move a transaction to `refund`               |
+| `GET /_ipn-log`                           | every IPN attempt, with status codes         |
+| `POST /_ipn-config`                       | set the IPN destination and retry ladder     |
+| `GET /_paystation` · `/_sms/records`      | current state                                |
+| `POST /_sms/:trackingId/dlr`              | apply a DLR outcome from the published table |
+| `POST /_sms/access`                       | toggle key activation / IP whitelisting      |
 
 ### Scripting a failure
 
@@ -326,13 +319,19 @@ curl localhost:4010/_ipn-log | jq '.[] | {delivered, attempts: [.attempts[] | .s
 pnpm --filter @zipzap/fakes test
 ```
 
-The suite asserts the verified contract (PayStation field names, error codes, IPN shape), the
-retry behaviour, the determinism of scripting, and that the one unverified provider is clearly
-marked. When a real provider reference lands, the failing test should be the one that says
-"this shape was a guess".
+The suite asserts the **verified contract** for both providers — PayStation field names, error
+codes and IPN shape; MiMSMS endpoints, recipient limits, number format, schedule rules and the
+DLR table — plus the retry behaviour and the determinism of scripting.
+
+A test asserting a field name is the thing that breaks when a provider changes their API. If
+one starts failing, the provider moved, not us.
 
 ## What this directory must never contain
 
 No real credentials. No live-provider calls. No dependency from `apps/backend` — the product
 does not know these exist; it only knows the interfaces in
 [provider-adapters.md](../../docs/architecture/provider-adapters.md).
+
+And no **invented** provider contract. If a third provider is ever added without a reachable
+public specification, it is labelled `⚠️ SHAPE-ACCURATE, UNVERIFIED` in this file, in its source
+header, and in the `/` index response — and that label is removed only when the real spec lands.

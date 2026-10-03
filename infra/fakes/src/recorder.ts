@@ -6,7 +6,7 @@
  * webhook signature verifies over the raw body.
  */
 
-export type ProviderName = 'paystation' | 'mimsms' | 'moneybag';
+export type ProviderName = 'paystation' | 'mimsms';
 
 export interface RecordedCall {
   readonly seq: number;

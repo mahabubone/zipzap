@@ -1,35 +1,71 @@
 /**
  * Entrypoint 2 of 3 — the worker.
  *
- * Runs BullMQ workers and NATS consumers. Scales with work volume.
+ * Subscribes to the event stream and runs consumers. Scales with work volume.
  *
- * `ponytail:` no BullMQ queues yet — they arrive with the first real job. NATS consumers
- * land with the first domain event. Registering an empty queue framework now proves
- * nothing and adds a Redis dependency to boot.
+ * The subscription loop lives here because subscribing is infrastructure, while the handler in
+ * each consumer is domain-aware and unit tested without NATS.
+ *
+ * Core NATS subscriptions, not JetStream consumers: the outbox is at-least-once by design and the
+ * dedupe lives in system.consumed_events. See docs/architecture/eventing.md.
  */
 
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { connectNats, drainQuietly } from './nats';
+import { AppModule } from './app.module.ts';
+import { connectNats, drainQuietly } from './nats.ts';
+import { TrackingConsumer } from './modules/tracking/infrastructure/tracking.consumer.ts';
+
+const logger = new Logger('worker');
+
+const SUBSCRIPTIONS = [{ consumer: 'tracking', subject: 'zipzap.shipment.created' }] as const;
 
 async function bootstrap(): Promise<void> {
-  // Keeps the Nest container alive so domain modules register their consumers as they are added.
-  await NestFactory.createApplicationContext(AppModule);
+  const app = await NestFactory.createApplicationContext(AppModule);
+  app.enableShutdownHooks();
 
   const { nc } = await connectNats('zipzap-worker');
-  new Logger('worker').log('worker started — no consumers registered yet');
+  const tracking = app.get(TrackingConsumer);
+
+  const open = SUBSCRIPTIONS.map(({ consumer, subject }) => {
+    const subscription = nc.subscribe(subject, { queue: consumer });
+    logger.log(`subscribed ${consumer} to ${subject}`);
+    return subscription;
+  });
 
   const shutdown = async (): Promise<void> => {
     await drainQuietly(nc);
+    await app.close();
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
+
+  logger.log('worker started');
+
+  await Promise.all(
+    open.map(async (subscription) => {
+      for await (const message of subscription) {
+        try {
+          const outcome = await tracking.handle({
+            subject: message.subject,
+            payload: message.data,
+          });
+          if (outcome === 'processed') {
+            logger.debug({ subject: message.subject }, 'event processed');
+          }
+        } catch (failure) {
+          // Log and continue. Throwing out of this loop tears down the subscription and
+          // silently stops processing, which is the failure mode a consumer must never have.
+          logger.error({ err: failure, subject: message.subject }, 'consumer handler failed');
+        }
+      }
+    }),
+  );
 }
 
 bootstrap().catch((error: unknown) => {
-  new Logger('worker').error(error);
+  logger.error(error);
   process.exit(1);
 });

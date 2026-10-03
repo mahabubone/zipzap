@@ -93,15 +93,20 @@ Two rules that follow from ADR-0009 and are not negotiable:
 
 ## Transaction status mapping
 
-Gateways disagree about status vocabularies. Ours is a closed enum; theirs is not.
+PayStation's vocabulary is not ours. Ours is a closed enum; theirs is a string field with
+documented values `processing`, `success`, `failed`, `refund`.
 
-| Our `TrxStatus`   | PayStation   | Moneybag (assumed) | Terminal |
-| ----------------- | ------------ | ------------------ | -------- |
-| `processing`      | `processing` | `created`          | no       |
-| `succeeded`       | `success`    | `paid`             | yes      |
-| `failed`          | `failed`     | `failed`           | yes      |
-| `refunded`        | `refund`     | `refunded`         | yes      |
-| **unknown value** | **throw**    | **throw**          | —        |
+| Our `TrxStatus`   | PayStation   | Terminal |
+| ----------------- | ------------ | -------- |
+| `processing`      | `processing` | no       |
+| `succeeded`       | `success`    | yes      |
+| `failed`          | `failed`     | yes      |
+| `refunded`        | `refund`     | yes      |
+| **unknown value** | **throw**    | —        |
+
+Note the casing trap, which is not hypothetical: PayStation's own documentation lists these values
+in lowercase but its sample response shows `"Success"`, and its IPN section pins `"Success"`.
+Match their literal output per endpoint, not your expectation of it.
 
 An unrecognised status is **not** mapped to `failed` and **not** mapped to `processing`. It is
 an error, because both mappings lose money:
@@ -143,7 +148,6 @@ the HTTP status will report successful payments that were rejected.
 | -------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
 | PayStation     | **verified**    | [paystation.com.bd/documentation](https://paystation.com.bd/documentation), retrieved 2026-10-02        |
 | MiMSMS         | **verified**    | [apidoc.mimsms.com](https://apidoc.mimsms.com), retrieved 2026-10-02 — Postman collection, SMS API v2.1 |
-| Moneybag       | **⚠️ assumed**  | no public API reference reachable; shape is ours                                                        |
 | Email          | real            | Mailpit (SMTP) locally, a provider adapter later                                                        |
 | Object storage | real            | MinIO (S3-compatible) locally, a provider adapter later                                                 |
 

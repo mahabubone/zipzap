@@ -385,7 +385,7 @@ a disputed payment.
 
 - [ ] Schema `cod`: `records`, `collections`, `reconciliation_runs`, `exceptions`
 - [ ] Lifecycle `COD_EXPECTED → COD_COLLECTED → COD_RECONCILED → COD_PAYABLE → SETTLEMENT_CREATED
-    → SETTLED`
+→ SETTLED`
 - [ ] Failures: `COLLECTION_FAILED` · `PARTIAL_COLLECTION` · `RECONCILIATION_EXCEPTION` ·
       `SETTLEMENT_HOLD`
 - [ ] `bigint` columns, integer arithmetic, currency on every row
@@ -476,7 +476,7 @@ a human.
 
 - [ ] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
 - [ ] Stages: `PENDING → VALIDATING → PREVIEW → PROCESSING → COMPLETED | FAILED |
-    COMPLETED_WITH_ERRORS`
+COMPLETED_WITH_ERRORS`
 - [ ] **Human preview checkpoint** — the first upload always has a column-mapping mistake, and
       10,000 mis-mapped shipments is a support incident
 - [ ] Idempotent on **merchant invoice reference**, with row-level outcomes

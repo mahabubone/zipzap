@@ -2,7 +2,7 @@
   "name": "@zipzap/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "ZipZap API, worker and publisher — one NestJS codebase, three entrypoints",
+  "description": "ZipZap API, worker and publisher \u2014 one NestJS codebase, three entrypoints",
   "license": "MIT",
   "main": "dist/main.js",
   "scripts": {
@@ -16,7 +16,8 @@
     "db:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "db:migrate": "node --env-file-if-exists=../../.env dist/database/cli.js migrate",
     "db:revert": "node --env-file-if-exists=../../.env dist/database/cli.js revert",
-    "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed"
+    "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed",
+    "test:integration": "node --experimental-transform-types --test \"test/integration/*.test.ts\""
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

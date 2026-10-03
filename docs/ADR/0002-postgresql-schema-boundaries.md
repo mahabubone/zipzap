@@ -23,13 +23,34 @@ Cross-module communication is either an **injected service** (synchronous, when 
 a value to proceed) or an **event** (asynchronous, when it needs to react). No cross-schema
 foreign keys — a `rider_id` in `delivery` is a bare identifier, not a constraint.
 
-### Enforced, not documented
+### Enforced, not documented — with an honest limit
 
-1. **One TypeORM connection per module, scoped to its schema.** A cross-module query fails at
-   runtime rather than silently succeeding in production.
+1. **One TypeORM connection per module, scoped to its schema.** This sets `search_path`, so an
+   **unqualified** name cannot escape: from the `shipment` connection, `SELECT * FROM merchants`
+   fails with `relation does not exist`.
+
+   **It does not block a fully-qualified name.** `SELECT * FROM merchant.merchants` from the
+   `shipment` connection succeeds. An earlier draft of this ADR claimed otherwise; it was wrong,
+   and it was found by running the query rather than reasoning about `search_path`.
+
+   Two stronger mechanisms were tried and neither worked:
+   - `SET ROLE` after `initialize()` covers one pooled client, and TypeORM uses a pg Pool.
+   - a `pool.on('connect')` hook — TypeORM does `new Pool(defaults, options.extra)` and never
+     accepts a pre-built pool, so the hook never runs. `role` in the pg config is ignored by
+     node-postgres, and `options: '-c role=x'` fails because `role` is not a GUC.
+
+   `ponytail:` true runtime isolation needs a Postgres role per module plus a separate connection
+   credential for each — four more DSNs and four more secrets. That is the upgrade path when a
+   deployment exists. Until then, qualified access is caught by the checker below, and an
+   integration test asserts the current behaviour so this paragraph cannot quietly become wrong
+   again.
+
 2. **`domain/` imports no framework.** No `@nestjs/*`, no `typeorm`, no `class-validator`, no
    `bullmq`. Keeps business rules honest about their dependencies.
-3. **A CI grep** for cross-schema SQL and cross-module infrastructure imports.
+3. **`scripts/check-boundaries.mjs`** for cross-schema SQL, cross-module infrastructure imports,
+   framework imports in `domain/`, provider wire formats outside adapters, and decimal literals
+   on money-shaped names. It runs in `pnpm verify` and in CI, so it is a gate rather than a
+   convention. Each rule has been proven to fire on a planted violation.
 
 ## Consequences
 

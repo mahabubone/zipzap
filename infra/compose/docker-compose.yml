@@ -60,7 +60,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # Local provider stand-ins: PayStation, Moneybag, SMS. Dev/CI only, never deployed.
+  # Local provider stand-ins: PayStation and MiMSMS. Dev/CI only, never deployed.
   # Fidelity is per-provider and labelled — see infra/fakes/README.md before trusting it.
   fakes:
     build:

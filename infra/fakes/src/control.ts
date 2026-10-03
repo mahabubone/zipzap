@@ -8,20 +8,17 @@
 
 import type { Hono } from 'hono';
 import * as ipn from './ipn.ts';
-import * as moneybag from './providers/moneybag.ts';
 import * as paystation from './providers/paystation.ts';
 import * as sms from './providers/sms.ts';
 import { allCalls, callsSince, cursor, reset, type ProviderName } from './recorder.ts';
 import { resetRules, script, scriptedRules, type Outcome } from './script.ts';
 
 function provider(name: string): ProviderName | undefined {
-  return name === 'paystation' || name === 'mimsms' || name === 'moneybag' ? name : undefined;
+  return name === 'paystation' || name === 'mimsms' ? name : undefined;
 }
 
 export function register(app: Hono): void {
-  app.get('/_healthz', (c) =>
-    c.json({ status: 'ok', providers: ['paystation', 'mimsms', 'moneybag'] }),
-  );
+  app.get('/_healthz', (c) => c.json({ status: 'ok', providers: ['paystation', 'mimsms'] }));
 
   // --- what we received ------------------------------------------------------------
   // The assertion surface. `?since=<seq>` returns only calls after a cursor, which is how a
@@ -52,7 +49,6 @@ export function register(app: Hono): void {
     resetRules();
     ipn.reset();
     paystation.reset();
-    moneybag.reset();
     sms.reset();
     return c.json({ reset: true, cursor: cursor() });
   });
@@ -69,7 +65,7 @@ export function register(app: Hono): void {
     };
 
     const name = body.provider ? provider(body.provider) : undefined;
-    if (!name) return c.json({ error: 'provider must be paystation | mimsms | moneybag' }, 400);
+    if (!name) return c.json({ error: 'provider must be paystation | mimsms' }, 400);
     if (!body.outcome?.kind) return c.json({ error: 'outcome is required' }, 400);
 
     const rule = script({
@@ -117,7 +113,6 @@ export function register(app: Hono): void {
   });
 
   app.get('/_paystation', (c) => c.json(paystation.allTransactions()));
-  app.get('/_moneybag', (c) => c.json(moneybag.allCharges()));
   app.get('/sms-messages', (c) => c.json(sms.allRecords()));
   app.get('/_sms/dlr', (c) => c.json(sms.DLR_CODES));
   app.post('/_sms/access', async (c) => {

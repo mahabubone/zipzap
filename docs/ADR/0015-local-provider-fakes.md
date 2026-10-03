@@ -1,14 +1,15 @@
 # ADR-0015: Local provider fakes over real sandbox accounts
 
-**Status** accepted · 2026-10-02
+**Status** accepted · 2026-10-02 · amended 2026-10-02 (provider scope narrowed to the two
+chosen integrations; the decision itself is unchanged)
 
 ## Context
 
-ZipZap integrates with payment gateways (PayStation, Moneybag), domestic SMS providers
-(MiMSMS), email, and object storage. Every one of them is outside our control:
+ZipZap integrates with a payment gateway (**PayStation**), a domestic SMS provider (**MiMSMS**),
+email, and object storage. Every one of them is outside our control:
 
-- **Sandbox access requires a merchant application.** PayStation's sandbox exists but needs an
-  account; Moneybag's is behind onboarding.
+- **Sandbox access requires a merchant account.** PayStation's sandbox exists but is gated
+  behind a merchant application.
 - **SMS costs money per message** and needs prepaid credit, in a currency, from a vendor.
 - **Both are unavailable in CI** without credentials, and flaky in CI even with them.
 - **Provider outages would fail our tests**, which is the worst possible coupling: our
@@ -19,11 +20,15 @@ real money — cannot be tested at all until Phase 3.
 
 ## Decision
 
-**Simulate the external providers locally, and keep the seam narrow enough that a real
+**Simulate the two chosen providers locally, and keep the seam narrow enough that a real
 integration is a one-line binding change.**
 
-`infra/fakes` runs one Hono service standing in for PayStation, Moneybag, and the SMS
-provider. It is never deployed and `apps/backend` has no knowledge of it.
+`infra/fakes` runs one Hono service standing in for **PayStation** and **MiMSMS**. It is never
+deployed and `apps/backend` has no knowledge of it.
+
+Provider choice is a product decision, not an infrastructure one. One gateway and one SMS
+provider is enough to make the integration real; a second of each would double the maintenance
+surface for no additional insight.
 
 ### Requirements the fakes must satisfy
 
@@ -36,23 +41,28 @@ A fake that returns `200 OK` tests nothing. The failure paths are where this pro
    the signature.
 3. **Retrying delivery** — the payment IPN dispatcher re-POSTs on non-2xx, so the _receiver_
    half of the idempotency contract is testable.
-4. **Honest about fidelity** — see below.
+4. **Contract-verified, never invented** — see below.
 
-### Fidelity is labelled per provider, not assumed
+### Both fakes are reproduced from published specifications
 
-| Provider   | Status                                                             |
-| ---------- | ------------------------------------------------------------------ |
-| PayStation | **verified** against published documentation                       |
-| MiMSMS     | **verified** against a published Postman collection (SMS API v2.1) |
-| Moneybag   | **⚠️ shape-accurate only** — no public API reference is reachable  |
+| Provider   | Source                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------- |
+| PayStation | [paystation.com.bd/documentation](https://paystation.com.bd/documentation)             |
+| MiMSMS     | [apidoc.mimsms.com](https://apidoc.mimsms.com) — Postman collection, Bulk SMS API v2.1 |
 
-Unverified shapes are marked in the source file, in `infra/fakes/README.md`, and in the
-service's own index response.
+Endpoint paths, field names, error codes, recipient limits and the DLR table are the providers',
+not ours.
+
+**The rule this establishes for the next provider:** an unverified shape is labelled
+`⚠️ SHAPE-ACCURATE, UNVERIFIED` in its source header, in `infra/fakes/README.md`, and in the
+service's `/` index response — and the label comes off only when the real spec lands. A fake that
+looks authoritative but is invented is worse than no fake: it passes CI, and the first real
+integration fails on a field name nobody checked.
 
 ### What verification actually bought us
 
-Two of the three providers turned out to contradict assumptions that a guessed fake would have
-locked in:
+Two details in MiMSMS's real specification contradicted assumptions that a guessed fake would
+have locked in:
 
 - **MiMSMS rejects `+8801844909020`.** It wants `8801XXXXXXXXX`, no plus and no leading zero. The
   "normalise everything to E.164" reflex — which most integrations reach for automatically —
@@ -63,12 +73,8 @@ locked in:
   that only reported "failed" would have hidden a rule that changes when we dead-letter.
 
 Neither was findable by reasoning about what a bulk SMS API plausibly looks like. Both came from
-reading the provider's own documentation. That is the argument for paying the cost of
-retrieving it.
-
-**This is the part that matters.** A fake that looks authoritative but is invented is worse
-than no fake: it passes CI, and the first real integration fails on a field name nobody
-checked. A labelled guess is a useful default; an unlabelled one is a trap.
+reading the provider's own documentation — which is the argument for insisting on verification
+rather than settling for a labelled guess.
 
 ### Email and object storage are real, not faked
 
@@ -89,8 +95,12 @@ simulated, because those are where a public sandbox costs money or does not exis
 
 ### Negative
 
-- **Unverified shapes will not match the real API.** Accepted, and labelled. The adaptation
-  cost is one adapter file, by design.
+- **A provider can change their API without telling us.** That is the cost of pinning to a
+  published spec: a change breaks the tests loudly rather than silently, which is the correct
+  failure direction. The adaptation cost is one adapter file.
+- **Where a provider under-documents, we still infer.** MiMSMS documents response fields only
+  for `BalanceCheck`, so `data[]` contents for the send endpoints are inferred and marked as
+  such. Those specific inferences remain unverified.
 - **A fake that passes tells you nothing about the real integration.** Contract tests against
   a real sandbox are still required before go-live, and are tracked separately.
 - **Money conversion is a live bug surface.** Providers speak decimal major units
@@ -121,10 +131,15 @@ routes wins.
 **Defer until Phase 3.** Rejected: it means the settlement design is built and reviewed without
 ever being executed, and the bugs found only at Phase 3 are architectural rather than local.
 
+**Simulate a second gateway (Moneybag) as well.** Rejected: its API reference is not publicly
+reachable, so the fake would be an invented shape — the one thing this decision rules out. It
+would also double the maintenance surface for no additional insight, since one gateway and one
+SMS provider already exercise everything the integration layer needs to handle.
+
 ## Revisit when
 
 - A real sandbox account exists → keep the fakes for CI, add contract tests against the real
   sandbox alongside them
-- A provider's public API reference becomes available → replace the labelled shape and delete
-  the "this is a guess" marker
+- A second provider is added without a reachable public spec → label it `⚠️` and treat its
+  adapter as provisional
 - More than two providers per category need faking → split the service
