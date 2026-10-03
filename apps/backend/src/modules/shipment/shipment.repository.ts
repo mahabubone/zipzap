@@ -24,6 +24,24 @@ export class ShipmentRepository {
   }
 
   /**
+   * The tracking boundary's read: a shipment id in, its tracking code out. The only thing the
+   * consumer may learn, and the only thing it needs. Returns null for a deleted-or-never
+   * shipment, which the consumer treats as ignorable rather than fatal — a missing parcel is
+   * an operations problem, never a consumer-crash problem.
+   */
+  async findTrackingCode(
+    manager: EntityManager,
+    shipmentId: string,
+  ): Promise<string | null> {
+    const row = await manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .select('s.trackingCode', 'trackingCode')
+      .where('s.id = :id', { id: shipmentId })
+      .getRawOne<{ trackingCode: string }>();
+    return row?.trackingCode ?? null;
+  }
+
+  /**
    * Locks the row so two simultaneous transitions serialise. Without this, two riders scanning
    * at once both read the same state and both advance the machine.
    */

@@ -19,7 +19,13 @@ import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 
 const logger = new Logger('worker');
 
-const SUBSCRIPTIONS = [{ consumer: 'tracking', subject: 'zipzap.shipment.created' }] as const;
+const SUBSCRIPTIONS = [
+  { consumer: 'tracking', subject: 'zipzap.shipment.created' },
+  { consumer: 'tracking', subject: 'zipzap.pickup.requested' },
+  { consumer: 'tracking', subject: 'zipzap.pickup.assigned' },
+  { consumer: 'tracking', subject: 'zipzap.delivery.out_for_delivery' },
+  { consumer: 'tracking', subject: 'zipzap.delivery.attempted' },
+] as const;
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);

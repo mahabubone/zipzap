@@ -116,6 +116,7 @@ export class AssignPickupService {
           riderId: assigned.riderId,
           score: assigned.score,
           reasons: assigned.reasons,
+          shipmentIds: row.shipmentIds,
         },
       });
 
