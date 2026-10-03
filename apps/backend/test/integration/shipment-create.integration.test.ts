@@ -18,13 +18,13 @@ import { after, before, describe, test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { money } from '../../dist/common/money.js';
-import { CreateShipmentService } from '../../dist/modules/shipment/application/create-shipment.service.js';
-import { ShipmentRepository } from '../../dist/modules/shipment/infrastructure/shipment.repository.js';
-import { AppendTrackingEventService } from '../../dist/modules/tracking/application/append-tracking-event.service.js';
+import { CreateShipmentService } from '../../dist/modules/shipment/create-shipment.service.js';
+import { ShipmentRepository } from '../../dist/modules/shipment/shipment.repository.js';
+import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
-import { ShipmentEntity } from '../../dist/modules/shipment/infrastructure/entities/shipment.entity.js';
-import { PublicTimelineEntity } from '../../dist/modules/tracking/infrastructure/entities/public-timeline.entity.js';
-import { TrackingEventEntity } from '../../dist/modules/tracking/infrastructure/entities/tracking-event.entity.js';
+import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
+import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
+import { TrackingEventEntity } from '../../dist/modules/tracking/tracking-event.entity.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -280,10 +280,8 @@ describeIfDb('module boundaries — what is actually enforced', () => {
     const { execFileSync } = await import('node:child_process');
     const checker = new URL('../../../../scripts/check-boundaries.mjs', import.meta.url).pathname;
 
-    const source = new URL(
-      '../../src/modules/shipment/application/__boundary-probe.ts',
-      import.meta.url,
-    ).pathname;
+    const source = new URL('../../src/modules/shipment/__boundary-probe.ts', import.meta.url)
+      .pathname;
 
     const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
     mkdirSync(new URL('../../src/modules/shipment/application', import.meta.url).pathname, {

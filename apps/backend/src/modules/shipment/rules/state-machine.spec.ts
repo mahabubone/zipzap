@@ -1,5 +1,5 @@
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
 import {
   SHIPMENT_STATUSES,
   TRANSITIONS,
@@ -10,19 +10,19 @@ import {
   isForwardTerminal,
   isTerminal,
   type ShipmentStatus,
-} from '../src/modules/shipment/domain/state-machine.ts';
+} from './state-machine.ts';
 import {
   createShipment,
   generateTrackingCode,
   release,
   transition,
   type Shipment,
-} from '../src/modules/shipment/domain/shipment.ts';
+} from './shipment.ts';
 
 function drive(shipment: Shipment, path: readonly ShipmentStatus[]): Shipment {
   return path.reduce(transition, shipment);
 }
-import { InvalidTransitionError } from '../src/common/domain-error.ts';
+import { InvalidTransitionError } from '../../../common/domain-error.ts';
 
 const ALL = SHIPMENT_STATUSES;
 

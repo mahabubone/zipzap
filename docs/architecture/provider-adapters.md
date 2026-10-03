@@ -11,7 +11,7 @@ fakes in [`infra/fakes`](../../infra/fakes) are one legitimate implementation of
 ## The rule
 
 > **No provider's field names, error codes, or wire format appear outside
-> `<module>/infrastructure/provider/`.**
+> `<module>/provider/`.**
 
 The domain speaks `Money` and `TrxStatus`. A gateway speaks `"1008"` and `"120.00"`. That
 translation happens in exactly one file per provider, and nowhere else.
@@ -25,13 +25,13 @@ If a controller or a use case contains the string `'status_code'`, the boundary 
 Declared by the domain, implemented by infrastructure. The dependency points inward.
 
 ```ts
-// finance/domain/payment-provider.ts
+// finance/rules/payment-provider.ts
 export interface PaymentProvider {
   initiate(request: PaymentRequest): Promise<Payment>;
   verify(reference: string): Promise<Payment>;
 }
 
-// notification/domain/channel.ts
+// notification/rules/channel.ts
 export interface NotificationChannel {
   readonly name: string;
   send(message: OutboundMessage): Promise<DeliveryReceipt>;
@@ -71,7 +71,7 @@ being silently truncated to `125050`.
 The adapter is the only place this conversion happens:
 
 ```ts
-// finance/infrastructure/provider/paystation.adapter.ts
+// finance/provider/paystation.adapter.ts
 function toMoney(paystationAmount: string): Money {
   // Parse as a DECIMAL STRING. Never parseFloat — see docs/ADR/0009.
   const parsed = parseMajorStrict(paystationAmount);
@@ -177,7 +177,7 @@ conversion does: it is provider-specific, and getting it wrong is invisible unti
 silently fail.
 
 ```ts
-// notification/infrastructure/provider/mimsms.adapter.ts
+// notification/provider/mimsms.adapter.ts
 function toProviderMsisdn(stored: E164Phone): string {
   // +8801844909020 -> 8801844909020. MiMSMS rejects the plus sign.
   return stored.replace(/^\+/, '');
@@ -233,7 +233,7 @@ See [`infra/fakes/README.md`](../../infra/fakes/README.md) for the full verifica
 
 ## Adding a real adapter
 
-1. Implement the domain interface in `<module>/infrastructure/provider/`.
+1. Implement the domain interface in `<module>/provider/`.
 2. Map **only** at this layer: status vocabulary, error codes, and money.
 3. Keep provider exceptions inside the adapter. The domain sees `PaymentProviderError`, not
    `PayStationError`.
@@ -242,7 +242,7 @@ See [`infra/fakes/README.md`](../../infra/fakes/README.md) for the full verifica
    in different environments without a conditional in business logic.
 
 ```ts
-// finance/infrastructure/provider/index.ts — composition, not logic
+// finance/provider/index.ts — composition, not logic
 export const PAYMENT_PROVIDER = Symbol('PAYMENT_PROVIDER');
 
 // development

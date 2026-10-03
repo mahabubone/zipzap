@@ -32,7 +32,7 @@ should say which.
 - [ ] mutations are idempotency-keyed where the domain requires it
 - [ ] events are written to the outbox **in the same transaction**
 - [ ] no cross-module table access
-- [ ] `domain/` imports no framework
+- [ ] `rules/` files import no framework
 - [ ] migrations are additive and reversible
 - [ ] OpenAPI regenerated, api-client regenerated, contract test updated
 - [ ] the domain doc reflects the new behaviour
@@ -62,7 +62,7 @@ The questions worth asking, in order of how much they cost when missed:
 3. **Is the outbox row in the same transaction?** Not after. Not from a later hook.
 4. **Is this money?** Integer minor units? Append-only? Derived or stored?
 5. **Can this be retried?** What happens on a duplicate?
-6. **Does `domain/` import anything from the framework?**
+6. **Does any `rules/` file import anything from the framework?**
 7. **Is the test actually asserting?** A test that cannot fail is worse than no test, because it
    looks like coverage.
 

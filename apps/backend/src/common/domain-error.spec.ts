@@ -1,5 +1,5 @@
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
 import {
   AuthenticationRequiredError,
   DependencyUnavailableError,
@@ -15,8 +15,8 @@ import {
   ShipmentNotFoundError,
   ValidationFailedError,
   type DomainErrorSpec,
-} from '../src/common/domain-error.ts';
-import { toEnvelope } from '../src/common/error-envelope.ts';
+} from './domain-error.ts';
+import { toEnvelope } from './error-envelope.ts';
 
 /**
  * Every DomainError subclass. A subclass missing from DOMAIN_ERROR_SPECS surfaces as a 500

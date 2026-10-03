@@ -60,7 +60,8 @@ function moduleOf(file) {
 function inspect(file) {
   const lines = readFileSync(file, 'utf8').split('\n');
   const owner = moduleOf(file);
-  const inDomain = file.includes(`${sep}domain${sep}`);
+  // `rules/` is the purity marker: plain TS, zero framework imports. See AGENTS.md rule 3.
+  const inRules = file.includes(`${sep}rules${sep}`);
   const rel = relative(REPO_ROOT, file);
 
   lines.forEach((text, index) => {
@@ -80,31 +81,31 @@ function inspect(file) {
       }
     }
 
-    // 2. Framework imports inside domain/. Rule 3.
-    if (inDomain && /from\s+'(?:@nestjs|typeorm|bullmq|@hono)/.test(line)) {
-      add(file, 'domain/ must not import the framework (rule 3)', index, text);
+    // 2. Framework imports inside rules/. Rule 3.
+    if (inRules && /from\s+'(?:@nestjs|typeorm|bullmq|@hono)/.test(line)) {
+      add(file, 'rules/ must not import the framework (rule 3)', index, text);
     }
 
-    // 3. class-validator decorators in domain/ — a transport concern.
-    if (inDomain && /^\s*@(Is[A-Z]\w*|Validate\w*|Transform)/.test(text)) {
-      add(file, 'domain/ must not carry class-validator decorators (rule 3)', index, text);
+    // 3. class-validator decorators in rules/ — a transport concern.
+    if (inRules && /^\s*@(Is[A-Z]\w*|Validate\w*|Transform)/.test(text)) {
+      add(file, 'rules/ must not carry class-validator decorators (rule 3)', index, text);
     }
 
-    // 4. A module reaching into another module's infrastructure.
+    // 4. A module reaching into another module's persistence.
+    // In the flat layout the entity file is the persistence: `merchant.entity.ts`,
+    // `shipment.entity.ts`, `tracking-event.entity.ts`. Importing another module's
+    // `*.entity.ts` IS the cross-schema read — use a contract or an event instead.
     if (owner) {
-      const reach = /from\s+['"](?:\.\.\/)*(?:[\w-]+\/)*([a-z_]+)\/infrastructure\//.exec(line);
+      const reach = /from\s+['"](?:\.{1,2}\/)*([a-z][a-z0-9_-]*)\/([a-z][a-z0-9_-]*\.entity)(?:\.ts)?['"]/.exec(line);
       const target = reach?.[1];
       if (target && target !== owner) {
-        add(file, `module "${owner}" imports "${target}" infrastructure — use a contract or an event`, index, text);
+        add(file, `module "${owner}" imports "${target}" persistence — use a contract or an event`, index, text);
       }
     }
 
     // 5. A provider's wire format escaping the adapter layer. Rule 11.
-    //
-    // Only tokens that are unmistakably a provider's, and that have no legitimate use in our
-    // own schema or DTOs. An earlier, broader list included `senderName` and `apiKey`, which are
-    // real column names here — a rule that fires on valid code gets disabled, which is worse
-    // than not having it. `expair_Date` is their misspelling, which is the clearest signal of all.
+    // Token list narrowed once — see docs/ADR/0002-postgresql-schema-boundaries.md; a rule that
+    // fires on valid code gets disabled, which is worse than not having it.
     if (!rel.includes(`${sep}provider${sep}`)) {
       if (/\b(status_code|trx_status|expair_Date|transactionType|mobileNumber|senderName)\b\s*[:'"]/.test(line)
         && !/\bsenderName\b\s*:/.test(line)) {

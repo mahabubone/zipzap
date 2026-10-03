@@ -203,7 +203,7 @@ interface PaymentProvider {
 }
 ```
 
-Bank, mobile financial service, or mock. Implementations live in `finance/infrastructure/` and
+Bank, mobile financial service, or mock. Implementations live in a `finance/provider/` file and
 import nothing from the domain. The domain does not know which provider exists.
 
 The mock is the default in development. Real providers arrive in a later phase, behind the same

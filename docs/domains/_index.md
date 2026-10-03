@@ -47,13 +47,16 @@ Everything else on demand.
 
 ## Conventions
 
-Every module is four layers, dependencies pointing one way:
+Every module is flat — models, services, controllers side by side — with one subdir:
 
 ```
-transport/       controllers, DTOs, validation
-application/     use cases — owns the transaction boundary
-infrastructure/  TypeORM entities, repositories, adapters
-domain/          entities, value objects, state machines — framework-free
+shipment/
+  shipment.module.ts    wires providers to the connections they own
+  shipment.service.ts   @Injectable(), owns the transaction boundary
+  shipment.controller.ts thin: validate → one service call → return
+  shipment.entity.ts    TypeORM row shape, module schema only
+  shipment.repository.ts joins the caller's transaction, opens none of its own
+  rules/                framework-free pure logic — state machines, domain errors
 ```
 
 A module reads nothing from another module's schema. See

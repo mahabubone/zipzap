@@ -66,7 +66,7 @@ hides rounding bugs — which are exactly the bugs these tests exist to catch.
 
 ### Time
 
-Inject a clock. `domain/` takes a `Clock`; the test supplies a fixed one.
+Inject a clock. Rules code takes a `Clock`; the test supplies a fixed one.
 
 Business rules around cutoff times, SLA windows, and holiday calendars are all time-dependent. A
 test that runs at 23:59 local time and passes differently tomorrow is worse than no test, because

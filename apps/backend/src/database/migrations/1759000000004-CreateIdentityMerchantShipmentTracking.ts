@@ -9,10 +9,10 @@
  */
 
 import type { MigrationInterface, QueryRunner } from 'typeorm';
-import { MERCHANT_STATUSES } from '../../modules/merchant/domain/merchant.ts';
+import { MERCHANT_STATUSES } from '../../modules/merchant/rules/merchant.ts';
 import { API_SCOPES } from '../../common/scopes.ts';
-import { SHIPMENT_STATUSES } from '../../modules/shipment/domain/state-machine.ts';
-import { TRACKING_EVENT_TYPES } from '../../modules/tracking/domain/tracking-event.ts';
+import { SHIPMENT_STATUSES } from '../../modules/shipment/rules/state-machine.ts';
+import { TRACKING_EVENT_TYPES } from '../../modules/tracking/rules/tracking-event.ts';
 
 /** Postgres enum type. Names are schema-qualified so two modules may use the same name. */
 const enumType = (values: readonly string[], name: string): string =>

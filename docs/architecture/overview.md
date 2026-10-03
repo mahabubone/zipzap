@@ -81,19 +81,24 @@ modules — never duplicate a module per process.
 
 ## Module layout
 
-Every module is four layers, and the dependency direction is one-way:
+Every module is a flat NestJS feature module — models, services, controllers side by side,
+Django-app style — with exactly one exception:
 
 ```
-transport/         controllers, DTOs, validation    → knows application
-application/       use cases, commands, queries      → knows domain
-infrastructure/    TypeORM entities, repositories    → knows domain
-domain/            entities, value objects, machines  → knows nothing
+shipment/
+  shipment.module.ts    wires providers to the connections they own
+  shipment.service.ts   @Injectable(), owns the transaction boundary
+  shipment.controller.ts thin: validate → one service call → return
+  shipment.entity.ts    TypeORM row shape for the module's schema
+  shipment.repository.ts joins the caller's transaction, opens none of its own
+  rules/                framework-free pure logic — state machines, transitions,
+                        domain errors. Checker-enforced, never decorated.
 ```
 
-`domain/` imports no framework. No `@nestjs/*`, no `typeorm`, no `class-validator`
-decorators, no BullMQ, no Nest DI. Domain errors are plain `Error` subclasses. This is what
-makes the business rules testable without a container and portable to another runtime if rule 5
-is ever exercised.
+One-way knowledge: the controller knows the service; the service and the entity both know the
+rules; the rules know nothing. Files matching `rules/` import no framework — no `@nestjs/*`, no
+`typeorm`, no `class-validator` decorators, no BullMQ, no Nest DI. Domain errors are plain `Error`
+subclasses.
 
 See [module-boundaries.md](module-boundaries.md) for the full contract, and
 [../domains/](../domains/) for what each of the eighteen modules owns.

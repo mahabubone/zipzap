@@ -4,7 +4,7 @@
  */
 
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
-import { TRACKING_EVENT_TYPES, type TrackingEventType } from '../../domain/tracking-event.ts';
+import { TRACKING_EVENT_TYPES, type TrackingEventType } from './rules/tracking-event.ts';
 
 @Entity('events')
 @Index('events_shipment_occurred_idx', ['shipmentId', 'occurredAt'])

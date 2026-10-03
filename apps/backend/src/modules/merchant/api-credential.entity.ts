@@ -6,7 +6,7 @@
  */
 
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
-import type { ApiScope } from '../../../../common/scopes.ts';
+import type { ApiScope } from '../../common/scopes.ts';
 
 @Entity('api_credentials')
 export class ApiCredentialEntity {

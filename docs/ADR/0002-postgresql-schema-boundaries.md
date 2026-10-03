@@ -45,12 +45,12 @@ foreign keys — a `rider_id` in `delivery` is a bare identifier, not a constrai
    integration test asserts the current behaviour so this paragraph cannot quietly become wrong
    again.
 
-2. **`domain/` imports no framework.** No `@nestjs/*`, no `typeorm`, no `class-validator`, no
-   `bullmq`. Keeps business rules honest about their dependencies.
-3. **`scripts/check-boundaries.mjs`** for cross-schema SQL, cross-module infrastructure imports,
-   framework imports in `domain/`, provider wire formats outside adapters, and decimal literals
-   on money-shaped names. It runs in `pnpm verify` and in CI, so it is a gate rather than a
-   convention. Each rule has been proven to fire on a planted violation.
+2. **Files matching `rules/` import no framework.** No `@nestjs/*`, no `typeorm`, no
+   `class-validator`, no `bullmq`. Keeps business rules honest about their dependencies.
+3. **`scripts/check-boundaries.mjs`** for cross-schema SQL, cross-module `*.entity.ts` imports,
+   framework imports in `rules/` files, provider wire formats outside adapters, and decimal
+   literals on money-shaped names. It runs in `pnpm verify` and in CI, so it is a gate rather
+   than a convention. Each rule has been proven to fire on a planted violation.
 
 ## Consequences
 

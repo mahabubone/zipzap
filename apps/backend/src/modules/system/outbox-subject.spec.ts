@@ -1,6 +1,6 @@
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
-import { subjectFor } from '../src/modules/system/outbox.publisher.ts';
+import { subjectFor } from './outbox.publisher.ts';
 
 /**
  * The subject is a public contract: consumers subscribe to it. Once published in production

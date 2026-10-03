@@ -14,7 +14,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
-import { consumeOnce } from '../../system/consume-once.ts';
+import { consumeOnce } from '../system/consume-once.ts';
 
 export const TRACKING_CONSUMER = 'tracking';
 

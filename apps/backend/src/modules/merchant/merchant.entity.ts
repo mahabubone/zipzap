@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
-import { MERCHANT_STATUSES, type MerchantStatus } from '../../domain/merchant.ts';
+import { MERCHANT_STATUSES, type MerchantStatus } from './rules/merchant.ts';
 
 @Entity('merchants')
 export class MerchantEntity {

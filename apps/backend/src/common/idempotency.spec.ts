@@ -1,6 +1,6 @@
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
-import { decide, hashRequest, scopeKey } from '../src/common/idempotency.ts';
+import { decide, hashRequest, scopeKey } from './idempotency.ts';
 
 describe('hashRequest', () => {
   test('is insensitive to key order — the same body must hash the same', () => {

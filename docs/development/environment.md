@@ -85,24 +85,28 @@ There is no ESLint yet. `noUnusedLocals` and `noUnusedParameters` in `tsconfig.b
 the unused-variable class of bug for free, and Prettier covers formatting. Add ESLint when a
 rule cannot be expressed in those two.
 
-Unit tests use Node's built-in runner and run TypeScript directly:
+Unit tests run under Vitest as `*.spec.ts` colocated with source:
 
 ```bash
-node --experimental-transform-types --test "test/*.test.ts"
+pnpm --filter @zipzap/backend test          # vitest run, once
+pnpm --filter @zipzap/backend test:watch    # watch mode
 ```
 
-They can only reach framework-free code, because Node cannot load decorators. That is the
-architecture working — `domain/` is exactly the part that should be testable without a
-container.
+Pure `rules/` files need no container. Services instantiate through `@nestjs/testing` with
+`useMocker()` — every constructor param carries an explicit `@Inject()` because esbuild cannot
+emit the decorator metadata `tsc` would, and bare params resolve `undefined` under test.
 
 ## Adding a module
 
+Flat, Django-style. No subdirs except `rules/`:
+
 ```bash
-mkdir -p apps/backend/src/modules/<name>/{domain,application,infrastructure,transport}
+mkdir apps/backend/src/modules/<name>/rules
 ```
 
-- [ ] `domain/` imports nothing from the framework
-- [ ] `infrastructure/` owns the TypeORM entities for the module's schema
+- [ ] `<name>.entity.ts` owns the TypeORM shape for the module's schema
+- [ ] `<name>.service.ts` is `@Injectable()` and owns the transaction boundary
+- [ ] `rules/` imports nothing from the framework
 - [ ] the module's TypeORM connection is scoped to that schema
 - [ ] a migration exists; `synchronize` is still `false`
 - [ ] `docs/domains/<name>.md` exists

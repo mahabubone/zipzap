@@ -5,7 +5,7 @@
 
 import type { EntityManager } from 'typeorm';
 import { Injectable } from '@nestjs/common';
-import { ShipmentEntity } from './entities/shipment.entity.ts';
+import { ShipmentEntity } from './shipment.entity.ts';
 
 /**
  * Takes an EntityManager on every method rather than holding a connection. That is what makes

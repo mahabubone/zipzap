@@ -43,7 +43,7 @@ Microservices are an **extraction strategy**, available when a module earns it. 
 ### Negative
 
 - **The boundary needs enforcement.** Nothing prevents a cross-module table access. Mitigated by
-  schema-scoped TypeORM connections, a framework-free `domain/`, and a CI grep.
+  schema-scoped TypeORM connections, framework-free `rules/` files, and a CI grep.
 - **One deployable means one blast radius.** A bad deploy affects every module. Mitigated by
   roll-forward-only migrations and staged rollout.
 - **Scaling is coarse.** Tracking load and finance load contend for the same process. Mitigated

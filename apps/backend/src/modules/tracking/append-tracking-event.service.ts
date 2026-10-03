@@ -8,7 +8,7 @@
  */
 
 import type { EntityManager } from 'typeorm';
-import type { AppendTrackingEvent } from '../domain/tracking-event.ts';
+import type { AppendTrackingEvent } from './rules/tracking-event.ts';
 
 export class AppendTrackingEventService {
   append(manager: EntityManager, event: AppendTrackingEvent): Promise<void> {

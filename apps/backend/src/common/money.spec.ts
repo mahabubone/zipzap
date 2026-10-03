@@ -1,5 +1,5 @@
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
 import {
   add,
   allocate,
@@ -11,7 +11,7 @@ import {
   subtract,
   sum,
   type Currency,
-} from '../src/common/money.ts';
+} from './money.ts';
 
 describe('money', () => {
   test('rejects a float — the rule that makes the rest of this file matter', () => {

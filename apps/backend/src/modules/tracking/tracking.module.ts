@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { forModule } from '../../database/module-connection.ts';
-import { TrackingEventEntity } from './infrastructure/entities/tracking-event.entity.ts';
-import { PublicTimelineEntity } from './infrastructure/entities/public-timeline.entity.ts';
-import { AppendTrackingEventService } from './application/append-tracking-event.service.ts';
-import { TrackingConsumer } from './infrastructure/tracking.consumer.ts';
-import { PublicTrackingController } from './transport/public-tracking.controller.ts';
+import { TrackingEventEntity } from './tracking-event.entity.ts';
+import { PublicTimelineEntity } from './public-timeline.entity.ts';
+import { AppendTrackingEventService } from './append-tracking-event.service.ts';
+import { TrackingConsumer } from './tracking.consumer.ts';
+import { PublicTrackingController } from './public-tracking.controller.ts';
 
 @Module({
   imports: [forModule('tracking', [TrackingEventEntity, PublicTimelineEntity])],

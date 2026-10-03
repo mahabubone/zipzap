@@ -7,7 +7,7 @@
  */
 
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
-import { TRACKING_EVENT_TYPES, type TrackingEventType } from '../../domain/tracking-event.ts';
+import { TRACKING_EVENT_TYPES, type TrackingEventType } from './rules/tracking-event.ts';
 
 @Entity('public_timeline')
 @Index('public_timeline_code_seq_idx', ['trackingCode', 'sequence'])

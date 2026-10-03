@@ -12,7 +12,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
-import type { MerchantStatus } from '../domain/merchant.ts';
+import type { MerchantStatus } from './rules/merchant.ts';
 
 export interface FoundCredential {
   readonly id: string;

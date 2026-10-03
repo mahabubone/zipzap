@@ -106,7 +106,7 @@ never the answer.
 The shape, not the implementation:
 
 ```ts
-// shipment/domain/state-machine.ts — no @nestjs, no typeorm
+// shipment/rules/state-machine.ts — no @nestjs, no typeorm
 const TRANSITIONS: Record<ShipmentStatus, ShipmentStatus[]> = {
   CREATED: ['PICKUP_REQUESTED', 'CANCELLED'],
   /* … */

@@ -22,7 +22,7 @@ message is fine; changing a `code` is a breaking change.
 
 ## The rule
 
-Domain errors are plain `Error` subclasses in `domain/`. They are mapped to this envelope in a
+Domain errors are plain `Error` subclasses in `rules/` files. They are mapped to this envelope in a
 **single exception filter**. Controllers never construct an error response.
 
 ```

@@ -18,9 +18,7 @@ export default defineConfig({
     // Decorated specs boot the Nest container; reloading it per file is slow and can
     // leak connections across forks. Sequential files, parallel tests within a file.
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    maxWorkers: 1,
     coverage: {
       provider: 'v8',
       exclude: [...coverageConfigDefaults.exclude, '**/*.module.ts', 'src/worker.ts', 'src/main.ts', 'src/publisher.ts'],

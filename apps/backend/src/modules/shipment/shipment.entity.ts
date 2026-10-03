@@ -6,7 +6,7 @@
  */
 
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
-import { SHIPMENT_STATUSES, type ShipmentStatus } from '../../domain/state-machine.ts';
+import { SHIPMENT_STATUSES, type ShipmentStatus } from './rules/state-machine.ts';
 
 @Entity('shipments')
 @Index('shipments_merchant_created_idx', ['merchantId', 'createdAt'])

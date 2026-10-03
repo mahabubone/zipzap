@@ -26,7 +26,7 @@ it asks the rider module, or waits for an event.
 value to proceed:
 
 ```ts
-// In delivery/application/AssignDelivery
+// In delivery/delivery.service.ts
 const rider = await this.riders.getAvailableForZone(zoneId);
 ```
 
@@ -66,18 +66,21 @@ TypeOrmModule.forRootAsync({
 With a schema-scoped connection, a cross-module query fails at runtime rather than silently
 succeeding in production and confusing someone later.
 
-**2. Domain imports nothing.**
+**2. Pure rules import nothing.**
 
-`domain/` may not import `@nestjs/*`, `typeorm`, `class-validator`, or `bullmq`. Entities that
-know about the ORM live in `infrastructure/`. Domain errors are plain `Error` subclasses. This
-keeps the business rules honest about what they depend on.
+Files in `rules/` may not import `@nestjs/*`, `typeorm`, `class-validator`, or `bullmq`.
+The TypeORM entity (`shipment.entity.ts`) lives beside them but outside the `rules/`
+marker; it is a row shape, not business logic. Domain errors are plain `Error` subclasses.
+This keeps the business rules honest about what they depend on.
 
-**3. A CI grep.**
+**3. A CI grep.** `pnpm boundaries:check` enforces, in order of how much each costs when missed:
 
 ```
-FORBIDDEN: @Entity(<other module> schema)  outside that module
-FORBIDDEN: \b(SELECT|UPDATE|DELETE|INSERT)\b.*\b<other schema>\.   outside that module
-FORBIDDEN: imports of another module's infrastructure/ path
+FORBIDDEN: SELECT/INSERT/UPDATE/JOIN against a schema the module does not own
+FORBIDDEN: imports of another module's *.entity.ts
+FORBIDDEN: framework imports in rules/ files
+FORBIDDEN: provider wire tokens outside <module>/provider/
+FORBIDDEN: decimal literals on money-shaped names
 ```
 
 It is crude. It catches the careless cases, which is most of them.

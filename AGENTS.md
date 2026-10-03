@@ -34,7 +34,7 @@ Async       NATS JetStream (events) · BullMQ (work) · Redis (cache, rate limit
 Obs.        OpenTelemetry · Prometheus · Grafana · pino
 Web         React 19 · TanStack Router/Query/Table · Vite · Tailwind
 Other       Expo / React Native (rider) · Electron (desktop) · Astro 7 (site + docs)
-Testing     node:test (no test framework) · Testcontainers when integration tests arrive
+Testing     Vitest 5 (*.spec.ts colocal, node env) · @nestjs/testing DI · Testcontainers (integration)
 ```
 
 ### Version traps — all four were hit, all four will bite again
@@ -48,10 +48,10 @@ Testing     node:test (no test framework) · Testcontainers when integration tes
 - **`pg`'s `getTypeParser` override is global.** Returning a parser unconditionally replaces
   _every_ type parser — it broke `SELECT version()`. Only override the OID you mean
   (`src/database/pg-types.ts`).
-- **Node's test runner cannot load decorators.** `node --test` runs `.ts` directly, so
-  unit tests can only reach framework-free code. That is the architecture working, not a
-  limitation to work around. Tests run with `--experimental-transform-types` because
-  strip-only mode rejects parameter properties.
+- **esbuild (Vitest's transformer) cannot infer constructor DI.** Bare params resolve
+  `undefined` under Vitest while working under `tsc`, because the Nest decorator metadata is
+  never emitted. Fix it once, in production code: explicit `@Inject()` on every constructor
+  param. If a service works in `pnpm dev` and `undefined`s in `pnpm test`, this is why.
 
 ## Layout
 
@@ -81,9 +81,10 @@ process — import it.
    JOINs, no foreign repositories, no raw SQL crossing a schema boundary. Cross-module =
    injected service (sync) or event (async).
    Enforced by one `TypeOrmModule.forRoot({ schema })` per module + a CI grep.
-3. **The domain imports nothing from the framework.** Plain TypeScript in `domain/`: no
-   `@nestjs/*`, no `typeorm`, no `class-validator` decorators, no BullMQ, no Nest DI. Domain
-   errors are plain `Error` subclasses.
+3. **Pure rules import nothing from the framework.** Files matching `rules/` are plain
+   TypeScript: no `@nestjs/*`, no `typeorm`, no `class-validator` decorators, no BullMQ,
+   no Nest DI. Domain errors are plain `Error` subclasses. Enforced by the checker on the
+   directory name, not on promises.
 4. **Money is integer minor units + currency.** `125050` poisha. Never `1250.50`. Never float,
    anywhere, including tests. Columns are `bigint`. Arithmetic is integers only.
 5. **`synchronize: false` permanently.** Every schema change is a reviewed migration. Never
@@ -97,16 +98,21 @@ process — import it.
 9. **`Idempotency-Key` is mandatory** on: shipment create, bulk import, COD collect, delivery
    confirm, settlement approve, rider offline sync. The server must reject duplicates.
 10. **Never log**: password, API secret, token, webhook signing secret, full payment credential.
-11. **A provider's wire format never leaves `infrastructure/provider/`.** No `'status_code'` or
-    `'1250.50'` in a domain, application, or transport file. See docs/architecture/provider-adapters.md.
+11. **A provider's wire format never leaves `<module>/provider/`.** No `'status_code'` or
+    `'1250.50'` in a rules, service, or controller file. See docs/architecture/provider-adapters.md.
 
 ## Conventions
 
-- **Module shape** (§68): `<module>/{domain,application,infrastructure,transport}`
-  - `domain/` — entities, value objects, state machines, domain errors. Framework-free.
-  - `application/` — use cases (commands + queries). **Owns the transaction boundary.**
-  - `infrastructure/` — TypeORM entities, repositories, outbox, provider adapters.
-  - `transport/` — controllers, DTOs, validation. Thin: validate → one use case → return.
+- **Module shape**: flat NestJS feature modules. Each `src/modules/<name>/` mixes
+  `<name>.module.ts`, `<name>.service.ts`, `<name>.controller.ts`, `<name>.entity.ts`,
+  `<name>.repository.ts`. One exception kept from the layered sketch: a `rules/` subdir holds
+  the framework-free pure logic — entities-as-values, state machines, domain errors — and the
+  checker enforces zero framework imports there.
+  - The **service** (Nest `@Injectable()`) owns the transaction boundary.
+  - The **controller** is thin: validate → one service call → return.
+  - **Explicit `@Inject()` on every constructor param.** esbuild (Vitest's transformer) cannot
+    emit decorator metadata, so bare params resolve `undefined` under Vitest while working under
+    `tsc`. Nest's own runtime survives either; the tests do not.
 - **Transactions**: the application service calls `manager.transaction()`. Repositories accept
   an optional `EntityManager` so they join the caller's transaction. A repository must never
   open its own transaction.

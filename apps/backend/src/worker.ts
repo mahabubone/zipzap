@@ -15,7 +15,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.ts';
 import { connectNats, drainQuietly } from './nats.ts';
-import { TrackingConsumer } from './modules/tracking/infrastructure/tracking.consumer.ts';
+import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 
 const logger = new Logger('worker');
 

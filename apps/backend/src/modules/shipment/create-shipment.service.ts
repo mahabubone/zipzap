@@ -19,20 +19,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
-import { money, type Money } from '../../../common/money.ts';
-import { hashRequest } from '../../../common/idempotency.ts';
-import { InvalidIdempotencyKeyError } from '../../../common/domain-error.ts';
-import { claim } from '../../system/idempotency.store.ts';
-import { append as appendOutbox } from '../../system/outbox.writer.ts';
-import { ShipmentRepository } from '../infrastructure/shipment.repository.ts';
+import { money, type Money } from '../../common/money.ts';
+import { hashRequest } from '../../common/idempotency.ts';
+import { InvalidIdempotencyKeyError } from '../../common/domain-error.ts';
+import { claim } from '../system/idempotency.store.ts';
+import { append as appendOutbox } from '../system/outbox.writer.ts';
+import { ShipmentRepository } from './shipment.repository.ts';
 import {
   createShipment,
   generateTrackingCode,
   type Address,
   type Parcel,
-} from '../domain/shipment.ts';
-import { transition } from '../domain/shipment.ts';
-import { AppendTrackingEventService } from '../../tracking/application/append-tracking-event.service.ts';
+} from './rules/shipment.ts';
+import { transition } from './rules/shipment.ts';
+import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 
 export interface CreateShipmentCommand {
   readonly merchantId: string;

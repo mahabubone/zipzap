@@ -17,17 +17,10 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
-import {
-  ApiKeyGuard,
-  ScopeGuard,
-  type AuthenticatedRequest,
-} from '../../identity/transport/api-key.guard.ts';
-import {
-  CreateShipmentService,
-  type CreatedShipment,
-} from '../application/create-shipment.service.ts';
-import { DuplicateRequestError } from '../../../common/domain-error.ts';
-import { money } from '../../../common/money.ts';
+import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import { CreateShipmentService, type CreatedShipment } from './create-shipment.service.ts';
+import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { money } from '../../common/money.ts';
 
 export class AddressDto {
   @IsString() @IsNotEmpty() @MaxLength(120) name!: string;
@@ -59,7 +52,9 @@ export class CreateShipmentDto {
 @Controller('v1/shipments')
 @UseGuards(ApiKeyGuard)
 export class CreateShipmentController {
-  constructor(@Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService) {}
+  constructor(
+    @Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService,
+  ) {}
 
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'))

@@ -8,15 +8,12 @@
 
 import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import {
-  AuthenticationRequiredError,
-  PermissionDeniedError,
-} from '../../../common/domain-error.ts';
-import { verifySecret } from '../../../common/secret.ts';
-import { canAcceptShipments } from '../../merchant/domain/merchant.ts';
-import { FindCredentialService } from '../../merchant/application/find-credential.service.ts';
-import type { ApiPrincipal } from '../domain/api-principal.ts';
-import type { ApiScope } from '../../../common/scopes.ts';
+import { AuthenticationRequiredError, PermissionDeniedError } from '../../common/domain-error.ts';
+import { verifySecret } from '../../common/secret.ts';
+import { canAcceptShipments } from '../merchant/rules/merchant.ts';
+import { FindCredentialService } from '../merchant/find-credential.service.ts';
+import type { ApiPrincipal } from './rules/api-principal.ts';
+import type { ApiScope } from '../../common/scopes.ts';
 
 export const FIND_CREDENTIAL = Symbol('FIND_CREDENTIAL');
 

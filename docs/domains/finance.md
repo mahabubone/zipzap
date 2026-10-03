@@ -62,7 +62,7 @@ interface PaymentProvider {
 }
 ```
 
-Bank, mobile financial service, mock. Implementations in `infrastructure/`, importing nothing
+Bank, mobile financial service, mock. Implementations in `finance/provider/`, importing nothing
 from the domain. ZipZap is not a payment processor — the interface exists so providers can change
 without the domain noticing.
 

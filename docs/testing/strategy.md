@@ -2,20 +2,26 @@
 
 Four levels. Each exists because the level below cannot catch a class of bug.
 
-| Level           | Scope                              | Needs infra | Runs on       |
-| --------------- | ---------------------------------- | ----------- | ------------- |
-| **Unit**        | `domain/` only                     | no          | every commit  |
-| **Integration** | repositories, transactions, outbox | yes         | every PR      |
-| **API**         | HTTP → use case → Postgres         | yes         | every PR      |
-| **E2E**         | the full shipment lifecycle        | yes         | main, nightly |
+| Level           | Scope                                                  | Needs infra | Runs on       |
+| --------------- | ------------------------------------------------------ | ----------- | ------------- |
+| **Unit**        | `*.rules.ts` + services via `@nestjs/testing` (Vitest) | no          | every commit  |
+| **Integration** | repositories, transactions, outbox (live Postgres)     | yes         | every PR      |
+| **API**         | HTTP → service → Postgres                              | yes         | every PR      |
+| **E2E**         | the full shipment lifecycle                            | yes         | main, nightly |
 
 The first three run in CI on every push. E2E runs on `main` and nightly because it is slow and
 stateful — a suite that only runs nightly is a suite that is red when you are fixing something.
 
-## Unit — domain only
+## Unit — pure rules plus services, Vitest
 
-No container, no database, no mocks. The domain imports no framework precisely so this is
-possible.
+Two tiers, same runner (`*.spec.ts` colocated, node env):
+
+- **Rules**: no container, no database, no DI. `*.rules.ts` imports no framework precisely so
+  this is possible.
+- **Services**: `Test.createTestingModule` with `useMocker()` auto-mocks repositories and
+  collaborator services. This is the class the old runner could never run — instantiation of a
+  decorated class. Constructor params use explicit `@Inject()` on every param because esbuild
+  cannot emit the decorator metadata `tsc` would.
 
 Covered exhaustively:
 
