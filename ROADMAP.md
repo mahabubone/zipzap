@@ -1,14 +1,42 @@
 # ROADMAP.md
 
-Build order for ZipZap. Derived from the product spec; [`docs/product/roadmap.md`](docs/product/roadmap.md)
-covers the same phases from the product side.
+Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
+phase is not done until its gate passes.
 
-Each phase has an **exit gate** — a check you can run, not a feeling. A phase is not done until
-its gate passes.
+**Last updated:** 2026-10-02 · 4 commits · Phase 0 substantially complete, 1 open item
 
 ---
 
-## The spine: one shipment, end to end
+## How to read this
+
+| Marker                  | Meaning                                                        |
+| ----------------------- | -------------------------------------------------------------- |
+| ✅                      | Done and verified. The evidence is named.                      |
+| 🔲                      | Not started.                                                   |
+| ⚠️ **OPEN**             | Started, or claimed, but not actually finished.                |
+| ⛔ **Deliberately not** | A decision to skip it, with the trigger that would reverse it. |
+
+**A checkbox is only ticked when the thing is verifiable.** "Implemented" means there is a test,
+a migration, or a command that proves it. An unticked box is a to-do, not an oversight.
+
+The product view of these phases is in [docs/product/roadmap.md](docs/product/roadmap.md). This
+file is the build view and is the one to follow when implementing.
+
+---
+
+## Where we are
+
+| Phase                      | Scope                                                         | State                   |
+| -------------------------- | ------------------------------------------------------------- | ----------------------- |
+| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item |
+| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔲 next                 |
+| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔲                      |
+| **3 — Finance**            | cod · ledger · settlement                                     | 🔲                      |
+| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔲                      |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲                      |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲                      |
+
+**The spine: one shipment, end to end.**
 
 Everything in this roadmap exists to make this story demonstrable:
 
@@ -19,133 +47,636 @@ merchant creates order → pricing → pickup requested → rider assigned → r
 → COD reconciliation → settlement
 ```
 
-The same event must be visible in five places: merchant dashboard, operations console, rider
-app, customer tracking page, financial dashboard. That is the portfolio demo, and it is the
-acceptance test for the architecture. If the story does not run through all five, the phase
-that broke it is not done.
+The same event must be visible in five places simultaneously — merchant dashboard, operations
+console, rider app, customer tracking page, financial dashboard. **That simultaneity is the
+portfolio demonstration.** It is only possible if the module boundaries held, which means it is
+the acceptance test for the architecture, not just for the features.
 
 ---
 
-## Phase 0 — Foundation ✅ in progress
+## Rules that gate every phase
 
-Repo, documentation, ADRs, local infrastructure, CI.
+Five rules, in priority order. Everything else is negotiable. Full statements in
+[AGENTS.md](AGENTS.md).
 
-- pnpm + turbo monorepo; NestJS 12 backend with three entrypoints (api / worker / publisher)
-- PostgreSQL + PostGIS, Redis, NATS JetStream under `infra/compose`
-- Outbox table, error envelope, `Money` type, idempotency middleware — the four primitives
-  every module will need, built once
-- 18 domain docs, 14 ADRs, CI running lint + typecheck + test
+1. PostgreSQL is the transactional source of truth.
+2. Modules own their data and their business rules.
+3. Cross-module communication is an explicit contract — never an accidental table join.
+4. Events describe facts; jobs do work.
+5. Microservices are an extraction strategy, not a starting architecture.
 
-**Gate:** `pnpm i && docker compose -f infra/compose/docker-compose.yml up -d && pnpm db:migrate`
-from a clean clone, then all three processes boot and `/healthz` returns 200.
+**Enforcement, not documentation.** A rule that is only written down is a wish. Each phase's gate
+therefore includes a check that the rule is mechanically enforced — a test that fails when it is
+broken, or a grep in CI.
 
 ---
 
-## Phase 1 — Foundation domain
+## Phase 0 — Foundation
 
-Identity, merchant, shipment, tracking.
+### ✅ Delivered
 
-- Auth: sessions, API key + secret (hashed, rotatable, revocable), roles → permissions
-- Merchant lifecycle APPLIED → UNDER_REVIEW → VERIFIED → ACTIVE → SUSPENDED
-- Shipment aggregate + validated state machine (`DRAFT` → `CREATED`)
-- Immutable tracking events; public `/track/:trackingCode` read model
-- Outbox wired end to end: mutation → outbox row → publisher → NATS → consumer
+**Repository**
 
-**Gate:** create a shipment via API with an `Idempotency-Key`, replay the same key, get the
-original response and one row only. Kill the publisher, mutate, restart it, event lands exactly
-once.
+- [x] pnpm 11 workspaces + turbo 2.11 monorepo
+- [x] TypeScript 6.0.3 pinned — TS 7 ships `tsc` only and `@nestjs/cli` needs the compiler API
+- [x] Prettier as formatter; `noUnusedLocals` / `noUnusedParameters` in place of ESLint
+- [x] `pnpm verify` = format:check → typecheck → test, and it is green
+- [x] `.env.example` committed, `.env` gitignored, no secrets in history
+
+**Documentation** — 68 files
+
+- [x] `docs/product/` — vision, personas, surfaces, roadmap, glossary (5)
+- [x] `docs/architecture/` — overview, module-boundaries, database, eventing, state-machines,
+      money-and-ledger, extraction, **provider-adapters** (8)
+- [x] `docs/domains/` — index + one file per module, mirroring the module graph 1:1 (19)
+- [x] `docs/api/` — auth, versioning, errors, pagination, idempotency, bulk, webhooks,
+      rate-limits, index (9)
+- [x] `docs/operations/` — deployment, observability, reliability, retention-privacy,
+      performance, demo-scenarios (6)
+- [x] `docs/development/` — environment, workflow (2)
+- [x] `docs/testing/` — strategy, fixtures (2)
+- [x] **15 ADRs** recording what was rejected and why
+- [x] `prompt.txt` gitignored; the distilled docs are the source of truth
+
+**Local infrastructure** — `infra/compose`
+
+- [x] PostgreSQL 18 + PostGIS 3.6, with a healthcheck that runs a real spatial query
+- [x] Redis 8, NATS 2.11 with JetStream
+- [x] Mailpit (SMTP) and MinIO (S3) — **real** local implementations, not fakes
+- [x] Prometheus + Grafana behind an `observability` profile
+- [x] Host ports parameterised so it coexists with another stack on the same machine
+
+**Backend skeleton** — `apps/backend`, 27 TypeScript files
+
+- [x] Three entrypoints from one module graph: `main.ts` · `worker.ts` · `publisher.ts`
+- [x] **19 module schemas** created by migration, one per module
+- [x] Per-module TypeORM connection scoped to its own schema — the mechanical enforcement of
+      rule 2, so a cross-module query fails at runtime rather than in production
+- [x] `synchronize: false` in every environment, permanently
+- [x] Global transactional **outbox** with a partial index on unpublished rows
+- [x] **Outbox publisher** as the only process that touches NATS, draining with
+      `FOR UPDATE SKIP LOCKED`
+- [x] **`Money`** as integer minor units, with exact remainder allocation and no float anywhere
+- [x] **Domain errors** mapped once, in a single exception filter, to the §87 envelope; the
+      registry is asserted exhaustive by test
+- [x] **Idempotency** keyed per operation class and per merchant, request body hashed
+- [x] snake_case naming strategy, and an `int8`-only `pg` type parser
+- [x] `/healthz`, `/readyz`, Swagger at `/docs`
+
+**Provider fakes** — `infra/fakes`, 7 TypeScript files
+
+- [x] PayStation, contract-verified against the published documentation
+- [x] MiMSMS Bulk SMS API v2.1, contract-verified against the published Postman collection
+- [x] Scriptable faults, recorded calls with raw bodies, retrying IPN delivery
+- [x] Nothing invented — see the honesty rule below
+
+### ✅ Verification evidence
+
+Not "should work" — run and observed:
+
+| Check                                         | Result                                                                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `pnpm verify`                                 | green — 78 tests (37 backend + 41 fakes)                                                                              |
+| Migrations against real Postgres 18 + PostGIS | 4 applied, 19 schemas created                                                                                         |
+| **Append-only enforced**                      | event columns and `DELETE` rejected; publisher bookkeeping still writable                                             |
+| Three entrypoints boot                        | `/healthz` 200 · `/readyz` 200 · `/docs` 200                                                                          |
+| **Outbox → NATS proven live**                 | rows drained to `zipzap.shipment.delivered`, `zipzap.cod.collected`, `zipzap.settlement.completed`                    |
+| IPN retry ladder                              | failing receiver saw 3 identical IPNs, `delivered=false`; recovering receiver saw `[500, 500, 200]`, `delivered=true` |
+| Scripted outage                               | 503, 503, 202                                                                                                         |
+| Both provider contracts                       | `+8801…` rejected · 2-recipient `T` rejected · Bangla segmented as UCS-2                                              |
+
+### ⚠️ Open item
+
+- [ ] **CI workflow.** `.github/workflows/` does not exist. `pnpm verify` runs locally and is
+      green, but nothing enforces it on a pull request. This is the one gap between "Phase 0 is
+      designed" and "Phase 0 is complete". Until it exists, the phase gate below passes on a clean
+      clone but the _invariant_ is not protected against regression.
+
+### ⛔ Deliberately not done in Phase 0
+
+| Skipped                        | Why it can wait                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Frontend workspace packages    | ~60 files of boilerplate that the first real screen would rewrite. Building one vertical first gives a proven shape to clone. |
+| Git hooks / pre-commit         | CI is the right gate; local hooks are a fast-fail convenience on top of it.                                                   |
+| ESLint                         | `noUnusedLocals` + Prettier cover what applies. Add it when a rule cannot be expressed in either.                             |
+| Elasticsearch / search cluster | PostgreSQL search is sufficient until measured otherwise.                                                                     |
+| Read replicas                  | CQRS is logical here. Splitting reads from writes is a scale decision.                                                        |
+
+### Exit gate
+
+```bash
+git clone <repo> && cd zipzap
+corepack enable && pnpm install
+cp .env.example .env
+pnpm infra:up && pnpm db:migrate && pnpm dev
+curl -s localhost:3000/healthz   # 200
+curl -s localhost:3000/readyz    # 200
+pnpm verify                      # green
+```
+
+**Status: passes.** The CI workflow remains open.
+
+---
+
+## Phase 1 — Identity, merchant, shipment, tracking
+
+The minimum needed to accept an order and show where it is. Everything downstream is a consumer
+of these facts, which is why this phase is first and why finishing it properly is worth more than
+starting three more phases.
+
+### 🔲 `identity`
+
+- [ ] Schema `identity`: `users`, `identities`, `sessions`, `credentials`, `devices`, `roles`,
+      `permissions`, `role_permissions`
+- [ ] Two principal kinds, separately: **human** (session cookie) and **machine** (API key +
+      secret). A merchant API key must never open a browser session.
+- [ ] Password hashing with argon2id. Never MD5, SHA-1, or unsalted SHA-256.
+- [ ] API secrets hashed and compared, never stored raw. `last_used_at`, rotation, revocation.
+- [ ] Session rotation on privilege change — a role change invalidates live sessions.
+- [ ] Guard enforcing **permissions** (`shipment:create`, `settlement:approve`), never role names
+- [ ] **Tenant scoping derived from the principal**, never accepted from the request body
+- [ ] Role bundles: `PLATFORM_ADMIN`, `OPERATIONS_MANAGER`, `HUB_OPERATOR`, `SUPPORT_AGENT`,
+      `MERCHANT_OWNER`, `MERCHANT_OPERATOR`, `RIDER`
+- [ ] Audit events: login, failed login, logout, credential rotation, credential revocation
+- [ ] Migration + `docs/domains/identity.md` updated
+
+### 🔲 `merchant`
+
+- [ ] Schema `merchant`: `merchants`, `users`, `branches`, `addresses`, `contracts`,
+      `pricing_profiles`, `settlement_accounts`, `api_credentials`, `webhooks`
+- [ ] Lifecycle machine: `APPLIED → UNDER_REVIEW → VERIFIED → ACTIVE ⇄ SUSPENDED`
+- [ ] Suspension blocks new shipments and preserves in-flight ones
+- [ ] Scopes: `shipments:read/write`, `tracking:read`, `returns:write`, `settlements:read`,
+      `webhooks:manage`
+- [ ] Per-merchant rate limits from the contract
+- [ ] **No `balance` column here.** Balance is derived from the ledger in Phase 3.
+- [ ] Migration + doc
+
+### 🔲 `shipment` — the central aggregate
+
+- [ ] Schema `shipment`: `shipments`, `parcels`, `scans`
+- [ ] Value objects: tracking code, addresses, parcel dimensions, weight, money
+- [ ] **Non-sequential, non-guessable tracking codes** (`ZP-8F32A1`) with a unique index. A
+      guessable code is a customer-address enumeration vector on a public endpoint.
+- [ ] **Validated state machine** from the transition table in
+      [architecture/state-machines.md](docs/architecture/state-machines.md) — every `from` × `to`
+      pair tested, legal passes and everything else throws
+- [ ] Transitions serialise on the shipment row (`SELECT … FOR UPDATE`) so two simultaneous
+      scans cannot both advance the machine
+- [ ] **Exhaustive transition test** — the highest-value test in the repository
+- [ ] Every transition appends a scan _and_ a tracking event; one fact, one record
+- [ ] Idempotency-keyed creation
+- [ ] Frozen `pricing_version` at creation
+- [ ] Migration + doc
+
+### 🔲 `tracking`
+
+- [ ] Schema `tracking`: `events`, append-only, `REVOKE UPDATE, DELETE` **enforced by trigger**
+      — not by `REVOKE` from the owner, which is a no-op in PostgreSQL and was verified to be
+- [ ] `occurred_at` distinct from `recorded_at`; both needed for audit
+- [ ] Corrections are **new events** referencing the original, never rewrites
+- [ ] Public tracking projection built as a **separate read model** — the dangerous fields are
+      not present, so there is no query to get wrong
+- [ ] `GET /track/:trackingCode` with no account
+- [ ] Partitioning and retention from day one — this is the largest table in the system
+- [ ] Migration + doc
+
+### 🔲 `pricing`
+
+- [ ] Schema `pricing`: `rules`, `zones`, `weight_slabs`, `plans`, `merchant_profiles`,
+      `contracts`, `quotes`, `versions`
+- [ ] Itemised composition: base + weight + COD + remote area + handling + packaging + tax −
+      discount. A quote returns **every line**, never just a total.
+- [ ] Resolution order: default → merchant profile → volume discount → custom contract
+- [ ] **Deterministic**: same inputs + same version = same quote, always. No clock, no randomness,
+      no network calls inside the engine.
+- [ ] Versioned quotes; a shipment stores the version it used
+- [ ] **No hardcoded price in any handler**
+- [ ] Migration + doc
+
+### 🔲 Cross-module
+
+- [ ] `GET /v1/shipments` with cursor pagination, total ordering (`created_at DESC, id DESC`)
+- [ ] Error envelope on every failure path, mapped once
+- [ ] `Idempotency-Key` honoured and its response stored
+- [ ] OpenAPI generated; `packages/api-client` generated from it
+- [ ] Seed data: geography, one merchant, one credential
+
+### Exit gate
+
+- [ ] Create a shipment via `POST /v1/shipments` with an `Idempotency-Key`
+- [ ] Replay the same key with the same body → **original response, one row**
+- [ ] Replay the same key with a _different_ body → `400 INVALID_IDEMPOTENCY_KEY`
+- [ ] Kill the publisher, mutate, restart it → the event lands **exactly once**
+- [ ] Concurrent duplicate `Idempotency-Key` → exactly one shipment created
+- [ ] Attempt an invalid transition → `409 INVALID_TRANSITION`, and the state machine test proves
+      every illegal pair is rejected
+- [ ] Try to read another merchant's shipment → `404`, not `403` (no enumeration oracle)
+- [ ] `UPDATE tracking.events` and `DELETE FROM tracking.events` both rejected **by the database**
+- [ ] `pnpm verify` green; a cross-module table access **fails the build**
+
+### Risks
+
+| Risk                                      | Mitigation                                                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Identity scope creep into other modules   | Guards only; no module may read `identity` tables. A permission without tenant scope is a breach.         |
+| Shipment aggregate absorbing everything   | State machine, scans and tracking are separate modules with their own schemas.                            |
+| Tracking table outgrowing the design      | Partition by time from the first migration. Retrofitting partitioning on a live table is a night of pain. |
+| Idempotency added late and inconsistently | It is in `common/` already, with tests. It is not per-endpoint optional work.                             |
 
 ---
 
 ## Phase 2 — Logistics
 
-Pickup, rider, hub, manifest, network, delivery, returns.
+Movement. This is where the product stops being an order form and becomes a courier.
 
-- Pickup request → batching → rider assignment (deterministic and explainable, not "optimal")
-- Hub scan in / sort / dispatch; manifest sealing and reconciliation
-- PostGIS: Bangladesh hierarchy (division → district → upazila → union → ward), service areas,
-  serviceability check before a shipment may be created
-- Delivery attempts with structured failure reasons, OTP + photo proof of delivery
-- Return flow referencing the original shipment
+### 🔲 `network` — zones, routes, manifests, geo
 
-**Gate:** the flagship story runs to `DELIVERED` in a seeded network. The failure story runs
-too: refused → retry → refused → return → merchant receives it.
+- [ ] Bangladesh hierarchy: division → district → upazila → union → ward → delivery point
+- [ ] `geography(Point|MultiPolygon, 4326)`, **not** `geometry` — metres, not coordinate units
+- [ ] `GIST` index on every geometry column
+- [ ] **Coverage as data**: `serviceable`, `estimated_days`, `pickup_available`,
+      `delivery_available`, `COD_available`. Never `if (city === 'Dhaka')`.
+- [ ] Serviceability check **before** shipment creation, with a reason
+- [ ] Route → RouteLeg → Trip. Fixed topology first.
+- [ ] Manifest lifecycle `DRAFT → SEALED → DISPATCHED → RECEIVED → RECONCILED`
+- [ ] **A missing shipment at reconciliation becomes an exception.** Silence is never the answer.
+- [ ] Seed: 8 divisions, 64 districts, sample upazilas and hubs
+
+### 🔲 `pickup`
+
+- [ ] Schema `pickup`: `requests`, `batches`, `assignments`, `attempts`
+- [ ] First-class workflow, not an implicit side effect of shipment creation
+- [ ] **Batching**: one assignment covers many parcels. Bounded by count, weight, or time window.
+- [ ] Idempotency-keyed requests
+- [ ] `ExpirePickupRequest` scheduled job
+- [ ] Scan required per parcel to complete
+
+### 🔲 `rider`
+
+- [ ] Schema `rider`: `riders`, `profiles`, `devices`, `availability`, `assignments`,
+      `performance`
+- [ ] State `OFFLINE ⇄ AVAILABLE → ON_PICKUP / ON_DELIVERY`, `ON_BREAK`, `SUSPENDED`
+- [ ] Assignment scoring: distance, zone, location, capacity, workload, availability, vehicle,
+      priority, SLA
+- [ ] **Deterministic and explainable, not optimal.** Ties break on `rider_id`, never iteration
+      order. When a customer asks why the parcel went the long way, operations need an answer they
+      can read.
+- [ ] Devices revocable — cuts off offline sync from a lost phone
+- [ ] Performance metrics as projections, never written on a scan's hot path
+
+### 🔲 `hub`
+
+- [ ] Schema `hub`: `hubs`, `zones`, `staff`, `capacity`, `schedules`, `routes`
+- [ ] Types `REGIONAL_HUB` · `DISTRICT_HUB` · `LOCAL_HUB` · `DELIVERY_POINT`
+- [ ] Inbound scan-in → sort → destination; outbound dispatch batch → manifest → scan-out
+- [ ] Capacity modelled, so "hub backlog" is actionable rather than decorative
+- [ ] Discrepancies raise: received-not-on-manifest, manifested-not-received, received-twice
+
+### 🔲 `delivery`
+
+- [ ] Schema `delivery`: `jobs`, `attempts`, `proof`, `failure_reasons`
+- [ ] `CREATED → ASSIGNED → ACCEPTED → OUT_FOR_DELIVERY → ATTEMPTED → DELIVERED | FAILED`
+- [ ] **Structured failure reasons**, never free text — a free-text reason gives operations a
+      string to read and nothing to act on
+- [ ] Retryable vs terminal reasons distinguished. Retrying a wrong address burns rider time and
+      delays every parcel behind it.
+- [ ] Proof: OTP + photo + timestamp + GPS + rider identity. **Required** for `DELIVERED`.
+- [ ] Delivery confirmation idempotency-keyed
+- [ ] Proof media treated as sensitive customer data
+
+### 🔲 `returns`
+
+- [ ] Schema `returns`: `requests`, `approvals`, `transitions`, `reasons`
+- [ ] `RETURN_REQUESTED → APPROVED → INITIATED → IN_TRANSIT → AT_HUB → TO_MERCHANT → RETURNED`
+- [ ] **References the original shipment.** Never a second, unrelated parcel.
+- [ ] Forward lifecycle is never rewound — a delivered-then-returned shipment reached `DELIVERED`
+      first
+- [ ] Financial consequences as compensating entries via events, never calculated twice
+
+### Exit gate
+
+- [ ] The **flagship story** runs to `DELIVERED` in a seeded network
+- [ ] The **failure story** runs too: refused → retry → refused → return → merchant receives it
+- [ ] An unserviceable destination is rejected at creation with a reason
+- [ ] Two riders scanning simultaneously produce exactly one transition and one tracking event
+- [ ] A manifest missing a shipment raises an exception at reconciliation
+- [ ] Assignment is deterministic — the same inputs assign the same rider 100 times
+- [ ] Return creates a reversing ledger request, not a second parcel
+- [ ] `pnpm verify` green
+
+### Risks
+
+| Risk                                         | Mitigation                                                                                                   |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Rider assignment becoming a research project | Explicitly deterministic and explainable. Optimisation is Phase 5 with a named trigger.                      |
+| Hub console unusable on a loading dock       | Designed for gloves, glare, dropped connections, bursts. A bypassed scan is a parcel with no custody record. |
+| Geo data going stale                         | Upazila boundaries change. Stale boundaries produce confidently wrong serviceability.                        |
+| Scope: six modules at once                   | Ship the spine first — pickup → hub → delivery — then the rest.                                              |
 
 ---
 
 ## Phase 3 — Finance
 
-COD, ledger, settlement.
+Money. The phase where correctness stops being optional, because a bug here is not a bug — it is
+a disputed payment.
 
-- COD lifecycle `COD_EXPECTED` → `COLLECTED` → `RECONCILED` → `PAYABLE` → settled
-- Double-entry style ledger, append-only, corrections as compensating rows
-- Settlement batch → approval → payment initiation → confirmation → settled
-- Merchant balance derived from the ledger, never a mutable counter
-- Payment provider behind one interface; mock implementation first
+### 🔲 `cod`
 
-**Gate:** the ledger balances to the settlement total. Deliberately corrupt one COD collection;
-reconciliation raises an exception, and the compensating entry restores the balance with both
-original rows preserved.
+- [ ] Schema `cod`: `records`, `collections`, `reconciliation_runs`, `exceptions`
+- [ ] Lifecycle `COD_EXPECTED → COD_COLLECTED → COD_RECONCILED → COD_PAYABLE → SETTLEMENT_CREATED
+    → SETTLED`
+- [ ] Failures: `COLLECTION_FAILED` · `PARTIAL_COLLECTION` · `RECONCILIATION_EXCEPTION` ·
+      `SETTLEMENT_HOLD`
+- [ ] `bigint` columns, integer arithmetic, currency on every row
+- [ ] **Collection is idempotency-keyed** — the highest-value idempotency requirement in the
+      product, because it is the one that loses money
+- [ ] **Partial collection is a first-class outcome.** 125000 against 125050 expected is
+      `PARTIAL_COLLECTION`: recorded, reconciled, settled at the collected amount, shortfall
+      visible. Nobody reconciles it by hand and nobody invents the missing 50.
+- [ ] **Reconciliation mismatch blocks; it never auto-corrects.** An auto-corrected discrepancy is
+      a merchant quietly losing money, discovered weeks later.
+- [ ] `COD_EXPECTED` set at creation from the frozen quote — a promise, not a record. Overwriting
+      it destroys the measurement reconciliation depends on.
+
+### 🔲 `finance`
+
+- [ ] Schema `finance`: `accounts`, `ledger_entries`, `settlements`, `settlement_items`,
+      `settlement_batches`, `settlement_adjustments`, `provider_transactions`
+- [ ] **No `merchant.balance` column.** Balance is `SUM(direction * amount_minor)`.
+- [ ] Ledger append-only, enforced by trigger — `REVOKE` from the owner does nothing
+- [ ] Corrections are compensating entries; the wrong row stays visible
+- [ ] `direction` separate from the sign of the amount, so sign is never ambiguous and never
+      zero-ambiguous
+- [ ] `amount_minor > 0` check constraint
+- [ ] `reference_type` + `reference_id` on every entry — an untraceable entry is unauditable money
+- [ ] `occurred_at` distinct from `recorded_at`
+- [ ] Settlement is a **frozen view** of entries, not a recalculation. Late money goes to the next
+      settlement; an approved settlement is a contract.
+- [ ] Approval idempotency-keyed, permission-checked, audited — it moves real money, so it is
+      guarded three ways
+- [ ] `PaymentProvider` interface with a **mock** implementation first. ZipZap is not a payment
+      processor.
+- [ ] Rebalance test: the ledger sums to the settlement total, to the unit
+
+### 🔲 Return reversal
+
+- [ ] A returned parcel **reverses** its COD collection with a compensating entry
+- [ ] Both rows remain visible; the merchant reconciles collection against reversal
+
+### Exit gate
+
+- [ ] The ledger balances to the settlement total — asserted to the poisha
+- [ ] **Corrupt one COD collection deliberately** → reconciliation raises an exception, settlement
+      is blocked, a compensating entry restores the balance, and both original rows are preserved
+- [ ] Duplicate COD collect with the same key → one collection, original response returned
+- [ ] Partial collection settles at the collected amount with the shortfall reported
+- [ ] 10,000-shipment settlement allocation loses **zero** minor units (remainder test)
+- [ ] `UPDATE finance.ledger_entries` rejected by the database
+- [ ] `pnpm verify` green
+
+### Risks
+
+| Risk                                     | Mitigation                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| A counter reintroduced for performance   | The balance query is documented as the source. A projection is acceptable; a stored counter is not. |
+| Rounding quietly losing money            | Remainder allocation is explicit, tested, and sums exactly.                                         |
+| Auto-reconciliation hiding a discrepancy | Mismatch blocks settlement. This is the one behaviour that must not be optimised.                   |
+| Retention deleting financial evidence    | Ledger retention is long and separate from operational data. Partitioning, never `DELETE`.          |
 
 ---
 
 ## Phase 4 — Platform
 
-Public API v1, webhooks, bulk import, notifications, risk signals, developer portal.
+Self-service and integration. The point at which a merchant can run on ZipZap without talking to
+a human.
 
-- Full `/v1` surface, OpenAPI as a generated contract, `packages/api-client` from it
-- Webhooks with the retry ladder 1m → 5m → 15m → 1h → 6h → 24h and an immutable delivery log
-- Bulk CSV/XLSX import as an async job with preview and a downloadable result file
-- Notifications async (SMS / email / push / in-app), never inline in a request
-- Risk scoring as decision support, with visible signals — never an automated accusation
+### 🔲 Public API v1
 
-**Gate:** duplicate request rejected by idempotency; webhook endpoint down → retries exhausted
-→ failure recorded and merchant-visible; 10k-row import completes without a timeout.
+- [ ] Full `/v1` surface per [docs/api/_index.md](docs/api/_index.md)
+- [ ] API key auth with scopes and per-merchant rate limits
+- [ ] Cursor pagination on every unbounded collection, total ordering
+- [ ] Error envelope on every path, from the single filter
+- [ ] `RateLimit-*` headers, `Retry-After` on 429
+- [ ] OpenAPI generated; `packages/api-client` generated from it; both committed together
+- [ ] Contract tests asserting the spec matches observed behaviour
+
+### 🔲 Webhooks
+
+- [ ] Event subscriptions: `shipment.created` … `settlement.completed`
+- [ ] **HMAC-SHA256 over `{timestamp}.{raw_body}`** — the raw body, because re-serialising parsed
+      JSON changes key order and breaks verification. This is the most common integration bug.
+- [ ] Retry ladder 1m → 5m → 15m → 1h → 6h → 24h, then a visible failed state
+- [ ] 4xx is **not** retried — retrying a 400 forever is a DoS tool against our own infrastructure
+- [ ] Immutable delivery log: every attempt, success and failure
+- [ ] **Pause beats delete** — a merchant with a broken integration pauses, fixes, replays
+- [ ] Fast acknowledgement; work happens after the 2xx
+
+### 🔲 Bulk import
+
+- [ ] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
+- [ ] Stages: `PENDING → VALIDATING → PREVIEW → PROCESSING → COMPLETED | FAILED |
+    COMPLETED_WITH_ERRORS`
+- [ ] **Human preview checkpoint** — the first upload always has a column-mapping mistake, and
+      10,000 mis-mapped shipments is a support incident
+- [ ] Idempotent on **merchant invoice reference**, with row-level outcomes
+- [ ] CSV + XLSX in, CSV out
+- [ ] Chunked execution — one 10,000-row transaction holds locks on 10,000 rows
+- [ ] Downloadable result file, row by row
+
+### 🔲 `notification`
+
+- [ ] Schema `notification`: `templates`, `messages`, `deliveries`, `preferences`
+- [ ] Consume the event, enqueue a BullMQ job, send from the worker. **Never send inline.**
+- [ ] Idempotent on `(eventId, channel, recipient)` — a customer receiving two SMS is a real,
+      visible failure, worse than a late one
+- [ ] Versioned templates; the version is stored on the delivery row
+- [ ] Per-send throttling and quiet hours; a misconfigured trigger costs real money at national
+      volume in minutes
+- [ ] **Dead-letter only on carrier retry policy `0`.** `Absent subscriber for SM` carries policy
+      `3` — the carrier retries the handset. Dead-lettering on first failure discards messages
+      that were about to land, and a customer never learns their parcel arrived.
+- [ ] All parcel notifications sent as MiMSMS `transactionType: "T"` — never batched promotionally,
+      where DND would silently delay them
+- [ ] MiMSMS adapter: `8801XXXXXXXXX`, **not** `+8801…`. Number formatting for a provider is not
+      the same operation as normalisation for our records.
+
+### 🔲 Risk signals
+
+- [ ] Inputs: phone, prior shipments, deliveries, returns, refusals, merchant history, COD value,
+      destination
+- [ ] Output: `risk_score`, `risk_level`, `signals[]`
+- [ ] **Decision support for a human.** Never an automated block, never an accusation.
+- [ ] Signals stored and explained — a black-box score is not usable by the person who must act
+
+### 🔲 `support` + developer portal
+
+- [ ] Schema `support`: `tickets`, `messages`, `assignments`, `status_history`, `attachments`
+- [ ] Cross-domain reads via six explicit contracts, audited — **not** one six-table join
+- [ ] `LOST`, `DAMAGED`, `COD_RECONCILIATION_EXCEPTION` can open a ticket automatically
+- [ ] Developer portal: API keys, webhook config and logs, sandbox, examples
+
+### Exit gate
+
+- [ ] Duplicate request rejected by idempotency, returning the original response
+- [ ] Webhook endpoint down → retries on the ladder → terminal failed state visible to the merchant
+- [ ] 10,000-row import completes without a timeout and yields a downloadable row-level result
+- [ ] Webhook signature verifies over the **raw** body, asserted in a test
+- [ ] A merchant with only `shipments:write` cannot read settlements or delete a webhook
+- [ ] Notification provider outage → retries → dead-letter visible, and **the transaction that
+      triggered it still succeeded**
+- [ ] `pnpm verify` green
 
 ---
 
 ## Phase 5 — Advanced logistics
 
-Routing, serviceability depth, rider optimization, offline rider mode.
+Depth in the network model. Every item here has a trigger; none is needed for the flagship demo.
 
-- Network routing pickup zone → origin → regional → destination → delivery point
-- Offline-capable rider app with a durable local command queue, every command idempotent
-- Rider assignment scoring by distance, capacity, workload, SLA
-- Timezone- and holiday-aware SLA calculation (Asia/Dhaka)
+### 🔲 Routing and serviceability
 
-**Gate:** rider completes a full day of jobs in airplane mode, reconnects, and the server
-rejects every duplicate while applying each command exactly once.
+- [ ] Network routing: pickup zone → origin → regional → destination → delivery point
+- [ ] Timezone- and holiday-aware SLA. **Asia/Dhaka**, with cutoff times and a holiday calendar.
+- [ ] Serviceability depth: capacity-aware and multi-stop rider routing
+
+### 🔲 Rider optimisation
+
+- [ ] Workload and capacity-aware assignment
+- [ ] Utilisation as a measured KPI, then optimised — **in that order**
+
+### 🔲 Offline rider mode
+
+- [ ] Local-first app: every mutating action goes through the local queue, not just the last few
+- [ ] Durable local storage with its own integrity story — a cleared cache loses queued scans
+- [ ] Ordered replay by `created_at`; a command that is no longer valid is **rejected explicitly**
+      and reported back to the device. Silently dropping it leaves the rider believing a scan
+      succeeded that did not.
+- [ ] Storage cap and alert — a device offline indefinitely grows without bound
+
+### Exit gate
+
+- [ ] A rider completes a full day of jobs in airplane mode, reconnects, and the server rejects
+      every duplicate while applying each command exactly once
+- [ ] A cancelled-while-offline shipment's scan is explicitly rejected, not silently dropped
+- [ ] Assignment improves a measured utilisation KPI, with the before/after recorded
+- [ ] `pnpm verify` green
 
 ---
 
 ## Phase 6 — Operations
 
-Control tower, analytics projections, observability maturity, simulation, load testing.
+Running it at volume, and proving it.
 
-- Control tower: live map, assignment, rerouting, holds, exceptions
-- Analytics projections from the event stream, never slowing a transaction
-- Simulation engine (`simulate shipment ZP-8F32A1 --scenario customer-refused`) and seed data
-- Load tests against the targets in `docs/operations/performance.md`
+### 🔲 Control tower
 
-**Gate:** a new engineer can clone, seed, and reproduce the flagship story and the failure story
-from the docs alone, in under 30 minutes.
+- [ ] Live counts: today's shipments, active pickups, in transit, at hub, out for delivery,
+      delivered, failed, returned, COD outstanding, riders online, hub backlog
+- [ ] Live map of hubs, riders, destinations
+- [ ] Actions: inspect, assign pickup, assign/reassign rider, transfer, hold, release, initiate
+      return, inspect attempt, inspect COD, raise a ticket
+- [ ] `apps/desktop` Electron shell over the console
+
+### 🔲 Analytics
+
+- [ ] Projections fed by events, fed by nothing else
+- [ ] **Rebuildable from scratch.** `analytics:rebuild` must work. If it does not, the projection
+      has become authoritative by accident, and that is the bug to fix first.
+- [ ] KPIs with their formulas and their source events documented
+- [ ] Every dashboard showing a money figure says so, or reads from finance
+- [ ] PostgreSQL search first; a search cluster only when measured insufficient
+
+### 🔲 Simulation and seed
+
+- [ ] `simulate shipment ZP-8F32A1 --scenario <name>`
+- [ ] Scenarios: `delivered` · `failed-then-delivered` · `customer-refused` · `returned` · `lost`
+      · `damaged`
+- [ ] The simulator goes through the **real state machine and the real outbox.** A simulator that
+      writes statuses directly can demo a transition the product cannot perform.
+- [ ] Seed profiles: `demo` (small) and `load` (100 merchants, 1,000 customers, 100 riders,
+      20 hubs, 10,000 shipments), deterministic from a fixed seed
+
+### 🔲 Observability maturity
+
+- [ ] `/metrics` on all three entrypoints
+- [ ] Dashboards: API, database, eventing, workers, business, operations
+- [ ] Alerts on symptoms, not causes: `outbox_pending`, `nats_consumer_lag` growing, 5xx rate,
+      pool saturation, job failures, **and COD collection dropping to ~0 in business hours** —
+      a business outage no 5xx rate will show
+- [ ] Metric cardinality controlled: never label by shipment id, rider id, request id, or a URL
+      containing an id
+- [ ] Every alert links to a dashboard
+
+### 🔲 Load testing
+
+- [ ] Shipment creation · tracking · merchant dashboard · bulk import · webhook processing
+- [ ] Measure RPS, p50/p95/p99, DB utilisation, queue lag, event processing rate
+- [ ] **Replace the targets in [docs/operations/performance.md](docs/operations/performance.md)
+      with measurements.** Those numbers are currently hypotheses, and the first honest thing to do
+      with them is run this test.
+
+### Exit gate
+
+- [ ] A new engineer clones, seeds, and reproduces both the flagship and failure stories **from
+      the docs alone**, in under 30 minutes
+- [ ] `analytics:rebuild` reproduces every projection exactly
+- [ ] Every reliability scenario in [docs/operations/reliability.md](docs/operations/reliability.md)
+      induced and asserted: Postgres down, Redis down, NATS down, publisher killed, worker killed,
+      duplicate event, duplicate request, rider reconnect, duplicate settlement
+- [ ] Performance targets replaced by measured numbers
+- [ ] `pnpm verify` green
+
+---
+
+## Cross-cutting workstreams
+
+These run across phases rather than inside one.
+
+### Provider integrations
+
+- [x] Fakes for PayStation and MiMSMS, both contract-verified
+- [ ] `PaymentProvider` adapter for PayStation — in-band errors, money conversion, status mapping
+- [ ] `NotificationChannel` adapter for MiMSMS — `8801…` formatting, `T` vs `P`, DLR retry policy
+- [ ] Fault injection wired into CI so failure paths are exercised on every run
+- [ ] Contract tests against real sandboxes before go-live — **a passing fake proves the wiring,
+      not the integration**
+- [ ] Mailpit wired for email; MinIO for proof-of-delivery media
+
+### CI/CD
+
+- [ ] ⚠️ **Pull request workflow** — the one open Phase 0 item
+- [ ] Format → lint → typecheck → unit → integration → build → container → security scan
+- [ ] Integration tests with Testcontainers: Postgres, Redis, NATS
+- [ ] Module-boundary grep enforced in CI, not just documented
+- [ ] Migration applied and rolled back in CI against a real database
+- [ ] Container build and a deploy path to a single VPS
+
+### Security
+
+- [ ] Secrets from a secret store, never in an image or a committed `.env`
+- [ ] Rate limiting fails **closed on writes**, open on reads
+- [ ] Argon2id; constant-time comparison on every secret and signature
+- [ ] Customer data access audited on **read**, not merely restricted
+- [ ] `REQUEST_ID` correlation from the edge through every log and span
+- [ ] Dependency audit in CI; Renovate for updates
 
 ---
 
 ## Deliberately deferred
 
-Do not build these until a phase gate above forces the issue. Each has a named trigger.
+Do not build these until a phase gate above forces the issue. Each has a named trigger — the
+trigger is the point, not the deferral.
 
-| Deferred                            | Trigger                                                           |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| k3s / Kubernetes                    | single-VPS deployment stops being enough                          |
-| OpenSearch / Elasticsearch          | PostgreSQL search measurably insufficient                         |
-| Object storage (S3)                 | proof-of-delivery media exceeds local disk                        |
-| Merchant SDKs (TS, Go, PHP, Python) | a third-party integration actually asks for one                   |
-| Warehouse + packaging domains       | a real merchant needs fulfilment, not just delivery               |
-| Optimal routing / VRP               | rider-utilisation KPI becomes the business constraint             |
-| Read replicas, CQRS split           | reporting load degrades transactional latency                     |
-| Microservices                       | a module needs independent scaling, deployment, or team ownership |
+| Deferred                           | Trigger                                                          | Why it is safe to wait                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Kubernetes / k3s                   | Sustained resource pressure, or the database must leave the host | One VPS is cheaper and simpler; a cluster is operational surface with no problem to spend it on      |
+| Elasticsearch / OpenSearch         | A measured search query is insufficient                          | `pg_trgm` + `tsvector` + GIN handles tracking-code, phone and name at this scale                     |
+| Read replicas, CQRS split          | Reporting load degrades transactional latency                    | CQRS is logical today; splitting introduces replication lag where we promised strong consistency     |
+| Warehouse + packaging domains      | A merchant needs fulfilment, not just delivery                   | A different business with a different lifecycle, competing with the one that proves the architecture |
+| Optimal routing / VRP              | Rider utilisation becomes the binding business constraint        | Deterministic and explainable beats marginally better and unexplainable                              |
+| Second payment gateway             | A merchant asks for one                                          | The integration layer is exercised by one; a second adds maintenance and no insight                  |
+| Merchant SDKs (TS, Python, PHP)    | A third-party integration actually asks for one                  | Generated `packages/api-client` covers our own surfaces today                                        |
+| Additional markets                 | Bangladesh is working end to end                                 | A second market is the real test of whether the model is general or merely local                     |
+| Read-your-own-writes for consumers | A consumer genuinely needs it                                    | Costs an extra hop; NATS is already seconds-level                                                    |
 
 ---
 
@@ -155,8 +686,22 @@ A reviewer should be able to answer, unprompted:
 
 - [ ] What problem does ZipZap solve?
 - [ ] How does a shipment actually move, and where does that logic live?
-- [ ] How does COD money stay correct, and what happens on a duplicate collect?
-- [ ] How does a duplicate request fail safely?
+- [ ] How does COD money stay correct?
+- [ ] What happens on a duplicate request?
 - [ ] How does an outage degrade instead of corrupting?
 - [ ] Why these technologies, and what was rejected?
 - [ ] How would this become services without a rewrite?
+
+That is the definition of done for the portfolio, and it is a test of the documentation as much
+as of the code.
+
+---
+
+## Keeping this document current
+
+- Update **Last updated** and the phase table whenever a gate passes or a phase starts.
+- Tick a checkbox only when the thing is **verifiable** — a test, a migration, or a command.
+- If a phase's scope changes, record it in the relevant ADR rather than rewriting history here.
+- New deferred item? Add it to the deferred table **with its trigger**. A deferral without a
+  trigger is just a postponement.
+- A gate that can no longer be run as written is a stale gate. Fix the gate before trusting it.
