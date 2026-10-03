@@ -6,7 +6,7 @@
  * a trust-boundary concern and belongs at the edge.
  */
 
-import { Body, Controller, Headers, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   IsInt,
@@ -59,7 +59,7 @@ export class CreateShipmentDto {
 @Controller('v1/shipments')
 @UseGuards(ApiKeyGuard)
 export class CreateShipmentController {
-  constructor(private readonly createShipment: CreateShipmentService) {}
+  constructor(@Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService) {}
 
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'))

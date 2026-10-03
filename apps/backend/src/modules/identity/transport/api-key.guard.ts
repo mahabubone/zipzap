@@ -6,7 +6,7 @@
  * merchantId from the request.
  */
 
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import { hasScope, type ApiPrincipal } from '../domain/api-principal.ts';
 import { PermissionDeniedError } from '../../../common/domain-error.ts';
@@ -19,7 +19,7 @@ export interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  constructor(private readonly authenticate: AuthenticateApiKeyService) {}
+  constructor(@Inject(AuthenticateApiKeyService) private readonly authenticate: AuthenticateApiKeyService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();

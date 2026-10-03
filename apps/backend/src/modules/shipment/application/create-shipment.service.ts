@@ -15,7 +15,7 @@
  * The transaction boundary lives here, in the application layer. No repository opens its own.
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
@@ -59,8 +59,8 @@ const RESPONSE_META = { statusCode: 201 };
 export class CreateShipmentService {
   constructor(
     @InjectDataSource('shipment') private readonly shipmentDataSource: DataSource,
-    private readonly shipments: ShipmentRepository,
-    private readonly tracking: AppendTrackingEventService,
+    @Inject(ShipmentRepository) private readonly shipments: ShipmentRepository,
+    @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
   ) {}
 
   async execute(command: CreateShipmentCommand): Promise<{

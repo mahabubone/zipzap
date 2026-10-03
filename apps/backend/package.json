@@ -12,12 +12,13 @@
     "start:worker": "node --env-file-if-exists=../../.env dist/worker.js",
     "start:publisher": "node --env-file-if-exists=../../.env dist/publisher.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --experimental-transform-types --test \"test/*.test.ts\"",
+    "test": "vitest run",
     "db:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "db:migrate": "node --env-file-if-exists=../../.env dist/database/cli.js migrate",
     "db:revert": "node --env-file-if-exists=../../.env dist/database/cli.js revert",
     "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed",
-    "test:integration": "node --experimental-transform-types --test \"test/integration/*.test.ts\""
+    "test:integration": "node --experimental-transform-types --test \"test/integration/*.test.ts\"",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",
@@ -35,9 +36,11 @@
   },
   "devDependencies": {
     "@nestjs/cli": "12.0.8",
+    "@nestjs/testing": "^12.1.2",
     "@types/express": "^5.0.6",
     "@types/node": "24.10.1",
     "@types/pg": "^8.23.1",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^5.0.3"
   }
 }
