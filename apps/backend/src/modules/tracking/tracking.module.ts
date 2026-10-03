@@ -11,7 +11,10 @@ import { ShipmentModule } from '../shipment/shipment.module.ts';
   // Cycle is inherent, not accidental: shipment writes tracking history through
   // AppendTrackingEventService (shipment -> tracking), while the consumer resolves public codes
   // back through ShipmentLookup (tracking -> shipment). forwardRef on both edges.
-  imports: [forModule('tracking', [TrackingEventEntity, PublicTimelineEntity]), forwardRef(() => ShipmentModule)],
+  imports: [
+    forModule('tracking', [TrackingEventEntity, PublicTimelineEntity]),
+    forwardRef(() => ShipmentModule),
+  ],
   controllers: [PublicTrackingController],
   providers: [AppendTrackingEventService, TrackingConsumer],
   exports: [AppendTrackingEventService, TrackingConsumer],

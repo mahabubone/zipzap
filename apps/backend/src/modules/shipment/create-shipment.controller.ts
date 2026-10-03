@@ -9,6 +9,7 @@
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -46,6 +47,12 @@ export class CreateShipmentDto {
   /** Money as integer minor units. A decimal here is a bug, not a convenience. */
   @IsOptional() @IsInt() @IsPositive() codAmountMinor?: number;
   @IsOptional() @Matches(/^[A-Z]{3}$/) codCurrency?: string;
+
+  @IsString() @MaxLength(80) zone!: string;
+  @IsBoolean() remoteArea!: boolean;
+  @IsBoolean() fragile!: boolean;
+  @IsOptional() @IsString() @MaxLength(40) packagingKind?: string;
+  @IsString() @MaxLength(40) merchantPlan!: string;
 }
 
 @ApiTags('shipments')
@@ -74,6 +81,11 @@ export class CreateShipmentController {
     const { result, replayed } = await this.createShipment.execute({
       // merchantId comes from the credential, never from the body.
       merchantId: principal.merchantId!,
+      merchantPlan: body.merchantPlan,
+      zone: body.zone,
+      remoteArea: body.remoteArea,
+      fragile: body.fragile,
+      packagingKind: body.packagingKind ?? null,
       idempotencyKey: idempotencyKey.trim(),
       actorId: null,
       sender: { name: body.senderName, phone: body.senderPhone, line: body.senderAddress },

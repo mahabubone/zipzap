@@ -6,11 +6,17 @@ import { CreateShipmentService } from './create-shipment.service.ts';
 import { ShipmentLookup, SHIPMENT_LOOKUP } from './shipment.lookup.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
+import { PricingModule } from '../pricing/pricing.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 import { CreateShipmentController } from './create-shipment.controller.ts';
 
 @Module({
-  imports: [forModule('shipment', [ShipmentEntity]), forwardRef(() => TrackingModule), IdentityModule],
+  imports: [
+    forModule('shipment', [ShipmentEntity]),
+    forwardRef(() => TrackingModule),
+    PricingModule,
+    IdentityModule,
+  ],
   controllers: [CreateShipmentController],
   providers: [
     ShipmentRepository,

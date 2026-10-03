@@ -109,10 +109,16 @@ describe('TrackingConsumer dispatch', () => {
   });
 
   it('ignores unknown types, missing identity, SILENT types, and malformed payloads', async () => {
-    expect(await consumer.handle(message('SomethingElseHappened', { shipmentId: 's-1' }))).toBe('ignored');
+    expect(await consumer.handle(message('SomethingElseHappened', { shipmentId: 's-1' }))).toBe(
+      'ignored',
+    );
     expect(await consumer.handle(message('DeliveryOutForDelivery', {}))).toBe('ignored');
-    expect(await consumer.handle(message('DeliveryJobCreated', { shipmentId: 's-1' }))).toBe('ignored');
-    expect(await consumer.handle({ subject: 'x', payload: new TextEncoder().encode('{nope') })).toBe('malformed');
+    expect(await consumer.handle(message('DeliveryJobCreated', { shipmentId: 's-1' }))).toBe(
+      'ignored',
+    );
+    expect(
+      await consumer.handle({ subject: 'x', payload: new TextEncoder().encode('{nope') }),
+    ).toBe('malformed');
     expect(projected).toHaveLength(0);
   });
 

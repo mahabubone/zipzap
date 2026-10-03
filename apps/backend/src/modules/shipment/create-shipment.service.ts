@@ -25,6 +25,7 @@ import { InvalidIdempotencyKeyError } from '../../common/domain-error.ts';
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
+import { PricingService } from '../pricing/pricing.service.ts';
 import {
   createShipment,
   generateTrackingCode,
@@ -36,6 +37,11 @@ import { AppendTrackingEventService } from '../tracking/append-tracking-event.se
 
 export interface CreateShipmentCommand {
   readonly merchantId: string;
+  readonly merchantPlan: string;
+  readonly zone: string;
+  readonly remoteArea: boolean;
+  readonly fragile: boolean;
+  readonly packagingKind: string | null;
   readonly sender: Address;
   readonly recipient: Address;
   readonly parcel: Parcel;
@@ -61,6 +67,7 @@ export class CreateShipmentService {
     @InjectDataSource('shipment') private readonly shipmentDataSource: DataSource,
     @Inject(ShipmentRepository) private readonly shipments: ShipmentRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
+    @Inject(PricingService) private readonly pricing: PricingService,
   ) {}
 
   async execute(command: CreateShipmentCommand): Promise<{
@@ -74,6 +81,11 @@ export class CreateShipmentService {
       parcel: command.parcel,
       cod: command.cod?.amountMinor ?? 0,
       currency: command.cod?.currency ?? 'BDT',
+      merchantPlan: command.merchantPlan,
+      zone: command.zone,
+      remoteArea: command.remoteArea,
+      fragile: command.fragile,
+      packagingKind: command.packagingKind,
     });
 
     return this.shipmentDataSource.transaction(async (manager) => {
@@ -98,6 +110,20 @@ export class CreateShipmentService {
       }
 
       // DRAFT -> CREATED, validated. A caller cannot set a status directly.
+      // The quote is computed BEFORE the transaction: pricing is read-only and deterministic,
+      // so it needs no lock — and quoting inside the transaction would hold it open while
+      // resolving a version row it never writes.
+      const quote = await this.pricing.quote({
+        weightGrams: command.parcel.weightGrams,
+        codAmountMinor: command.cod?.amountMinor ?? 0,
+        zone: command.zone,
+        remoteArea: command.remoteArea,
+        fragile: command.fragile,
+        packagingKind: command.packagingKind,
+        merchantPlan: command.merchantPlan,
+        currency: command.cod?.currency,
+      });
+
       const draft = createShipment({
         id: randomUUID(),
         merchantId: command.merchantId,
@@ -106,6 +132,7 @@ export class CreateShipmentService {
         parcel: command.parcel,
         cod: command.cod ?? money(0),
         trackingCode: generateTrackingCode(),
+        pricingVersion: quote.version,
       });
       const shipment = transition(draft, 'CREATED');
 

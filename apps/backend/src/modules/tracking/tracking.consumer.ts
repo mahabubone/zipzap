@@ -66,9 +66,7 @@ export class TrackingConsumer {
   async handle(message: { subject: string; payload: Uint8Array }): Promise<ConsumeOutcomeResult> {
     let envelope: TrackingEnvelope;
     try {
-      envelope = JSON.parse(
-        Buffer.from(message.payload).toString('utf8'),
-      ) as TrackingEnvelope;
+      envelope = JSON.parse(Buffer.from(message.payload).toString('utf8')) as TrackingEnvelope;
     } catch {
       // An unparseable message must not kill the consumer loop.
       this.logger.error({ subject: message.subject }, 'unparseable event payload');

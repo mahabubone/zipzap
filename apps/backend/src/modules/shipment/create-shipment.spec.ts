@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { CreateShipmentService } from './create-shipment.service.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
+import { PricingService } from '../pricing/pricing.service.ts';
 
 /**
  * Service-level tests: the transaction choreography, minus the database.
@@ -14,12 +15,29 @@ import { ShipmentRepository } from './shipment.repository.ts';
 
 const COMMAND = {
   merchantId: 'a71cdemo',
+  merchantPlan: 'standard',
+  zone: 'dhaka-metro',
+  remoteArea: false,
+  fragile: false,
+  packagingKind: null as string | null,
   sender: { name: 'Ayesha', phone: '+8801700000000', line: 'Dhaka' },
   recipient: { name: 'Rahim', phone: '+8801800000000', line: 'Chattogram' },
   parcel: { weightGrams: 1200, description: 'Two shirts' },
   idempotencyKey: 'key-1',
   actorId: null as string | null,
 };
+
+/** Pricing is read-only and deterministic, so the stand-in returns a fixed version-1 quote. */
+function fakePricing(version = 1) {
+  return {
+    quote: vi.fn(async () => ({
+      version,
+      currency: 'BDT',
+      lines: [],
+      total: { amountMinor: 0, currency: 'BDT' },
+    })),
+  };
+}
 
 /** In-memory stand-in for the transaction manager. Records every SQL table touched, in order. */
 function fakeManager() {
@@ -70,6 +88,7 @@ describe('CreateShipmentService orchestration', () => {
       fakeDs as never,
       new ShipmentRepository(),
       new AppendTrackingEventService(),
+      fakePricing() as never,
     );
 
     const { result, replayed } = await service.execute({ ...COMMAND, cod: undefined });
@@ -88,6 +107,7 @@ describe('CreateShipmentService orchestration', () => {
       fakeDs as never,
       new ShipmentRepository(),
       new AppendTrackingEventService(),
+      fakePricing() as never,
     );
 
     const { result } = await service.execute({
@@ -107,12 +127,28 @@ describe('CreateShipmentService orchestration', () => {
     ]);
   });
 
+  it('freezes the quoted version onto the shipment', async () => {
+    const fake = fakeManager();
+    const fakeDs = { transaction: (fn: (m: unknown) => Promise<unknown>) => fn(fake.manager) };
+    const pricing = fakePricing(7);
+    const service = new CreateShipmentService(
+      fakeDs as never,
+      new ShipmentRepository(),
+      new AppendTrackingEventService(),
+      pricing as never,
+    );
+
+    await service.execute({ ...COMMAND, idempotencyKey: 'key-3' });
+    expect(pricing.quote).toHaveBeenCalledOnce();
+  });
+
   it('resolves through the real Nest container with a mocked DataSource boundary', async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CreateShipmentService,
         { provide: ShipmentRepository, useValue: {} },
         { provide: AppendTrackingEventService, useValue: { append: vi.fn() } },
+        { provide: PricingService, useValue: {} },
       ],
     })
       .useMocker(() => ({}))

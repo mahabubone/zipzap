@@ -29,10 +29,7 @@ export class ShipmentRepository {
    * shipment, which the consumer treats as ignorable rather than fatal — a missing parcel is
    * an operations problem, never a consumer-crash problem.
    */
-  async findTrackingCode(
-    manager: EntityManager,
-    shipmentId: string,
-  ): Promise<string | null> {
+  async findTrackingCode(manager: EntityManager, shipmentId: string): Promise<string | null> {
     const row = await manager
       .createQueryBuilder(ShipmentEntity, 's')
       .select('s.trackingCode', 'trackingCode')

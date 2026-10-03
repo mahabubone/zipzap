@@ -8,6 +8,7 @@ import { TrackingModule } from './modules/tracking/tracking.module.ts';
 import { PickupModule } from './modules/pickup/pickup.module.ts';
 import { RiderModule } from './modules/rider/rider.module.ts';
 import { DeliveryModule } from './modules/delivery/delivery.module.ts';
+import { PricingModule } from './modules/pricing/pricing.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -26,6 +27,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module.ts';
     PickupModule,
     RiderModule,
     DeliveryModule,
+    PricingModule,
   ],
   controllers: [HealthController],
 })

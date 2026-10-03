@@ -79,6 +79,22 @@ export class PickupNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class PricingVersionNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'PRICING_VERSION_NOT_FOUND',
+    status: 409,
+    title: 'Pricing version not found',
+  } satisfies DomainErrorSpec;
+
+  constructor(readonly version: number | null) {
+    super(
+      version === null
+        ? 'No active pricing version exists.'
+        : `No pricing version ${version} exists.`,
+    );
+  }
+}
+
 export class InvalidBatchError extends DomainError {
   readonly spec = {
     code: 'INVALID_BATCH',
@@ -175,6 +191,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [ResourceNotFoundError, new ResourceNotFoundError().spec],
   [ShipmentNotFoundError, new ShipmentNotFoundError().spec],
   [PickupNotFoundError, new PickupNotFoundError().spec],
+  [PricingVersionNotFoundError, new PricingVersionNotFoundError(null).spec],
   [InvalidBatchError, new InvalidBatchError('reason').spec],
   [DuplicateRequestError, new DuplicateRequestError().spec],
   [InvalidIdempotencyKeyError, new InvalidIdempotencyKeyError().spec],

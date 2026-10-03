@@ -21,6 +21,9 @@ import { money } from '../../dist/common/money.js';
 import { CreateShipmentService } from '../../dist/modules/shipment/create-shipment.service.js';
 import { ShipmentRepository } from '../../dist/modules/shipment/shipment.repository.js';
 import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
+import { PricingService } from '../../dist/modules/pricing/pricing.service.js';
+import { PricingRepository } from '../../dist/modules/pricing/pricing.repository.js';
+import { PricingVersionEntity } from '../../dist/modules/pricing/pricing-version.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
@@ -32,10 +35,16 @@ const describeIfDb = databaseUrl ? describe : describe.skip;
 let shipmentDb: DataSource;
 let trackingDb: DataSource;
 let systemDb: DataSource;
+let pricingDb: DataSource;
 let service: CreateShipmentService;
 
 const command = (key: string) => ({
   merchantId: randomUUID(),
+  merchantPlan: 'standard',
+  zone: 'dhaka-metro',
+  remoteArea: false,
+  fragile: false,
+  packagingKind: null as string | null,
   sender: { name: 'Ayesha', phone: '+8801700000000', line: 'Dhaka' },
   recipient: { name: 'Rahim', phone: '+8801800000000', line: 'Chattogram' },
   parcel: { weightGrams: 1200, description: 'Two shirts' },
@@ -52,11 +61,13 @@ before(async () => {
     PublicTimelineEntity,
   ]);
   systemDb = await connectModuleDataSource('system', []);
+  pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
 
   service = new CreateShipmentService(
     shipmentDb,
     new ShipmentRepository(),
     new AppendTrackingEventService(),
+    new PricingService(pricingDb, new PricingRepository()),
   );
 });
 
@@ -64,6 +75,7 @@ after(async () => {
   await shipmentDb?.destroy();
   await trackingDb?.destroy();
   await systemDb?.destroy();
+  await pricingDb?.destroy();
 });
 
 describeIfDb('CreateShipment — one transaction, four writes', () => {
@@ -113,6 +125,14 @@ describeIfDb('CreateShipment — one transaction, four writes', () => {
     Object.assign(exploding, {
       shipmentDataSource: shipmentDb,
       shipments: new ShipmentRepository(),
+      pricing: {
+        quote: async () => ({
+          version: 1,
+          currency: 'BDT',
+          lines: [],
+          total: { amountMinor: 0, currency: 'BDT' },
+        }),
+      },
       tracking: {
         append: async () => {
           throw new Error('simulated failure after the aggregate insert');
