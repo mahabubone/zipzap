@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-02 · 4 commits · Phase 0 substantially complete, 1 open item
+**Last updated:** 2026-10-04 · COD collect + ledger + settlement proven live end to end
 
 ---
 
@@ -26,15 +26,15 @@ file is the build view and is the one to follow when implementing.
 
 ## Where we are
 
-| Phase                      | Scope                                                         | State                   |
-| -------------------------- | ------------------------------------------------------------- | ----------------------- |
-| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item |
-| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔲 next                 |
-| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔲                      |
-| **3 — Finance**            | cod · ledger · settlement                                     | 🔲                      |
-| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔲                      |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲                      |
-| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲                      |
+| Phase                      | Scope                                                         | State                                                     |
+| -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
+| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                   |
+| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live        |
+| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 in progress: pickup, rider, delivery live-proven       |
+| **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven |
+| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔲                                                        |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲                                                        |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲                                                        |
 
 **The spine: one shipment, end to end.**
 
@@ -226,7 +226,7 @@ starting three more phases.
 - [ ] **Exhaustive transition test** — the highest-value test in the repository
 - [ ] Every transition appends a scan _and_ a tracking event; one fact, one record
 - [ ] Idempotency-keyed creation
-- [ ] Frozen `pricing_version` at creation
+- [x] Frozen `pricing_version` at creation — via PricingService, proven live 2026-10-03
 - [ ] Migration + doc
 
 ### 🔲 `tracking`
@@ -241,18 +241,20 @@ starting three more phases.
 - [ ] Partitioning and retention from day one — this is the largest table in the system
 - [ ] Migration + doc
 
-### 🔲 `pricing`
+### ✅ `pricing` — shipped 2026-10-03
 
-- [ ] Schema `pricing`: `rules`, `zones`, `weight_slabs`, `plans`, `merchant_profiles`,
-      `contracts`, `quotes`, `versions`
-- [ ] Itemised composition: base + weight + COD + remote area + handling + packaging + tax −
+- [x] Schema `pricing`: `versions` (frozen rule rows). Quotes are computed, not stored — storing
+      the version number on the shipment is the dispute evidence.
+- [x] Itemised composition: base + weight + COD + remote area + handling + packaging + tax −
       discount. A quote returns **every line**, never just a total.
-- [ ] Resolution order: default → merchant profile → volume discount → custom contract
-- [ ] **Deterministic**: same inputs + same version = same quote, always. No clock, no randomness,
-      no network calls inside the engine.
-- [ ] Versioned quotes; a shipment stores the version it used
-- [ ] **No hardcoded price in any handler**
-- [ ] Migration + doc
+- [x] Resolution order: default → merchant profile → volume discount → custom contract, with the
+      version number itself never overridable.
+- [x] **Deterministic**: same inputs + same version = same quote, always. No clock, no randomness,
+      no network calls inside the engine. Proven live: replay returned 12862 twice.
+- [x] Versioned quotes; a shipment stores the version it used (`pricingVersion`, frozen).
+- [x] **No hardcoded price in any handler** — `pricingVersion: 1` is gone.
+- [x] Migration 0008 (seeds v1 as active) + `POST /v1/pricing/quote`.
+- [x] `PricingVersionNotFoundError` maps unknown/active-missing to a 409 envelope, not a 500.
 
 ### 🔲 Cross-module
 
@@ -381,43 +383,52 @@ Movement. This is where the product stops being an order form and becomes a cour
 Money. The phase where correctness stops being optional, because a bug here is not a bug — it is
 a disputed payment.
 
-### 🔲 `cod`
+### 🔄 `cod` — collect/reconcile live 2026-10-04; payable tail open
 
-- [ ] Schema `cod`: `records`, `collections`, `reconciliation_runs`, `exceptions`
-- [ ] Lifecycle `COD_EXPECTED → COD_COLLECTED → COD_RECONCILED → COD_PAYABLE → SETTLEMENT_CREATED
-→ SETTLED`
-- [ ] Failures: `COLLECTION_FAILED` · `PARTIAL_COLLECTION` · `RECONCILIATION_EXCEPTION` ·
-      `SETTLEMENT_HOLD`
-- [ ] `bigint` columns, integer arithmetic, currency on every row
-- [ ] **Collection is idempotency-keyed** — the highest-value idempotency requirement in the
-      product, because it is the one that loses money
-- [ ] **Partial collection is a first-class outcome.** 125000 against 125050 expected is
+- [x] Schema `cod`: `records` (migration `0009-CodSchema`). `collections`,
+      `reconciliation_runs`, `exceptions` tables deferred — one record row per shipment carries
+      expected/collected/status today.
+- [x] Lifecycle `COD_EXPECTED → COD_COLLECTED → COD_RECONCILED` live; `PARTIAL_COLLECTION` and
+      `RECONCILIATION_EXCEPTION` reachable and unit-tested (108 rules tests). The later states
+      (`COD_PAYABLE` onward) exist in `rules/cod.ts`, but no service advances past `COD_RECONCILED`.
+- [x] Failures: `COLLECTION_FAILED` · `PARTIAL_COLLECTION` · `RECONCILIATION_EXCEPTION` ·
+      `SETTLEMENT_HOLD` in the machine (`COD_TRANSITIONS`), all reachable via `collect`/`reconcile`.
+- [x] `bigint` columns, integer arithmetic, currency on every row
+- [x] **Collection is idempotency-keyed** — `cod.collect` scope in `CollectCodService`, race
+      test in `money-path.integration.test.ts` (concurrent double-collect converges on one entry)
+- [x] **Partial collection is a first-class outcome.** 125000 against 125050 expected is
       `PARTIAL_COLLECTION`: recorded, reconciled, settled at the collected amount, shortfall
-      visible. Nobody reconciles it by hand and nobody invents the missing 50.
-- [ ] **Reconciliation mismatch blocks; it never auto-corrects.** An auto-corrected discrepancy is
-      a merchant quietly losing money, discovered weeks later.
-- [ ] `COD_EXPECTED` set at creation from the frozen quote — a promise, not a record. Overwriting
-      it destroys the measurement reconciliation depends on.
+      visible — integration-tested, never hand-reconciled.
+- [x] **Reconciliation mismatch blocks; it never auto-corrects.** `ReconcileCodService` only
+      resolves `PARTIAL_COLLECTION`/`RECONCILIATION_EXCEPTION` → `COD_RECONCILED` with a recorded
+      reviewer note; amounts are never rewritten.
+- [x] `COD_EXPECTED` set at creation from the frozen quote — `EnsureCodRecordService` in the
+      shipment transaction, proven live 2026-10-04 (125050 seeded, collected, settled)
 
-### 🔲 `finance`
+### 🔄 `finance` — ledger/settlement/approve live 2026-10-04; provider open
 
-- [ ] Schema `finance`: `accounts`, `ledger_entries`, `settlements`, `settlement_items`,
-      `settlement_batches`, `settlement_adjustments`, `provider_transactions`
-- [ ] **No `merchant.balance` column.** Balance is `SUM(direction * amount_minor)`.
-- [ ] Ledger append-only, enforced by trigger — `REVOKE` from the owner does nothing
-- [ ] Corrections are compensating entries; the wrong row stays visible
-- [ ] `direction` separate from the sign of the amount, so sign is never ambiguous and never
-      zero-ambiguous
-- [ ] `amount_minor > 0` check constraint
-- [ ] `reference_type` + `reference_id` on every entry — an untraceable entry is unauditable money
-- [ ] `occurred_at` distinct from `recorded_at`
-- [ ] Settlement is a **frozen view** of entries, not a recalculation. Late money goes to the next
-      settlement; an approved settlement is a contract.
-- [ ] Approval idempotency-keyed, permission-checked, audited — it moves real money, so it is
-      guarded three ways
-- [ ] `PaymentProvider` interface with a **mock** implementation first. ZipZap is not a payment
-      processor.
-- [ ] Rebalance test: the ledger sums to the settlement total, to the unit
+- [x] Schema `finance`: `ledger_entries`, `settlements` (migration `0010-FinanceSchema`).
+      `accounts`, `settlement_items`, `settlement_batches`, `settlement_adjustments`,
+      `provider_transactions` deferred — settlement items live as `items_json` on the row.
+- [x] **No `merchant.balance` column.** Balance is `SUM(direction * amount_minor)` via
+      `FinanceRepository.balanceMinor`, exposed at `GET /v1/merchants/:id/balance`.
+- [x] Ledger append-only, enforced by trigger — `UPDATE`/`DELETE` rejected even from the owner
+      (trigger, not REVOKE; REVOKE from an owner is a no-op). Integration-tested.
+- [x] Corrections are compensating entries; the wrong row stays visible (`PostLedgerEntryService`
+      has no update path by construction)
+- [x] `direction` separate from the sign of the amount (`smallint` CHECK `IN (1, -1)`)
+- [x] `amount_minor > 0` check constraint
+- [x] `reference_type` + `reference_id` on every entry — enforced by `validateLedgerEntry`
+- [x] `occurred_at` distinct from `recorded_at` on every entry
+- [x] Settlement is a **frozen view** of entries (`CREATED` through `SETTLED`), immutable
+      after approval (trigger rejects status regression; late money freezes into the next
+      settlement). `PAYMENT_INITIATED` onward has no service yet — approval is the live tail.
+- [x] Approval idempotency-keyed, permission-checked (`settlements:approve`), audited
+      (`approvedBy`/`approvedAt` on the row) — replay returns the recorded decision byte-for-byte
+- [ ] `PaymentProvider` interface with a **mock** implementation first — deferred, no payout rail
+      exists yet; `SETTLED` is reachable in the machine but unwired
+- [x] Rebalance test: ledger sums to the settlement total, to the unit
+      (`money-path.integration.test.ts`: 100000 − 1800 fee = 98200 balance)
 
 ### 🔲 Return reversal
 
@@ -426,14 +437,17 @@ a disputed payment.
 
 ### Exit gate
 
-- [ ] The ledger balances to the settlement total — asserted to the poisha
+- [x] The ledger balances to the settlement total — asserted to the poisha (integration test +
+      live 2026-10-04: 125050 frozen, approved, balance 125050)
 - [ ] **Corrupt one COD collection deliberately** → reconciliation raises an exception, settlement
       is blocked, a compensating entry restores the balance, and both original rows are preserved
-- [ ] Duplicate COD collect with the same key → one collection, original response returned
-- [ ] Partial collection settles at the collected amount with the shortfall reported
-- [ ] 10,000-shipment settlement allocation loses **zero** minor units (remainder test)
-- [ ] `UPDATE finance.ledger_entries` rejected by the database
-- [ ] `pnpm verify` green
+      — machine paths exist and are unit-tested; the deliberate-corruption drill has not been run
+- [x] Duplicate COD collect with the same key → one collection, original response returned
+- [x] Partial collection settles at the collected amount with the shortfall reported
+- [ ] 10,000-shipment settlement allocation loses **zero** minor units (remainder test) — no
+      remainder allocation exists yet; `netPayable` sums exact items only
+- [x] `UPDATE finance.ledger_entries` rejected by the database
+- [x] `pnpm verify` green
 
 ### Risks
 

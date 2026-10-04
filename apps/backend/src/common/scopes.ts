@@ -17,6 +17,7 @@ export const API_SCOPES = [
   'delivery:complete',
   'returns:write',
   'settlements:read',
+  'settlements:approve',
   'webhooks:manage',
 ] as const;
 

@@ -19,6 +19,8 @@ import { ResourceNotFoundError } from '../../common/domain-error.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
+import { ShipmentLookup, SHIPMENT_LOOKUP } from '../shipment/shipment.lookup.ts';
+import { CollectCodService } from '../cod/collect-cod.service.ts';
 import { assertTransition, type DeliveryStatus } from './rules/delivery.ts';
 
 @Injectable()
@@ -27,6 +29,8 @@ export class AdvanceDeliveryService {
     @InjectDataSource('delivery') private readonly deliveryDataSource: DataSource,
     @Inject(DeliveryRepository) private readonly jobs: DeliveryRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
+    @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
+    @Inject(CollectCodService) private readonly cod: CollectCodService,
   ) {}
 
   async accept(jobId: string): Promise<DeliveryStatus> {
@@ -75,6 +79,59 @@ export class AdvanceDeliveryService {
         aggregateId: job.id,
         payload: { shipmentId: job.shipmentId, riderId: job.riderId },
       });
+
+      return job.status as DeliveryStatus;
+    });
+  }
+
+  async complete(
+    jobId: string,
+    command: { collectedMinor: number; idempotencyKey: string; actorId: string | null },
+  ): Promise<DeliveryStatus> {
+    return this.deliveryDataSource.transaction(async (manager) => {
+      const job = await this.jobs.findByIdForUpdate(manager, jobId);
+      if (!job) throw new ResourceNotFoundError('Delivery job not found.');
+
+      // ATTEMPTED -> DELIVERED via the machine: OUT_FOR_DELIVERY must pass through ATTEMPTED
+      // first (see record-attempt), so a job that was never attempted 409s here instead of
+      // inventing delivery history.
+      assertTransition(job.status as DeliveryStatus, 'ATTEMPTED');
+      job.status = 'ATTEMPTED';
+      await this.jobs.save(manager, job);
+      assertTransition('ATTEMPTED', 'DELIVERED');
+      job.status = 'DELIVERED';
+      await this.jobs.save(manager, job);
+
+      const now = new Date();
+      await this.tracking.append(manager, {
+        id: randomUUID(),
+        shipmentId: job.shipmentId,
+        eventType: 'DELIVERED',
+        occurredAt: now,
+        actorType: 'RIDER',
+        actorId: command.actorId,
+        metadata: { jobId: job.id, completed: true },
+      });
+
+      await appendOutbox(manager, {
+        type: 'DeliveryCompleted',
+        aggregateType: 'delivery',
+        aggregateId: job.id,
+        payload: { shipmentId: job.shipmentId, riderId: job.riderId },
+      });
+
+      // COD is collected through the injected contract, never by reading cod.records:
+      // expected amount from the frozen quote, collected amount from the rider's report.
+      // Zero-COD shipments skip collection — EnsureCodRecord created no record for them.
+      const codAmount = await this.shipments.findCodAmount(job.shipmentId);
+      if (codAmount !== null && codAmount.amountMinor > 0) {
+        await this.cod.execute({
+          shipmentId: job.shipmentId,
+          collectedMinor: command.collectedMinor,
+          idempotencyKey: `delivery-complete:${job.id}`,
+          actorId: command.actorId,
+        });
+      }
 
       return job.status as DeliveryStatus;
     });

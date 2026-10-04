@@ -27,4 +27,12 @@ export class ShipmentLookup {
       return this.shipments.findTrackingCode(manager, shipmentId);
     });
   }
+
+  async findCodAmount(
+    shipmentId: string,
+  ): Promise<{ amountMinor: number; currency: string } | null> {
+    return this.shipmentDataSource.transaction(async (manager) => {
+      return this.shipments.findCodAmount(manager, shipmentId);
+    });
+  }
 }

@@ -9,6 +9,8 @@ import { PickupModule } from './modules/pickup/pickup.module.ts';
 import { RiderModule } from './modules/rider/rider.module.ts';
 import { DeliveryModule } from './modules/delivery/delivery.module.ts';
 import { PricingModule } from './modules/pricing/pricing.module.ts';
+import { CodModule } from './modules/cod/cod.module.ts';
+import { FinanceModule } from './modules/finance/finance.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -28,6 +30,8 @@ import { PricingModule } from './modules/pricing/pricing.module.ts';
     RiderModule,
     DeliveryModule,
     PricingModule,
+    CodModule,
+    FinanceModule,
   ],
   controllers: [HealthController],
 })

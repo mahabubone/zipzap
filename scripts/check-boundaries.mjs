@@ -27,6 +27,12 @@ const OWNED = {
   merchant: 'merchant',
   shipment: 'shipment',
   tracking: 'tracking',
+  pickup: 'pickup',
+  rider: 'rider',
+  delivery: 'delivery',
+  pricing: 'pricing',
+  cod: 'cod',
+  finance: 'finance',
 };
 
 const MODULES_DIR = join(SRC_ROOT, 'modules');

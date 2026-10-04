@@ -79,6 +79,14 @@ export class PickupNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class CodRecordNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'COD_RECORD_NOT_FOUND',
+    status: 404,
+    title: 'COD record not found',
+  } satisfies DomainErrorSpec;
+}
+
 export class PricingVersionNotFoundError extends DomainError {
   readonly spec = {
     code: 'PRICING_VERSION_NOT_FOUND',
@@ -191,6 +199,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [ResourceNotFoundError, new ResourceNotFoundError().spec],
   [ShipmentNotFoundError, new ShipmentNotFoundError().spec],
   [PickupNotFoundError, new PickupNotFoundError().spec],
+  [CodRecordNotFoundError, new CodRecordNotFoundError().spec],
   [PricingVersionNotFoundError, new PricingVersionNotFoundError(null).spec],
   [InvalidBatchError, new InvalidBatchError('reason').spec],
   [DuplicateRequestError, new DuplicateRequestError().spec],

@@ -16,6 +16,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.ts';
 import { connectNats, drainQuietly } from './nats.ts';
 import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
+import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
 
 const logger = new Logger('worker');
 
@@ -25,6 +26,10 @@ const SUBSCRIPTIONS = [
   { consumer: 'tracking', subject: 'zipzap.pickup.assigned' },
   { consumer: 'tracking', subject: 'zipzap.delivery.out_for_delivery' },
   { consumer: 'tracking', subject: 'zipzap.delivery.attempted' },
+  { consumer: 'tracking', subject: 'zipzap.delivery.completed' },
+  { consumer: 'tracking', subject: 'zipzap.cod.collected' },
+  { consumer: 'finance', subject: 'zipzap.cod.collected' },
+  { consumer: 'finance', subject: 'zipzap.cod.partial_collection' },
 ] as const;
 
 async function bootstrap(): Promise<void> {
@@ -33,6 +38,9 @@ async function bootstrap(): Promise<void> {
 
   const { nc } = await connectNats('zipzap-worker');
   const tracking = app.get(TrackingConsumer);
+  const finance = app.get(FinanceConsumer);
+
+  const handlers = { tracking, finance } as const;
 
   const open = SUBSCRIPTIONS.map(({ consumer, subject }) => {
     const subscription = nc.subscribe(subject, { queue: consumer });
@@ -51,10 +59,11 @@ async function bootstrap(): Promise<void> {
   logger.log('worker started');
 
   await Promise.all(
-    open.map(async (subscription) => {
+    open.map(async (subscription, index) => {
+      const handler = handlers[SUBSCRIPTIONS[index]!.consumer];
       for await (const message of subscription) {
         try {
-          const outcome = await tracking.handle({
+          const outcome = await handler.handle({
             subject: message.subject,
             payload: message.data,
           });

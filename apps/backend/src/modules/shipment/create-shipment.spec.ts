@@ -89,6 +89,7 @@ describe('CreateShipmentService orchestration', () => {
       new ShipmentRepository(),
       new AppendTrackingEventService(),
       fakePricing() as never,
+      { ensure: async () => null } as never,
     );
 
     const { result, replayed } = await service.execute({ ...COMMAND, cod: undefined });
@@ -108,6 +109,7 @@ describe('CreateShipmentService orchestration', () => {
       new ShipmentRepository(),
       new AppendTrackingEventService(),
       fakePricing() as never,
+      { ensure: async () => null } as never,
     );
 
     const { result } = await service.execute({
@@ -136,6 +138,7 @@ describe('CreateShipmentService orchestration', () => {
       new ShipmentRepository(),
       new AppendTrackingEventService(),
       pricing as never,
+      { ensure: async () => null } as never,
     );
 
     await service.execute({ ...COMMAND, idempotencyKey: 'key-3' });

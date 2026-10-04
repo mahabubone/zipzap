@@ -26,6 +26,7 @@ import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
 import { PricingService } from '../pricing/pricing.service.ts';
+import { EnsureCodRecordService } from '../cod/ensure-cod-record.service.ts';
 import {
   createShipment,
   generateTrackingCode,
@@ -68,6 +69,7 @@ export class CreateShipmentService {
     @Inject(ShipmentRepository) private readonly shipments: ShipmentRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
     @Inject(PricingService) private readonly pricing: PricingService,
+    @Inject(EnsureCodRecordService) private readonly cod: EnsureCodRecordService,
   ) {}
 
   async execute(command: CreateShipmentCommand): Promise<{
@@ -156,6 +158,16 @@ export class CreateShipmentService {
         createdAt: shipment.createdAt,
         updatedAt: shipment.createdAt,
       } as never);
+
+      // Same transaction: the COD promise, seeded from the frozen quote. Zero-COD shipments get
+      // no record — there is nothing to promise, collect, or reconcile. Without this call the
+      // record would never exist and every collect would 404.
+      await this.cod.ensure(manager, {
+        shipmentId: shipment.id,
+        merchantId: shipment.merchantId,
+        expectedMinor: shipment.cod.amountMinor,
+        currency: shipment.cod.currency,
+      });
 
       // Same transaction: the movement history.
       await this.tracking.append(manager, {

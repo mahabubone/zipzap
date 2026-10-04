@@ -39,6 +39,26 @@ export class ShipmentRepository {
   }
 
   /**
+   * The COD boundary's read: a shipment id in, its quoted COD amount out. Same contract shape
+   * as findTrackingCode — delivery needs the expected amount to collect against, and must not
+   * open the shipment connection directly. Null means no COD on this shipment (or unknown id);
+   * the caller treats both as "nothing to collect", never as zero to invent.
+   */
+  async findCodAmount(
+    manager: EntityManager,
+    shipmentId: string,
+  ): Promise<{ amountMinor: number; currency: string } | null> {
+    const row = await manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .select('s.codAmountMinor', 'amountMinor')
+      .addSelect('s.codCurrency', 'currency')
+      .where('s.id = :id', { id: shipmentId })
+      .getRawOne<{ amountMinor: string; currency: string }>();
+    if (!row) return null;
+    return { amountMinor: Number(row.amountMinor), currency: row.currency };
+  }
+
+  /**
    * Locks the row so two simultaneous transitions serialise. Without this, two riders scanning
    * at once both read the same state and both advance the machine.
    */

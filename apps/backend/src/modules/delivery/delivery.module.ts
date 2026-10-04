@@ -11,12 +11,18 @@ import { CreateDeliveryController } from './create-delivery.controller.ts';
 import { AdvanceDeliveryController } from './advance-delivery.controller.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
+import { ShipmentModule } from '../shipment/shipment.module.ts';
+import { CodModule } from '../cod/cod.module.ts';
 
 @Module({
   imports: [
     forModule('delivery', [DeliveryJobEntity, DeliveryAttemptEntity]),
     TrackingModule,
     IdentityModule,
+    // One direction only: delivery reads shipment facts and triggers COD collect.
+    // Neither shipment nor cod imports delivery, so no forwardRef is needed.
+    ShipmentModule,
+    CodModule,
   ],
   controllers: [RecordAttemptController, CreateDeliveryController, AdvanceDeliveryController],
   providers: [

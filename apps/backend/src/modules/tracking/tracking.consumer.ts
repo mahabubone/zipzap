@@ -43,6 +43,8 @@ const EVENT_MAP = {
   PickupAssigned: 'PICKUP_ASSIGNED',
   DeliveryOutForDelivery: 'OUT_FOR_DELIVERY',
   DeliveryAttempted: 'DELIVERY_ATTEMPTED',
+  DeliveryCompleted: 'DELIVERED',
+  CODCollected: 'COD_COLLECTED',
 } as const satisfies Record<string, TrackingEventType>;
 
 /** Events with no public projection. Emitted for operations, not for recipients. */

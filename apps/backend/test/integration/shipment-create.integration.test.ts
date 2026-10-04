@@ -24,6 +24,8 @@ import { AppendTrackingEventService } from '../../dist/modules/tracking/append-t
 import { PricingService } from '../../dist/modules/pricing/pricing.service.js';
 import { PricingRepository } from '../../dist/modules/pricing/pricing.repository.js';
 import { PricingVersionEntity } from '../../dist/modules/pricing/pricing-version.entity.js';
+import { EnsureCodRecordService } from '../../dist/modules/cod/ensure-cod-record.service.js';
+import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
@@ -36,6 +38,7 @@ let shipmentDb: DataSource;
 let trackingDb: DataSource;
 let systemDb: DataSource;
 let pricingDb: DataSource;
+let codDb: DataSource;
 let service: CreateShipmentService;
 
 const command = (key: string) => ({
@@ -62,12 +65,14 @@ before(async () => {
   ]);
   systemDb = await connectModuleDataSource('system', []);
   pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
+  codDb = await connectModuleDataSource('cod', [CodRecordEntity]);
 
   service = new CreateShipmentService(
     shipmentDb,
     new ShipmentRepository(),
     new AppendTrackingEventService(),
     new PricingService(pricingDb, new PricingRepository()),
+    new EnsureCodRecordService(codDb),
   );
 });
 
@@ -76,6 +81,7 @@ after(async () => {
   await trackingDb?.destroy();
   await systemDb?.destroy();
   await pricingDb?.destroy();
+  await codDb?.destroy();
 });
 
 describeIfDb('CreateShipment — one transaction, four writes', () => {
@@ -133,6 +139,7 @@ describeIfDb('CreateShipment — one transaction, four writes', () => {
           total: { amountMinor: 0, currency: 'BDT' },
         }),
       },
+      cod: { ensure: async () => 'cod-stub-id' },
       tracking: {
         append: async () => {
           throw new Error('simulated failure after the aggregate insert');
