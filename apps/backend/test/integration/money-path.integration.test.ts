@@ -19,6 +19,9 @@ import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
 import { FinanceConsumer } from '../../dist/modules/finance/finance-consumer.service.js';
 import { CreateSettlementService } from '../../dist/modules/finance/create-settlement.service.js';
 import { ApproveSettlementService } from '../../dist/modules/finance/approve-settlement.service.js';
+import { InitiateSettlementPaymentService } from '../../dist/modules/finance/initiate-settlement-payment.service.js';
+import { ConfirmSettlementPaymentService } from '../../dist/modules/finance/confirm-settlement-payment.service.js';
+import { MockPaymentProvider } from '../../dist/modules/finance/provider/mock-payment.provider.js';
 import { FinanceRepository } from '../../dist/modules/finance/finance.repository.js';
 import { PostLedgerEntryService } from '../../dist/modules/finance/post-ledger-entry.service.js';
 import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
@@ -38,6 +41,9 @@ let financeConsumer: FinanceConsumer;
 let postEntry: PostLedgerEntryService;
 let createSettlement: CreateSettlementService;
 let approveSettlement: ApproveSettlementService;
+let initiatePayment: InitiateSettlementPaymentService;
+let confirmPayment: ConfirmSettlementPaymentService;
+let payments: MockPaymentProvider;
 let financeRepo: FinanceRepository;
 
 const MERCHANT = randomUUID();
@@ -101,6 +107,9 @@ before(async () => {
   postEntry = new PostLedgerEntryService(financeDb, financeRepo);
   createSettlement = new CreateSettlementService(financeDb, financeRepo);
   approveSettlement = new ApproveSettlementService(financeDb, financeRepo);
+  payments = new MockPaymentProvider();
+  initiatePayment = new InitiateSettlementPaymentService(financeDb, financeRepo, payments);
+  confirmPayment = new ConfirmSettlementPaymentService(financeDb, financeRepo, payments);
 });
 
 after(async () => {
@@ -327,5 +336,132 @@ describeIfDb('money path — collect to settled', () => {
       () => financeDb.query(`DELETE FROM finance.settlements WHERE id = $1`, [created.id]),
       /cannot be deleted|immutable/i,
     );
+  });
+
+  test('payout: initiate converges, confirm posts the payout entry and settles', async () => {
+    const merchant = randomUUID();
+    const s1 = randomUUID();
+    await codDb.transaction(async (manager) =>
+      new CodRecordRepository().insert(manager, {
+        id: randomUUID(),
+        shipmentId: s1,
+        merchantId: merchant,
+        expectedMinor: 125_050,
+        collectedMinor: null,
+        currency: 'BDT',
+        status: 'COD_EXPECTED',
+        failureNote: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never),
+    );
+    const rec = await codDb.query(`SELECT id FROM cod.records WHERE shipment_id = $1`, [s1]);
+    await collect.execute({
+      shipmentId: s1,
+      collectedMinor: 125_050,
+      idempotencyKey: `pay-${randomUUID()}`,
+      actorId: null,
+    });
+    await financeConsumer.handle(codEvent(randomUUID(), rec[0].id, s1, 125_050, merchant));
+    const created = await createSettlement.execute({ merchantId: merchant, actorId: null });
+    await approveSettlement.execute({
+      settlementId: created.id,
+      approverId: randomUUID(),
+      idempotencyKey: `pay-ap-${randomUUID()}`,
+    });
+
+    const initiated = await initiatePayment.execute({
+      settlementId: created.id,
+      idempotencyKey: `pay-init-${randomUUID()}`,
+    });
+    assert.equal(initiated.result.status, 'PAYMENT_INITIATED');
+    assert.match(initiated.result.paymentReference, /^MOCK\d+$/);
+
+    // Same settlement, fresh key, already initiated: the machine rejects the second run.
+    await assert.rejects(
+      () =>
+        initiatePayment.execute({
+          settlementId: created.id,
+          idempotencyKey: `pay-init-${randomUUID()}`,
+        }),
+      /PAYMENT_INITIATED/,
+    );
+
+    // Drive the mock to terminal, then confirm: payout entry posts, status settles.
+    payments.settle(initiated.result.paymentReference, 'succeeded');
+    const confirmed = await confirmPayment.execute({
+      settlementId: created.id,
+      idempotencyKey: `pay-conf-${randomUUID()}`,
+    });
+    assert.equal(confirmed.result.status, 'SETTLED');
+    assert.equal(confirmed.result.providerStatus, 'succeeded');
+
+    const payout = await financeDb.query(
+      `SELECT amount_minor, direction FROM finance.ledger_entries
+        WHERE reference_type = 'SETTLEMENT' AND reference_id = $1`,
+      [created.id],
+    );
+    assert.equal(payout.length, 1, 'exactly one payout entry for one settlement');
+    assert.equal(Number(payout[0].amount_minor), 125_050);
+    assert.equal(Number(payout[0].direction), -1);
+
+    const row = await financeDb.query(
+      `SELECT status, payment_reference FROM finance.settlements WHERE id = $1`,
+      [created.id],
+    );
+    assert.equal(row[0].status, 'SETTLED');
+    assert.equal(row[0].payment_reference, initiated.result.paymentReference);
+  });
+
+  test('failed payout advances nothing and posts no entry', async () => {
+    const merchant = randomUUID();
+    const s1 = randomUUID();
+    await codDb.transaction(async (manager) =>
+      new CodRecordRepository().insert(manager, {
+        id: randomUUID(),
+        shipmentId: s1,
+        merchantId: merchant,
+        expectedMinor: 50_000,
+        collectedMinor: null,
+        currency: 'BDT',
+        status: 'COD_EXPECTED',
+        failureNote: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never),
+    );
+    const rec = await codDb.query(`SELECT id FROM cod.records WHERE shipment_id = $1`, [s1]);
+    await collect.execute({
+      shipmentId: s1,
+      collectedMinor: 50_000,
+      idempotencyKey: `payf-${randomUUID()}`,
+      actorId: null,
+    });
+    await financeConsumer.handle(codEvent(randomUUID(), rec[0].id, s1, 50_000, merchant));
+    const created = await createSettlement.execute({ merchantId: merchant, actorId: null });
+    await approveSettlement.execute({
+      settlementId: created.id,
+      approverId: randomUUID(),
+      idempotencyKey: `payf-ap-${randomUUID()}`,
+    });
+    const initiated = await initiatePayment.execute({
+      settlementId: created.id,
+      idempotencyKey: `payf-init-${randomUUID()}`,
+    });
+
+    payments.settle(initiated.result.paymentReference, 'failed');
+    const confirmed = await confirmPayment.execute({
+      settlementId: created.id,
+      idempotencyKey: `payf-conf-${randomUUID()}`,
+    });
+    assert.equal(confirmed.result.status, 'PAYMENT_INITIATED');
+    assert.equal(confirmed.result.providerStatus, 'failed');
+
+    const payout = await financeDb.query(
+      `SELECT id FROM finance.ledger_entries
+        WHERE reference_type = 'SETTLEMENT' AND reference_id = $1`,
+      [created.id],
+    );
+    assert.equal(payout.length, 0, 'a failed payout posts no entry');
   });
 });

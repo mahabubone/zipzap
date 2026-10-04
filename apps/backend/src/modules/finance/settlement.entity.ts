@@ -53,6 +53,16 @@ export class SettlementEntity {
   @Column('timestamptz', { nullable: true })
   approvedAt!: Date | null;
 
+  /** Provider's id for this payout. Null until PAYMENT_INITIATED. */
+  @Column('text', { nullable: true })
+  paymentReference!: string | null;
+
+  @Column('timestamptz', { nullable: true })
+  paymentInitiatedAt!: Date | null;
+
+  @Column('timestamptz', { nullable: true })
+  paymentConfirmedAt!: Date | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

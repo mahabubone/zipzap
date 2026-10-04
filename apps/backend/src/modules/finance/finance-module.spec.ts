@@ -4,6 +4,7 @@ import { FinanceModule } from './finance.module.ts';
 import { CreateSettlementController } from './create-settlement.controller.ts';
 import { ApproveSettlementController } from './approve-settlement.controller.ts';
 import { BalanceController } from './balance.controller.ts';
+import { SettlementPaymentController } from './settlement-payment.controller.ts';
 
 /**
  * The registration that returned 404 until 2026-10-04: the three controllers
@@ -29,11 +30,13 @@ describe('FinanceModule wiring', () => {
     expect(controllers).toContain(CreateSettlementController);
     expect(controllers).toContain(ApproveSettlementController);
     expect(controllers).toContain(BalanceController);
+    expect(controllers).toContain(SettlementPaymentController);
   });
 
   it('maps the routes the money proof exercised', () => {
     expect(pathOf(CreateSettlementController)).toBe('v1/settlements');
     expect(pathOf(ApproveSettlementController)).toBe('v1/settlements');
     expect(pathOf(BalanceController)).toBe('v1/merchants');
+    expect(pathOf(SettlementPaymentController)).toBe('v1/settlements');
   });
 });
