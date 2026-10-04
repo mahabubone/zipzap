@@ -37,7 +37,7 @@ interface TrackingEnvelope {
 }
 
 /** Outbox event type -> the tracking event it projects. Exhaustive by construction of the switch. */
-const EVENT_MAP = {
+export const TRACKING_EVENT_MAP = {
   ShipmentCreated: 'SHIPMENT_CREATED',
   PickupRequested: 'PICKUP_REQUESTED',
   PickupAssigned: 'PICKUP_ASSIGNED',
@@ -77,7 +77,7 @@ export class TrackingConsumer {
 
     if (SILENT.has(envelope.type)) return 'ignored';
 
-    const eventType = EVENT_MAP[envelope.type as keyof typeof EVENT_MAP];
+    const eventType = TRACKING_EVENT_MAP[envelope.type as keyof typeof TRACKING_EVENT_MAP];
     if (!eventType) {
       this.logger.warn({ type: envelope.type }, 'unmapped event type');
       return 'ignored';

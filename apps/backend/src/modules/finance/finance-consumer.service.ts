@@ -27,6 +27,9 @@ import type { DataSource } from 'typeorm';
 
 export const FINANCE_CONSUMER = 'finance';
 
+/** Outbox event types this consumer processes. Everything else is ignored, never fatal. */
+export const FINANCE_HANDLED_TYPES = ['CODCollected', 'CODPartialCollection'] as const;
+
 interface CodCollectedPayload {
   readonly shipmentId: string;
   readonly merchantId: string;
@@ -61,7 +64,7 @@ export class FinanceConsumer {
       return 'malformed';
     }
 
-    if (envelope.type !== 'CODCollected' && envelope.type !== 'CODPartialCollection') {
+    if (!(FINANCE_HANDLED_TYPES as readonly string[]).includes(envelope.type)) {
       return 'ignored';
     }
 

@@ -17,20 +17,9 @@ import { AppModule } from './app.module.ts';
 import { connectNats, drainQuietly } from './nats.ts';
 import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
+import { SUBSCRIPTIONS } from './subscriptions.ts';
 
 const logger = new Logger('worker');
-
-const SUBSCRIPTIONS = [
-  { consumer: 'tracking', subject: 'zipzap.shipment.created' },
-  { consumer: 'tracking', subject: 'zipzap.pickup.requested' },
-  { consumer: 'tracking', subject: 'zipzap.pickup.assigned' },
-  { consumer: 'tracking', subject: 'zipzap.delivery.out_for_delivery' },
-  { consumer: 'tracking', subject: 'zipzap.delivery.attempted' },
-  { consumer: 'tracking', subject: 'zipzap.delivery.completed' },
-  { consumer: 'tracking', subject: 'zipzap.cod.collected' },
-  { consumer: 'finance', subject: 'zipzap.cod.collected' },
-  { consumer: 'finance', subject: 'zipzap.cod.partial_collection' },
-] as const;
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);
