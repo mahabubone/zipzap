@@ -11,6 +11,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { WebhookEndpointService, type EndpointView } from './webhook-endpoint.service.ts';
+import { WebhookReplayService } from './webhook-replay.service.ts';
 
 export class CreateWebhookDto {
   @IsUrl({ require_tld: false })
@@ -26,7 +27,10 @@ export class CreateWebhookDto {
 @Controller('v1/webhooks')
 @UseGuards(ApiKeyGuard)
 export class WebhookController {
-  constructor(@Inject(WebhookEndpointService) private readonly endpoints: WebhookEndpointService) {}
+  constructor(
+    @Inject(WebhookEndpointService) private readonly endpoints: WebhookEndpointService,
+    @Inject(WebhookReplayService) private readonly replay: WebhookReplayService,
+  ) {}
 
   private merchantId(request: AuthenticatedRequest): string {
     // ApiKeyGuard guarantees a merchant-scoped principal for this scope set.
@@ -75,5 +79,15 @@ export class WebhookController {
     @Req() request: AuthenticatedRequest,
   ): Promise<EndpointView> {
     return this.endpoints.setStatus(this.merchantId(request), id, 'ACTIVE');
+  }
+
+  @Post('deliveries/:deliveryId/replay')
+  @UseGuards(new ScopeGuard('webhooks:manage'))
+  @ApiOperation({ summary: 'Replay a terminal delivery with a fresh delivery id' })
+  async replayDelivery(
+    @Param('deliveryId') deliveryId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ deliveryId: string; endpointId: string; wireEvent: string }> {
+    return this.replay.replay({ merchantId: this.merchantId(request), deliveryId });
   }
 }

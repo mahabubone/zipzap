@@ -24,6 +24,8 @@ export const WEBHOOK_EVENTS = {
   CODCollected: 'cod.collected',
   SettlementApproved: 'settlement.created',
   SettlementCompleted: 'settlement.completed',
+  ReturnRequested: 'shipment.return_initiated',
+  ReturnCompleted: 'shipment.returned',
 } as const satisfies Record<string, string>;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[keyof typeof WEBHOOK_EVENTS];

@@ -33,6 +33,7 @@ const OWNED = {
   pricing: 'pricing',
   cod: 'cod',
   finance: 'finance',
+  returns: 'returns',
 };
 
 const MODULES_DIR = join(SRC_ROOT, 'modules');
@@ -102,10 +103,18 @@ function inspect(file) {
     // `shipment.entity.ts`, `tracking-event.entity.ts`. Importing another module's
     // `*.entity.ts` IS the cross-schema read — use a contract or an event instead.
     if (owner) {
-      const reach = /from\s+['"](?:\.{1,2}\/)*([a-z][a-z0-9_-]*)\/([a-z][a-z0-9_-]*\.entity)(?:\.ts)?['"]/.exec(line);
+      const reach =
+        /from\s+['"](?:\.{1,2}\/)*([a-z][a-z0-9_-]*)\/([a-z][a-z0-9_-]*\.entity)(?:\.ts)?['"]/.exec(
+          line,
+        );
       const target = reach?.[1];
       if (target && target !== owner) {
-        add(file, `module "${owner}" imports "${target}" persistence — use a contract or an event`, index, text);
+        add(
+          file,
+          `module "${owner}" imports "${target}" persistence — use a contract or an event`,
+          index,
+          text,
+        );
       }
     }
 
@@ -113,15 +122,24 @@ function inspect(file) {
     // Token list narrowed once — see docs/ADR/0002-postgresql-schema-boundaries.md; a rule that
     // fires on valid code gets disabled, which is worse than not having it.
     if (!rel.includes(`${sep}provider${sep}`)) {
-      if (/\b(status_code|trx_status|expair_Date|transactionType|mobileNumber|senderName)\b\s*[:'"]/.test(line)
-        && !/\bsenderName\b\s*:/.test(line)) {
+      if (
+        /\b(status_code|trx_status|expair_Date|transactionType|mobileNumber|senderName)\b\s*[:'"]/.test(
+          line,
+        ) &&
+        !/\bsenderName\b\s*:/.test(line)
+      ) {
         add(file, 'provider wire format outside an adapter (rule 11)', index, text);
       }
     }
 
     // 6. Floating-point money. Rule 4.
     if (/(amount|balance|total|fee|price|cod)\w*\s*[:=]\s*-?\d+\.\d+/.test(line)) {
-      add(file, 'decimal literal assigned to a money-like name (rule 4 — use integer minor units)', index, text);
+      add(
+        file,
+        'decimal literal assigned to a money-like name (rule 4 — use integer minor units)',
+        index,
+        text,
+      );
     }
   });
 }
@@ -132,10 +150,20 @@ function checkSchemaListIsInSync() {
   const declared = [...schemas.matchAll(/^\s*'([a-z_]+)',$/gm)].map((m) => m[1]);
   for (const [module, schema] of Object.entries(OWNED)) {
     if (module !== schema) {
-      violations.push({ file: 'scripts/check-boundaries.mjs', rule: `${module} owns schema ${schema} — expected matching names`, line: 0, text: '' });
+      violations.push({
+        file: 'scripts/check-boundaries.mjs',
+        rule: `${module} owns schema ${schema} — expected matching names`,
+        line: 0,
+        text: '',
+      });
     }
     if (!declared.includes(schema)) {
-      violations.push({ file: 'docs (schemas.ts)', rule: `module "${module}" owns unknown schema "${schema}"`, line: 0, text: '' });
+      violations.push({
+        file: 'docs (schemas.ts)',
+        rule: `module "${module}" owns unknown schema "${schema}"`,
+        line: 0,
+        text: '',
+      });
     }
   }
 }
@@ -152,7 +180,9 @@ if (violations.length > 0) {
     console.error(`  ${where}\n    ${violation.rule}`);
     if (violation.text) console.error(`    > ${violation.text}`);
   }
-  console.error(`\n${violations.length} violation(s). See docs/ADR/0002-postgresql-schema-boundaries.md.\n`);
+  console.error(
+    `\n${violations.length} violation(s). See docs/ADR/0002-postgresql-schema-boundaries.md.\n`,
+  );
   process.exit(1);
 }
 

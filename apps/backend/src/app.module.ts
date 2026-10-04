@@ -11,6 +11,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module.ts';
 import { PricingModule } from './modules/pricing/pricing.module.ts';
 import { CodModule } from './modules/cod/cod.module.ts';
 import { FinanceModule } from './modules/finance/finance.module.ts';
+import { ReturnsModule } from './modules/returns/returns.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -32,6 +33,7 @@ import { FinanceModule } from './modules/finance/finance.module.ts';
     PricingModule,
     CodModule,
     FinanceModule,
+    ReturnsModule,
   ],
   controllers: [HealthController],
 })

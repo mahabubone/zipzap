@@ -10,6 +10,7 @@ import { WebhookEndpointEntity } from './webhook-endpoint.entity.ts';
 import { WebhookDeliveryEntity } from './webhook-delivery.entity.ts';
 import { WebhookRepository } from './webhook.repository.ts';
 import { WebhookEndpointService } from './webhook-endpoint.service.ts';
+import { WebhookReplayService } from './webhook-replay.service.ts';
 import { WebhookController } from './webhook.controller.ts';
 import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
@@ -42,6 +43,7 @@ import { IdentityModule } from '../identity/identity.module.ts';
     FindCredentialService,
     WebhookRepository,
     WebhookEndpointService,
+    WebhookReplayService,
     WebhookConsumer,
     WebhookProcessor,
   ],

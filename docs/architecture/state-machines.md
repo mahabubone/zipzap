@@ -72,9 +72,13 @@ Administrative states reachable from most of the above: `ON_HOLD`, `CANCELLED`, 
 Return is a parallel lifecycle on the same shipment, never a second parcel:
 
 ```
-RETURN_INITIATED → RETURN_IN_TRANSIT → RETURN_AT_HUB
-                → RETURN_OUT_FOR_DELIVERY → RETURNED
+RETURN_REQUESTED → RETURN_APPROVED → RETURN_INITIATED → RETURN_IN_TRANSIT
+                → RETURN_AT_HUB → RETURN_OUT_FOR_DELIVERY → RETURNED
 ```
+
+Merged 2026-10-04 with [returns.md](../domains/returns.md): the decision half
+(REQUEST → APPROVE/REJECT) plus the custody legs. The machine in
+`rules/returns.ts` is the source.
 
 `RETURN_INITIATED` and `DELIVERED` are both terminal for the forward path — a shipment that was
 delivered and then returned reached `DELIVERED` first. There is no backwards transition. History

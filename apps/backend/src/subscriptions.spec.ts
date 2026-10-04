@@ -28,6 +28,9 @@ const AGGREGATE_OF: Record<string, string> = {
   CODPartialCollection: 'cod',
   SettlementApproved: 'settlement',
   SettlementCompleted: 'settlement',
+  ReturnRequested: 'return',
+  ReturnAdvanced: 'return',
+  ReturnCompleted: 'return',
 };
 
 function subjectsOf(types: readonly string[]): Set<string> {

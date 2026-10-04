@@ -28,7 +28,11 @@ import type { DataSource } from 'typeorm';
 export const FINANCE_CONSUMER = 'finance';
 
 /** Outbox event types this consumer processes. Everything else is ignored, never fatal. */
-export const FINANCE_HANDLED_TYPES = ['CODCollected', 'CODPartialCollection'] as const;
+export const FINANCE_HANDLED_TYPES = [
+  'CODCollected',
+  'CODPartialCollection',
+  'ReturnCompleted',
+] as const;
 
 interface CodCollectedPayload {
   readonly shipmentId: string;
@@ -44,6 +48,22 @@ interface CodEnvelope {
   readonly aggregateId: string;
   readonly occurredAt: string;
   readonly data: CodCollectedPayload;
+}
+
+interface ReturnCompletedPayload {
+  readonly shipmentId: string;
+  readonly merchantId: string;
+  readonly currency: string;
+  readonly reversedMinor: number;
+  readonly returnId: string;
+}
+
+interface ReturnEnvelope {
+  readonly id: string;
+  readonly type: string;
+  readonly aggregateId: string;
+  readonly occurredAt: string;
+  readonly data: ReturnCompletedPayload;
 }
 
 @Injectable()
@@ -66,6 +86,10 @@ export class FinanceConsumer {
 
     if (!(FINANCE_HANDLED_TYPES as readonly string[]).includes(envelope.type)) {
       return 'ignored';
+    }
+
+    if (envelope.type === 'ReturnCompleted') {
+      return this.postReversal(envelope as unknown as ReturnEnvelope);
     }
 
     return this.finance.transaction(async (manager) => {
@@ -99,6 +123,58 @@ export class FinanceConsumer {
           envelope.data.currency,
           envelope.aggregateId,
           'COD collected for shipment ' + envelope.data.shipmentId,
+          envelope.occurredAt,
+        ],
+      );
+
+      return 'processed';
+    });
+  }
+
+  /**
+   * The reversal: a compensating ADJUSTMENT against the original collection, never
+   * a rewrite. Both rows stay visible; the merchant reconciles collection against
+   * reversal. Idempotent by reference: one reversal per return, replays converge.
+   * A zero or negative amount is a no-op by construction — nothing was collected,
+   * so there is nothing to reverse.
+   */
+  private async postReversal(
+    envelope: ReturnEnvelope,
+  ): Promise<'processed' | 'duplicate' | 'ignored' | 'malformed'> {
+    if (!Number.isInteger(envelope.data.reversedMinor) || envelope.data.reversedMinor <= 0) {
+      return 'ignored';
+    }
+
+    return this.finance.transaction(async (manager) => {
+      const claimed = await manager.query(
+        `INSERT INTO system.consumed_events (consumer, event_id)
+         VALUES ($1, $2)
+         ON CONFLICT (consumer, event_id) DO NOTHING
+         RETURNING event_id`,
+        [FINANCE_CONSUMER, envelope.id],
+      );
+      if (claimed.length === 0) return 'duplicate';
+
+      const existing = await manager.query(
+        `SELECT id FROM finance.ledger_entries
+          WHERE reference_type = 'RETURN' AND reference_id = $1`,
+        [envelope.aggregateId],
+      );
+      if (existing.length > 0) return 'duplicate';
+
+      await manager.query(
+        `INSERT INTO finance.ledger_entries
+           (id, merchant_id, entry_type, direction, amount_minor, currency,
+            reference_type, reference_id, memo, occurred_at)
+         VALUES ($1, $2, 'ADJUSTMENT', -1, $3, $4,
+                 'RETURN', $5, $6, $7)`,
+        [
+          randomUUID(),
+          envelope.data.merchantId,
+          envelope.data.reversedMinor,
+          envelope.data.currency,
+          envelope.aggregateId,
+          'COD reversal for returned shipment ' + envelope.data.shipmentId,
           envelope.occurredAt,
         ],
       );

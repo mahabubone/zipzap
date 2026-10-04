@@ -5,10 +5,11 @@ import { FinanceConsumer } from './finance-consumer.service.ts';
 /**
  * The finance consumer, minus the database.
  *
- * What these prove: only CODCollected and CODPartialCollection are processed, anything else is
- * ignored without touching the ledger, and malformed payloads never throw out of the loop.
- * Exactly-once semantics — the reference check against existing entries — is proven by
- * test/integration/, against Postgres, where the unique reference actually races.
+ * What these prove: collections and return completions are processed, anything
+ * else is ignored without touching the ledger, and malformed payloads never
+ * throw out of the loop. Exactly-once semantics — the reference check against
+ * existing entries — is proven by test/integration/, against Postgres, where the
+ * unique reference actually races.
  */
 
 function message(type: string, data: Record<string, unknown> = {}) {
@@ -100,9 +101,31 @@ describe('FinanceConsumer dispatch', () => {
     expect(inserted[0]![2]).toBe(125_000);
   });
 
-  it('ignores anything that is not a collection event, touching nothing', async () => {
+  it('ignores anything that is not a collection or reversal event, touching nothing', async () => {
     expect(await consumer.handle(message('CODReconciled'))).toBe('ignored');
     expect(await consumer.handle(message('ShipmentCreated'))).toBe('ignored');
+    expect(inserted).toHaveLength(0);
+  });
+
+  it('posts a compensating ADJUSTMENT for a return completion', async () => {
+    const outcome = await consumer.handle(
+      message('ReturnCompleted', { reversedMinor: 125_050, returnId: 'ret-1' }),
+    );
+    expect(outcome).toBe('processed');
+    expect(inserted).toHaveLength(1);
+    const params = inserted[0]!;
+    // merchant, amount, currency, return id — in that order.
+    expect(params[1]).toBe('m-1');
+    expect(params[2]).toBe(125_050);
+    expect(params[3]).toBe('BDT');
+    expect(params[4]).toBe('cod-1');
+  });
+
+  it('ignores a zero-amount reversal — nothing collected, nothing to reverse', async () => {
+    const outcome = await consumer.handle(
+      message('ReturnCompleted', { reversedMinor: 0, returnId: 'ret-1' }),
+    );
+    expect(outcome).toBe('ignored');
     expect(inserted).toHaveLength(0);
   });
 

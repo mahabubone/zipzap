@@ -16,6 +16,7 @@ import { DataSource } from 'typeorm';
 import { CollectCodService } from '../../dist/modules/cod/collect-cod.service.js';
 import { CodRecordRepository } from '../../dist/modules/cod/cod-record.repository.js';
 import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
+import { CodLookup } from '../../dist/modules/cod/cod.lookup.js';
 import { FinanceConsumer } from '../../dist/modules/finance/finance-consumer.service.js';
 import { CreateSettlementService } from '../../dist/modules/finance/create-settlement.service.js';
 import { ApproveSettlementService } from '../../dist/modules/finance/approve-settlement.service.js';
@@ -25,6 +26,9 @@ import { MockPaymentProvider } from '../../dist/modules/finance/provider/mock-pa
 import { FinanceRepository } from '../../dist/modules/finance/finance.repository.js';
 import { PostLedgerEntryService } from '../../dist/modules/finance/post-ledger-entry.service.js';
 import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
+import { ReturnService } from '../../dist/modules/returns/return.service.js';
+import { ReturnRequestRepository } from '../../dist/modules/returns/return-request.repository.js';
+import { ReturnRequestEntity } from '../../dist/modules/returns/return-request.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
 import { LedgerEntryEntity } from '../../dist/modules/finance/ledger-entry.entity.js';
 import { SettlementEntity } from '../../dist/modules/finance/settlement.entity.js';
@@ -34,6 +38,7 @@ const describeIfDb = databaseUrl ? describe : describe.skip;
 
 let codDb: DataSource;
 let financeDb: DataSource;
+let returnsDb: DataSource;
 let systemDb: DataSource;
 let codRecords: CodRecordRepository;
 let collect: CollectCodService;
@@ -98,6 +103,7 @@ before(async () => {
   if (!databaseUrl) return;
   codDb = await connectModuleDataSource('cod', [CodRecordEntity]);
   financeDb = await connectModuleDataSource('finance', [LedgerEntryEntity, SettlementEntity]);
+  returnsDb = await connectModuleDataSource('returns', [ReturnRequestEntity]);
   systemDb = await connectModuleDataSource('system', []);
 
   codRecords = new CodRecordRepository();
@@ -115,6 +121,7 @@ before(async () => {
 after(async () => {
   await codDb?.destroy();
   await financeDb?.destroy();
+  await returnsDb?.destroy();
   await systemDb?.destroy();
 });
 
@@ -463,5 +470,100 @@ describeIfDb('money path — collect to settled', () => {
       [created.id],
     );
     assert.equal(payout.length, 0, 'a failed payout posts no entry');
+  });
+
+  test('return completion reverses the collection with a compensating entry', async () => {
+    const merchant = randomUUID();
+    const s1 = randomUUID();
+    await codDb.transaction(async (manager) =>
+      new CodRecordRepository().insert(manager, {
+        id: randomUUID(),
+        shipmentId: s1,
+        merchantId: merchant,
+        expectedMinor: 125_050,
+        collectedMinor: null,
+        currency: 'BDT',
+        status: 'COD_EXPECTED',
+        failureNote: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never),
+    );
+    const rec = await codDb.query(`SELECT id FROM cod.records WHERE shipment_id = $1`, [s1]);
+    await collect.execute({
+      shipmentId: s1,
+      collectedMinor: 125_050,
+      idempotencyKey: `rev-${randomUUID()}`,
+      actorId: null,
+    });
+    await financeConsumer.handle(codEvent(randomUUID(), rec[0].id, s1, 125_050, merchant));
+
+    const returns = new ReturnService(
+      returnsDb,
+      new ReturnRequestRepository(),
+      new AppendTrackingEventService(),
+      new CodLookup(codDb, new CodRecordRepository()),
+    );
+    const { result: requested } = await returns.request({
+      shipmentId: s1,
+      merchantId: merchant,
+      reason: 'CUSTOMER_REFUSED',
+      idempotencyKey: `rev-req-${randomUUID()}`,
+    });
+    await returns.decide({
+      returnId: requested.id,
+      approverId: randomUUID(),
+      note: 'customer refused an intact parcel at the door',
+      approve: true,
+    });
+    for (let leg = 0; leg < 5; leg++) {
+      await returns.advance({ returnId: requested.id, actorId: null });
+    }
+
+    const completed = await financeConsumer.handle({
+      subject: 'zipzap.return.completed',
+      payload: new TextEncoder().encode(
+        JSON.stringify({
+          id: randomUUID(),
+          type: 'ReturnCompleted',
+          aggregateType: 'return',
+          aggregateId: requested.id,
+          occurredAt: new Date().toISOString(),
+          data: {
+            shipmentId: s1,
+            merchantId: merchant,
+            currency: 'BDT',
+            reversedMinor: 125_050,
+            returnId: requested.id,
+          },
+        }),
+      ),
+    });
+    assert.equal(completed, 'processed');
+
+    const rows = await financeDb.query(
+      `SELECT entry_type, direction, amount_minor FROM finance.ledger_entries
+        WHERE reference_type IN ('COD_RECORD', 'RETURN')
+          AND reference_id IN ($1, $2)
+        ORDER BY recorded_at`,
+      [rec[0].id, requested.id],
+    );
+    assert.equal(rows.length, 2, 'collection plus reversal, both visible');
+    assert.deepEqual(
+      rows.map((r: { entry_type: string; direction: string; amount_minor: string }) => [
+        r.entry_type,
+        Number(r.direction),
+        Number(r.amount_minor),
+      ]),
+      [
+        ['COD_COLLECTED', 1, 125_050],
+        ['ADJUSTMENT', -1, 125_050],
+      ],
+    );
+
+    const balance = await financeDb.transaction(async (manager) =>
+      financeRepo.balanceMinor(manager, merchant),
+    );
+    assert.equal(balance, 0, 'the reversal nets the collection to zero');
   });
 });

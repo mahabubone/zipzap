@@ -45,6 +45,9 @@ export const TRACKING_EVENT_MAP = {
   DeliveryAttempted: 'DELIVERY_ATTEMPTED',
   DeliveryCompleted: 'DELIVERED',
   CODCollected: 'COD_COLLECTED',
+  ReturnRequested: 'RETURN_INITIATED',
+  ReturnAdvanced: 'RETURN_INITIATED',
+  ReturnCompleted: 'RETURNED',
 } as const satisfies Record<string, TrackingEventType>;
 
 /** Events with no public projection. Emitted for operations, not for recipients. */

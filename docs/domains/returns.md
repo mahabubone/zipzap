@@ -12,8 +12,13 @@ A parcel going backwards. Phase 2.
 
 ```
 RETURN_REQUESTED → RETURN_APPROVED → RETURN_INITIATED → RETURN_IN_TRANSIT
-                → RETURN_AT_HUB → RETURN_TO_MERCHANT → RETURNED
+                → RETURN_AT_HUB → RETURN_OUT_FOR_DELIVERY → RETURNED
 ```
+
+Merged 2026-10-04: the decision half (REQUEST → APPROVE/REJECT) from this page, the
+custody legs from [state-machines](../architecture/state-machines.md). `TO_MERCHANT`
+was dropped — a status masquerading as a leg. The machine in `rules/returns.ts` is
+the source; this page and the ROADMAP quote it.
 
 ## Reasons
 

@@ -72,6 +72,28 @@ describe('money', () => {
     assert.throws(() => allocate(money(100), 0, 0), RangeError);
   });
 
+  test('10,000 uneven splits lose zero minor units', () => {
+    // The ROADMAP exit-gate number: a settlement allocator that floors per
+    // shipment without tracking the remainder drifts ~3 poisha per shipment.
+    // allocate() carries the remainder into the first share, so the sum is
+    // exact at any scale. 10,000 pseudo-random weights, prime total.
+    let seed = 1234567;
+    const next = (): number => {
+      seed = (seed * 1103515245 + 12345) % 2_147_483_648;
+      return (seed % 97) + 1;
+    };
+    const weights = Array.from({ length: 10_000 }, next);
+    const total = money(1_000_000_007);
+    const start = Date.now();
+    const shares = allocate(total, ...weights);
+    assert.equal(shares.length, 10_000);
+    assert.equal(sum(shares).amountMinor, total.amountMinor);
+    assert.ok(
+      Date.now() - start < 5_000,
+      'allocation must be fast enough to run per settlement, not just in a test',
+    );
+  });
+
   test('basis points are integer in, integer out', () => {
     assert.equal(applyBasisPoints(money(10000), 250).amountMinor, 250);
     assert.equal(applyBasisPoints(money(1), 100).amountMinor, 0);

@@ -7,13 +7,20 @@ import { CollectCodController } from './collect-cod.controller.ts';
 import { ReconcileCodController } from './reconcile-cod.controller.ts';
 import { ReconcileCodService } from './reconcile-cod.service.ts';
 import { EnsureCodRecordService } from './ensure-cod-record.service.ts';
+import { CodLookup, COD_LOOKUP } from './cod.lookup.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
 @Module({
   imports: [forModule('cod', [CodRecordEntity]), TrackingModule, IdentityModule],
   controllers: [CollectCodController, ReconcileCodController],
-  providers: [CodRecordRepository, CollectCodService, ReconcileCodService, EnsureCodRecordService],
-  exports: [CollectCodService, ReconcileCodService, EnsureCodRecordService],
+  providers: [
+    CodRecordRepository,
+    CollectCodService,
+    ReconcileCodService,
+    EnsureCodRecordService,
+    { provide: COD_LOOKUP, useClass: CodLookup },
+  ],
+  exports: [CollectCodService, ReconcileCodService, EnsureCodRecordService, COD_LOOKUP],
 })
 export class CodModule {}

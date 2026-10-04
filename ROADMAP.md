@@ -347,14 +347,18 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] Delivery confirmation idempotency-keyed
 - [ ] Proof media treated as sensitive customer data
 
-### 🔲 `returns`
+### 🔄 `returns` — full machine live 2026-10-04; transit-leg live walk pending
 
-- [ ] Schema `returns`: `requests`, `approvals`, `transitions`, `reasons`
-- [ ] `RETURN_REQUESTED → APPROVED → INITIATED → IN_TRANSIT → AT_HUB → TO_MERCHANT → RETURNED`
-- [ ] **References the original shipment.** Never a second, unrelated parcel.
-- [ ] Forward lifecycle is never rewound — a delivered-then-returned shipment reached `DELIVERED`
-      first
-- [ ] Financial consequences as compensating entries via events, never calculated twice
+- [x] Schema `returns`: `requests` (migration `0015-ReturnsSchema`, transition-guarded by
+      trigger). `approvals`/`transitions`/`reasons` live as columns + closed vocab, not tables —
+      one row per return, reasons as enum.
+- [x] Full chain `RETURN_REQUESTED` through `RETURNED` (merged vocabulary: decision half
+      from returns.md, custody legs from state-machines.md; `TO_MERCHANT` dropped as a
+      status-masquerading-as-leg)
+- [x] **References the original shipment.** Unique index on `shipment_id`; second return rejected.
+- [x] Forward lifecycle is never rewound — terminal states accept nothing; 64-pair exhaustive test
+- [x] Financial consequences as compensating entries via events (`ReturnCompleted` →
+      `ADJUSTMENT`, both rows visible, balance nets to zero — integration-tested)
 
 ### Exit gate
 
@@ -434,10 +438,12 @@ a disputed payment.
 - [x] Rebalance test: ledger sums to the settlement total, to the unit
       (`money-path.integration.test.ts`: 100000 − 1800 fee = 98200 balance)
 
-### 🔲 Return reversal
+### 🔄 Return reversal — proven by integration test, live walk pending
 
-- [ ] A returned parcel **reverses** its COD collection with a compensating entry
-- [ ] Both rows remain visible; the merchant reconciles collection against reversal
+- [x] A returned parcel **reverses** its COD collection with a compensating entry
+      (`ADJUSTMENT −125050` against `COD_COLLECTED +125050`, both visible)
+- [x] Both rows remain visible; the merchant reconciles collection against reversal
+      (balance nets to exactly zero)
 
 ### Exit gate
 
