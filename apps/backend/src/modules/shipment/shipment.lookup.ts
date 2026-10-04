@@ -35,4 +35,16 @@ export class ShipmentLookup {
       return this.shipments.findCodAmount(manager, shipmentId);
     });
   }
+
+  /**
+   * The webhook boundary's read: a shipment id in, its owning merchant out. Delivery
+   * events carry the parcel, not the merchant — but webhook endpoints are per
+   * merchant, so the fan-out needs the owner. Same contract shape as the reads
+   * above; null means unknown, and the caller treats that as ignorable.
+   */
+  async findMerchantId(shipmentId: string): Promise<string | null> {
+    return this.shipmentDataSource.transaction(async (manager) => {
+      return this.shipments.findMerchantId(manager, shipmentId);
+    });
+  }
 }

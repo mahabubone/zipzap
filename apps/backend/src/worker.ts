@@ -17,6 +17,7 @@ import { AppModule } from './app.module.ts';
 import { connectNats, drainQuietly } from './nats.ts';
 import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
+import { WebhookConsumer } from './modules/merchant/webhook.consumer.ts';
 import { SUBSCRIPTIONS } from './subscriptions.ts';
 
 const logger = new Logger('worker');
@@ -28,8 +29,9 @@ async function bootstrap(): Promise<void> {
   const { nc } = await connectNats('zipzap-worker');
   const tracking = app.get(TrackingConsumer);
   const finance = app.get(FinanceConsumer);
+  const webhook = app.get(WebhookConsumer);
 
-  const handlers = { tracking, finance } as const;
+  const handlers = { tracking, finance, webhook } as const;
 
   const open = SUBSCRIPTIONS.map(({ consumer, subject }) => {
     const subscription = nc.subscribe(subject, { queue: consumer });

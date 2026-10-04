@@ -443,9 +443,11 @@ a disputed payment.
 
 - [x] The ledger balances to the settlement total — asserted to the poisha (integration test +
       live 2026-10-04: 125050 frozen, approved, balance 125050)
-- [ ] **Corrupt one COD collection deliberately** → reconciliation raises an exception, settlement
-      is blocked, a compensating entry restores the balance, and both original rows are preserved
-      — machine paths exist and are unit-tested; the deliberate-corruption drill has not been run
+- [x] **Corrupt one COD collection deliberately** → reconciliation raises an exception,
+      settlement is blocked, review resolves with a recorded note, and both original rows are
+      preserved (live 2026-10-04: over-collect 130000 vs 125000 expected →
+      `RECONCILIATION_EXCEPTION`, zero ledger rows, `COD_RECONCILED` after human review with
+      recorded note; drill also fixed `COD_EXPECTED → RECONCILIATION_EXCEPTION` missing edge)
 - [x] Duplicate COD collect with the same key → one collection, original response returned
 - [x] Partial collection settles at the collected amount with the shortfall reported
 - [ ] 10,000-shipment settlement allocation loses **zero** minor units (remainder test) — no
@@ -479,16 +481,19 @@ a human.
 - [ ] OpenAPI generated; `packages/api-client` generated from it; both committed together
 - [ ] Contract tests asserting the spec matches observed behaviour
 
-### 🔲 Webhooks
+### 🔄 Webhooks — skeleton live 2026-10-04; replay on demand open
 
-- [ ] Event subscriptions: `shipment.created` … `settlement.completed`
-- [ ] **HMAC-SHA256 over `{timestamp}.{raw_body}`** — the raw body, because re-serialising parsed
-      JSON changes key order and breaks verification. This is the most common integration bug.
-- [ ] Retry ladder 1m → 5m → 15m → 1h → 6h → 24h, then a visible failed state
-- [ ] 4xx is **not** retried — retrying a 400 forever is a DoS tool against our own infrastructure
-- [ ] Immutable delivery log: every attempt, success and failure
-- [ ] **Pause beats delete** — a merchant with a broken integration pauses, fixes, replays
-- [ ] Fast acknowledgement; work happens after the 2xx
+- [x] Event subscriptions: `shipment.created` … `settlement.completed` (6 subjects, parity-pinned)
+- [x] **HMAC-SHA256 over `{timestamp}.{raw_body}`** — raw body, constant-time compare, 5-min window
+- [x] Retry ladder 1m → 5m → 15m → 1h → 6h → 24h, then a visible failed state (one job per
+      attempt, ladder delays as job delay — not BullMQ backoff)
+- [x] 4xx is **not** retried — 429 honours retry; timeouts always retry
+- [x] Immutable delivery log: every attempt, success and failure (trigger-append-only)
+- [x] **Pause beats delete** — `PAUSED`/`ACTIVE` endpoints, `FAILING` auto-flag; no delete path
+- [ ] Fast acknowledgement; work happens after the 2xx — consumer enqueues, processor sends;
+      replay-on-demand endpoint not yet built
+- [ ] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — services done,
+      controller written, live proof pending
 
 ### 🔲 Bulk import
 

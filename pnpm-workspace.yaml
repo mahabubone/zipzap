@@ -17,3 +17,4 @@ allowBuilds:
   # TypeORM's telemetry agent. Declined: a self-hosted logistics system has no reason to
   # report usage to a third party.
   '@scarf/scarf': false
+  msgpackr-extract: true

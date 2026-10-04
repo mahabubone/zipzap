@@ -59,6 +59,20 @@ export class ShipmentRepository {
   }
 
   /**
+   * The webhook boundary's read: a shipment id in, its owning merchant out. Same
+   * contract shape as the reads above — the fan-out needs the owner, and must not
+   * open the shipment connection directly.
+   */
+  async findMerchantId(manager: EntityManager, shipmentId: string): Promise<string | null> {
+    const row = await manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .select('s.merchantId', 'merchantId')
+      .where('s.id = :id', { id: shipmentId })
+      .getRawOne<{ merchantId: string }>();
+    return row?.merchantId ?? null;
+  }
+
+  /**
    * Locks the row so two simultaneous transitions serialise. Without this, two riders scanning
    * at once both read the same state and both advance the machine.
    */

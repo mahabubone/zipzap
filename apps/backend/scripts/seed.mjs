@@ -32,7 +32,7 @@ await client.query(
 await client.query(
   `INSERT INTO merchant.api_credentials (id, merchant_id, key_id, secret_hash, scopes)
    VALUES ($1, $2, $3, $4, $5)`,
-  [randomUUID(), merchantId, keyId, hashSecret(secret), ['shipments:read', 'shipments:write', 'tracking:read', 'pickup:create', 'pickup:read', 'delivery:create', 'delivery:read', 'delivery:complete', 'settlements:read', 'settlements:approve']],
+  [randomUUID(), merchantId, keyId, hashSecret(secret), ['shipments:read', 'shipments:write', 'tracking:read', 'pickup:create', 'pickup:read', 'delivery:create', 'delivery:read', 'delivery:complete', 'settlements:read', 'settlements:approve', 'webhooks:manage']],
 );
 await client.query('COMMIT');
 

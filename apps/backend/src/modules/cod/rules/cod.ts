@@ -33,7 +33,12 @@ export type CodStatus = (typeof COD_STATUSES)[number];
  * settled at the collected amount with the shortfall visible, never invented.
  */
 export const COD_TRANSITIONS = {
-  COD_EXPECTED: ['COD_COLLECTED', 'COLLECTION_FAILED', 'PARTIAL_COLLECTION'],
+  COD_EXPECTED: [
+    'COD_COLLECTED',
+    'COLLECTION_FAILED',
+    'PARTIAL_COLLECTION',
+    'RECONCILIATION_EXCEPTION',
+  ],
   COD_COLLECTED: ['COD_RECONCILED', 'RECONCILIATION_EXCEPTION'],
   COD_RECONCILED: ['COD_PAYABLE'],
   COD_PAYABLE: ['SETTLEMENT_CREATED', 'SETTLEMENT_HOLD'],

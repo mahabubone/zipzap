@@ -2,7 +2,7 @@
   "name": "@zipzap/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "ZipZap API, worker and publisher \u2014 one NestJS codebase, three entrypoints",
+  "description": "ZipZap API, worker and publisher — one NestJS codebase, three entrypoints",
   "license": "MIT",
   "main": "dist/main.js",
   "scripts": {
@@ -21,11 +21,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@nestjs/bullmq": "12.0.0",
     "@nestjs/common": "12.1.2",
     "@nestjs/core": "12.1.2",
     "@nestjs/platform-express": "12.1.2",
     "@nestjs/swagger": "12.0.2",
     "@nestjs/typeorm": "12.0.2",
+    "bullmq": "6.3.11",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "nats": "2.29.3",
