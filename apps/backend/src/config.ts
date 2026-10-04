@@ -13,6 +13,11 @@ export interface Config {
   readonly redisUrl: string;
   readonly natsUrl: string;
   readonly natsStream: string;
+  /** Payout rail: mock moves no money; paystation talks to the gateway or the fake. */
+  readonly paymentProvider: 'mock' | 'paystation';
+  readonly paystationUrl: string;
+  readonly paystationMerchantId: string;
+  readonly paystationPassword: string;
 }
 
 function required(name: string): string {
@@ -40,6 +45,12 @@ let cached: Config | undefined;
 export function config(): Config {
   if (cached) return cached;
   const nodeEnv = process.env.NODE_ENV ?? 'development';
+  const paymentProvider = process.env.PAYMENT_PROVIDER ?? 'mock';
+  if (paymentProvider !== 'mock' && paymentProvider !== 'paystation') {
+    throw new Error(
+      `Environment variable PAYMENT_PROVIDER must be "mock" or "paystation", received "${paymentProvider}".`,
+    );
+  }
   cached = Object.freeze({
     nodeEnv,
     isProduction: nodeEnv === 'production',
@@ -48,6 +59,10 @@ export function config(): Config {
     redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
     natsUrl: process.env.NATS_URL ?? 'nats://localhost:4222',
     natsStream: process.env.NATS_STREAM ?? 'ZIPZAP',
+    paymentProvider,
+    paystationUrl: process.env.PAYSTATION_URL ?? 'http://localhost:4010',
+    paystationMerchantId: process.env.PAYSTATION_MERCHANT_ID ?? '104-1653730183',
+    paystationPassword: process.env.PAYSTATION_PASSWORD ?? 'gamecoderstorepass',
   });
   return cached;
 }

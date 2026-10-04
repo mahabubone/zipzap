@@ -422,11 +422,15 @@ a disputed payment.
 - [x] `occurred_at` distinct from `recorded_at` on every entry
 - [x] Settlement is a **frozen view** of entries (`CREATED` through `SETTLED`), immutable
       after approval (trigger rejects status regression; late money freezes into the next
-      settlement). `PAYMENT_INITIATED` onward has no service yet — approval is the live tail.
+      settlement). Full tail live 2026-10-04: approve → initiate → confirm → `SETTLED`,
+      payout entry posted, balance reconciles.
 - [x] Approval idempotency-keyed, permission-checked (`settlements:approve`), audited
       (`approvedBy`/`approvedAt` on the row) — replay returns the recorded decision byte-for-byte
-- [ ] `PaymentProvider` interface with a **mock** implementation first — deferred, no payout rail
-      exists yet; `SETTLED` is reachable in the machine but unwired
+- [x] `PaymentProvider` port with mock default + PayStation adapter — mock in
+      `finance/provider/`, adapter translates wire format (`status_code`, `trx_status`,
+      decimal strings) behind the port; binding switches on `PAYMENT_PROVIDER` env.
+      Live 2026-10-04 against the fake: initiate → control-API complete → confirm →
+      `SETTLED`, `SETTLEMENT_PAYOUT` −125000 posted. Contract tests: 7 green.
 - [x] Rebalance test: ledger sums to the settlement total, to the unit
       (`money-path.integration.test.ts`: 100000 − 1800 fee = 98200 balance)
 
@@ -648,7 +652,9 @@ These run across phases rather than inside one.
 ### Provider integrations
 
 - [x] Fakes for PayStation and MiMSMS, both contract-verified
-- [ ] `PaymentProvider` adapter for PayStation — in-band errors, money conversion, status mapping
+- [x] `PaymentProvider` adapter for PayStation — in-band errors, money conversion, status mapping
+      (`finance/provider/paystation.adapter.ts`, 7 contract tests green against the fake, live
+      `SETTLED` proven 2026-10-04; v2 trxId lookup, unknown-status throws, amount-mismatch throws)
 - [ ] `NotificationChannel` adapter for MiMSMS — `8801…` formatting, `T` vs `P`, DLR retry policy
 - [ ] Fault injection wired into CI so failure paths are exercised on every run
 - [ ] Contract tests against real sandboxes before go-live — **a passing fake proves the wiring,
