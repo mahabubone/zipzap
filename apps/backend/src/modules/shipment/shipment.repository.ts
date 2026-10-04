@@ -59,9 +59,8 @@ export class ShipmentRepository {
   }
 
   /**
-   * The webhook boundary's read: a shipment id in, its owning merchant out. Same
-   * contract shape as the reads above — the fan-out needs the owner, and must not
-   * open the shipment connection directly.
+   * A shipment id in, its owning merchant out. Same contract shape as the reads
+   * above — the fan-out needs the owner, and must not open this connection directly.
    */
   async findMerchantId(manager: EntityManager, shipmentId: string): Promise<string | null> {
     const row = await manager

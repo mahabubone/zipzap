@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MerchantModule } from '../merchant/merchant.module.ts';
 import { FIND_CREDENTIAL, AuthenticateApiKeyService } from './authenticate-api-key.service.ts';
 import { FindCredentialService } from '../merchant/find-credential.service.ts';
@@ -13,7 +13,7 @@ import { ApiKeyGuard } from './api-key.guard.ts';
  * an ownership question we would otherwise have answered wrongly.
  */
 @Module({
-  imports: [MerchantModule],
+  imports: [forwardRef(() => MerchantModule)],
   providers: [
     AuthenticateApiKeyService,
     ApiKeyGuard,

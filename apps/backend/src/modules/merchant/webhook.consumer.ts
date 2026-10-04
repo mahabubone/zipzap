@@ -16,7 +16,6 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import type { Queue } from 'bullmq';
 import { WebhookRepository } from './webhook.repository.ts';
-import { SHIPMENT_LOOKUP, type ShipmentLookup } from '../shipment/shipment.lookup.ts';
 import { wireEvent, type WebhookEvent } from './rules/webhook.ts';
 
 export const WEBHOOK_CONSUMER = 'webhook';
@@ -39,7 +38,6 @@ export class WebhookConsumer {
     @InjectDataSource('merchant') private readonly merchant: DataSource,
     @Inject(WebhookRepository) private readonly webhooks: WebhookRepository,
     @InjectQueue(WEBHOOK_QUEUE) private readonly queue: Queue,
-    @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
   ) {}
 
   async handle(message: {
@@ -53,17 +51,11 @@ export class WebhookConsumer {
       this.logger.error({ subject: message.subject }, 'unparseable event payload');
       return 'malformed';
     }
-
     const wire = wireEvent(envelope.type);
     if (!wire) return 'ignored';
 
-    // Prefer the envelope's own merchant; fall back to the shipment owner for
-    // delivery events, which carry the parcel, not the merchant. The lookup is
-    // the sanctioned cross-module path — never a table read.
-    let merchantId = typeof envelope.data.merchantId === 'string' ? envelope.data.merchantId : null;
-    if (!merchantId && typeof envelope.data.shipmentId === 'string') {
-      merchantId = await this.shipments.findMerchantId(envelope.data.shipmentId);
-    }
+    const merchantId =
+      typeof envelope.data.merchantId === 'string' ? envelope.data.merchantId : null;
     if (!merchantId) {
       this.logger.warn({ type: envelope.type }, 'event carries no merchant identity');
       return 'ignored';
@@ -95,7 +87,8 @@ export class WebhookConsumer {
         },
         // Same outbox event redelivered enqueues the same job id: BullMQ dedupes,
         // and the receiver dedupes on ZipZap-Delivery. At-least-once, both ends.
-        { jobId: `${deliveryId}:attempt-1` },
+        // No colons: BullMQ rejects them in custom job ids.
+        { jobId: `${deliveryId}-attempt-1` },
       );
     }
 

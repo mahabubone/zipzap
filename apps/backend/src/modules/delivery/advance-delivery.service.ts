@@ -77,7 +77,11 @@ export class AdvanceDeliveryService {
         type: 'DeliveryOutForDelivery',
         aggregateType: 'delivery',
         aggregateId: job.id,
-        payload: { shipmentId: job.shipmentId, riderId: job.riderId },
+        payload: {
+          shipmentId: job.shipmentId,
+          riderId: job.riderId,
+          merchantId: await this.shipments.findMerchantId(job.shipmentId),
+        },
       });
 
       return job.status as DeliveryStatus;
@@ -117,7 +121,11 @@ export class AdvanceDeliveryService {
         type: 'DeliveryCompleted',
         aggregateType: 'delivery',
         aggregateId: job.id,
-        payload: { shipmentId: job.shipmentId, riderId: job.riderId },
+        payload: {
+          shipmentId: job.shipmentId,
+          riderId: job.riderId,
+          merchantId: await this.shipments.findMerchantId(job.shipmentId),
+        },
       });
 
       // COD is collected through the injected contract, never by reading cod.records:

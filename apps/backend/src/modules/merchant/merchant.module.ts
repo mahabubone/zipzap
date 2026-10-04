@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { Redis } from 'ioredis';
 import { forModule } from '../../database/module-connection.ts';
 import { config } from '../../config.ts';
 import { ApiCredentialEntity } from './api-credential.entity.ts';
@@ -13,18 +14,26 @@ import { WebhookController } from './webhook.controller.ts';
 import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
-import { ShipmentModule } from '../shipment/shipment.module.ts';
 
 @Module({
   imports: [
-    forModule('merchant', [MerchantEntity, ApiCredentialEntity]),
-    forModule('merchant', [WebhookEndpointEntity, WebhookDeliveryEntity]),
-    IdentityModule,
-    // One direction only: webhooks read shipment facts for the merchant fallback.
-    // Shipment never imports merchant, so no forwardRef is needed.
-    ShipmentModule,
+    forModule('merchant', [
+      MerchantEntity,
+      ApiCredentialEntity,
+      WebhookEndpointEntity,
+      WebhookDeliveryEntity,
+    ]),
+    // Cycle is inherent, not introduced here: identity imports merchant for
+    // credential verification, and the webhook controller needs the guards.
+    // forwardRef on this edge, matching the shipment<->tracking precedent.
+    forwardRef(() => IdentityModule),
     BullModule.forRootAsync({
-      useFactory: () => ({ connection: { url: config().redisUrl } }),
+      // Native ESM: BullMQ cannot load ioredis itself, so pass a constructed
+      // client instead of connection options. maxRetriesPerRequest must be null
+      // for BullMQ's blocking connections — the default (20) breaks them.
+      useFactory: () => ({
+        connection: new Redis(config().redisUrl, { maxRetriesPerRequest: null }),
+      }),
     }),
     BullModule.registerQueue({ name: WEBHOOK_QUEUE }),
   ],

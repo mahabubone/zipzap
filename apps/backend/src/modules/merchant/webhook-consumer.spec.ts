@@ -49,12 +49,8 @@ describe('WebhookConsumer fan-out', () => {
       }),
     };
     const lookup = { findMerchantId: vi.fn(async () => 'm-fallback') };
-    consumer = new WebhookConsumer(
-      merchantDs as never,
-      repository as never,
-      queue as never,
-      lookup as never,
-    );
+    void lookup;
+    consumer = new WebhookConsumer(merchantDs as never, repository as never, queue as never);
   });
 
   it('enqueues one idempotent job per active endpoint', async () => {
@@ -69,28 +65,18 @@ describe('WebhookConsumer fan-out', () => {
     expect(added).toHaveLength(2);
     expect(added[0]!.data.wireEvent).toBe('shipment.delivered');
     // Same outbox event => same job ids: redelivery dedupes on the queue.
-    expect(added[0]!.opts.jobId).toBe('dlv_evt-7_ep-aaaa1:attempt-1');
-    expect(added[1]!.opts.jobId).toBe('dlv_evt-7_ep-bbbb2:attempt-1');
+    expect(added[0]!.opts.jobId).toBe('dlv_evt-7_ep-aaaa1-attempt-1');
+    expect(added[1]!.opts.jobId).toBe('dlv_evt-7_ep-bbbb2-attempt-1');
     // Secret travels with the job so the sender can sign — never logged.
     expect(added[0]!.data.secret).toBe('s1');
-  });
-
-  it('falls back to the shipment owner when the envelope names no merchant', async () => {
-    endpointsFor.mockResolvedValue([]);
-    const outcome = await consumer.handle(message('DeliveryCompleted', { shipmentId: 's-9' }));
-    expect(outcome).toBe('ignored');
-    // The fallback ran (and found no endpoints for the resolved merchant).
-    expect(endpointsFor).toHaveBeenCalledWith(
-      expect.anything(),
-      'm-fallback',
-      'shipment.delivered',
-    );
   });
 
   it('ignores unmapped types, missing identity, and malformed payloads', async () => {
     expect(await consumer.handle(message('SomethingElseHappened', { merchantId: 'm-1' }))).toBe(
       'ignored',
     );
+    // No merchant in the envelope: ignored, never fatal. Delivery envelopes carry
+    // merchantId from the service now; an absent one predates the enrichment.
     expect(await consumer.handle(message('DeliveryCompleted', {}))).toBe('ignored');
     expect(
       await consumer.handle({ subject: 'x', payload: new TextEncoder().encode('{nope') }),

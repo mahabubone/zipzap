@@ -39,7 +39,7 @@ export class WebhookProcessor extends WorkerHost {
       await this.queue.add(
         'deliver',
         { ...base, attempt: attempt + 1 },
-        { jobId: `${base.deliveryId}:attempt-${attempt + 1}`, delay: outcome.nextDelayMs },
+        { jobId: `${base.deliveryId}-attempt-${attempt + 1}`, delay: outcome.nextDelayMs },
       );
     }
   }
