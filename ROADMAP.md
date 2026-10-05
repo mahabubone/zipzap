@@ -347,7 +347,7 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] Delivery confirmation idempotency-keyed
 - [ ] Proof media treated as sensitive customer data
 
-### 🔄 `returns` — full machine live 2026-10-04; transit-leg live walk pending
+### 🔄 `returns` — full machine + live reversal 2026-10-05
 
 - [x] Schema `returns`: `requests` (migration `0015-ReturnsSchema`, transition-guarded by
       trigger). `approvals`/`transitions`/`reasons` live as columns + closed vocab, not tables —
@@ -438,12 +438,12 @@ a disputed payment.
 - [x] Rebalance test: ledger sums to the settlement total, to the unit
       (`money-path.integration.test.ts`: 100000 − 1800 fee = 98200 balance)
 
-### 🔄 Return reversal — proven by integration test, live walk pending
+### 🔄 Return reversal — live-proven 2026-10-05
 
 - [x] A returned parcel **reverses** its COD collection with a compensating entry
-      (`ADJUSTMENT −125050` against `COD_COLLECTED +125050`, both visible)
+      (live: collect +125000 → return → `ADJUSTMENT −125000`, both visible)
 - [x] Both rows remain visible; the merchant reconciles collection against reversal
-      (balance nets to exactly zero)
+      (live: `COD_COLLECTED +125000`, `ADJUSTMENT −125000`; tracking shows the full chain)
 
 ### Exit gate
 
@@ -496,10 +496,10 @@ a human.
 - [x] 4xx is **not** retried — 429 honours retry; timeouts always retry
 - [x] Immutable delivery log: every attempt, success and failure (trigger-append-only)
 - [x] **Pause beats delete** — `PAUSED`/`ACTIVE` endpoints, `FAILING` auto-flag; no delete path
-- [ ] Fast acknowledgement; work happens after the 2xx — consumer enqueues, processor sends;
-      replay-on-demand endpoint not yet built
-- [ ] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — services done,
-      controller written, live proof pending
+- [x] Fast acknowledgement; work happens after the 2xx — consumer enqueues, processor sends;
+      replay-on-demand at `POST /v1/webhooks/deliveries/:id/replay` (terminal-only, fresh id)
+- [x] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — proven live 2026-10-04:
+      endpoint registered, secret issued, signed `shipment.delivered` received 200
 
 ### 🔲 Bulk import
 
