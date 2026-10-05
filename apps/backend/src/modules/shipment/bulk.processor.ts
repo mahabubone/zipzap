@@ -18,6 +18,7 @@ import type { Job } from 'bullmq';
 import type { DataSource } from 'typeorm';
 import { BULK_QUEUE } from './bulk-import.service.ts';
 import { BulkRepository } from './bulk.repository.ts';
+import { ShipmentRepository } from './shipment.repository.ts';
 import { CreateShipmentService } from './create-shipment.service.ts';
 import { money } from '../../common/money.ts';
 
@@ -32,6 +33,7 @@ export class BulkProcessor extends WorkerHost {
   constructor(
     @InjectDataSource('shipment') private readonly shipments: DataSource,
     @Inject(BulkRepository) private readonly bulk: BulkRepository,
+    @Inject(ShipmentRepository) private readonly created: ShipmentRepository,
     @Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService,
   ) {
     super();
@@ -81,27 +83,33 @@ export class BulkProcessor extends WorkerHost {
     // No wrapping transaction: createShipment.execute owns its own (the
     // idempotency claim commits with the work). Nesting same-connection
     // transactions aborts. Snapshot, check, call, record — separate boundaries.
+    //
+    // Single-row reads throughout: the chunk owns its rowIds, so loading the
+    // whole job per row would turn a 10k import into 20k full scans.
+    //
+    // Already-terminal rows converge on their recorded outcome, never on
+    // 'failed': a retried chunk replays CREATED rows as successes, so the
+    // counters stay exact across retries instead of counting replays as failures.
     const snapshot = await this.shipments.transaction(async (manager) => {
-      const rows = await this.bulk.findRows(manager, jobId);
-      const row = rows.find((r) => r.id === rowId);
-      if (!row || row.outcome !== 'READY') return null;
+      const row = await this.bulk.findRowById(manager, rowId);
+      if (!row) return 'failed' as const;
+      if (row.outcome === 'CREATED') return 'succeeded' as const;
+      if (row.outcome === 'SKIPPED_DUPLICATE') return 'skipped' as const;
+      if (row.outcome !== 'READY') return null;
       return {
         invoice: row.invoice,
         fields: row.fields as Record<string, string>,
       };
     });
     if (!snapshot) return 'failed';
+    if (typeof snapshot === 'string') return snapshot;
 
     const duplicate = await this.shipments.transaction((manager) =>
-      manager
-        .getRepository('shipments' as never)
-        .findOneBy({ merchantId, merchantReference: snapshot.invoice } as never)
-        .catch(() => null),
+      this.created.findByMerchantReference(manager, merchantId, snapshot.invoice),
     );
     if (duplicate) {
       await this.shipments.transaction(async (manager) => {
-        const rows = await this.bulk.findRows(manager, jobId);
-        const row = rows.find((r) => r.id === rowId);
+        const row = await this.bulk.findRowById(manager, rowId);
         if (!row) return;
         row.outcome = 'SKIPPED_DUPLICATE';
         row.reason = 'shipment already exists';
@@ -138,8 +146,7 @@ export class BulkProcessor extends WorkerHost {
         actorId: null,
       });
       await this.shipments.transaction(async (manager) => {
-        const rows = await this.bulk.findRows(manager, jobId);
-        const row = rows.find((r) => r.id === rowId);
+        const row = await this.bulk.findRowById(manager, rowId);
         if (!row) return;
         row.outcome = 'CREATED';
         row.shipmentId = result.id;
@@ -150,8 +157,7 @@ export class BulkProcessor extends WorkerHost {
       const reason =
         error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
       await this.shipments.transaction(async (manager) => {
-        const rows = await this.bulk.findRows(manager, jobId);
-        const row = rows.find((r) => r.id === rowId);
+        const row = await this.bulk.findRowById(manager, rowId);
         if (!row) return;
         row.outcome = 'FAILED';
         row.reason = reason;

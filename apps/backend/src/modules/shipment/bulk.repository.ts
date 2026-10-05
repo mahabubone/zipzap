@@ -42,18 +42,8 @@ export class BulkRepository {
       .find({ where: { jobId }, order: { lineNumber: 'ASC' } });
   }
 
-  findShipmentByReference(
-    manager: EntityManager,
-    merchantId: string,
-    reference: string,
-  ): Promise<{ id: string } | null> {
-    return manager
-      .createQueryBuilder()
-      .select('s.id', 'id')
-      .from('shipment.shipments', 's')
-      .where('s.merchant_id = :merchantId', { merchantId })
-      .andWhere('s.merchant_reference = :reference', { reference })
-      .getRawOne<{ id: string }>()
-      .then((row) => row ?? null);
+  /** Single-row read for the chunk hot path: loading all 10k rows per row is O(n²). */
+  findRowById(manager: EntityManager, rowId: string): Promise<BulkRowEntity | null> {
+    return manager.getRepository(BulkRowEntity).findOneBy({ id: rowId });
   }
 }

@@ -117,23 +117,26 @@ export class BulkImportService {
         createdAt: now,
         updatedAt: now,
       } as never);
-      await this.bulk.insertRows(
-        manager,
-        rows.map(
-          (row) =>
-            ({
-              id: randomUUID(),
-              jobId,
-              lineNumber: row.lineNumber,
-              invoice: row.invoice,
-              fields: row.fields,
-              outcome: row.outcome.kind,
-              reason: row.outcome.kind === 'READY' ? null : row.outcome.reason,
-              shipmentId: null,
-              createdAt: now,
-            }) as never,
-        ),
+      // One save() per 500 rows: 10,000 rows × 8 columns in a single INSERT
+      // exceeds Postgres's 65535 bind-parameter cap. Same transaction, batched
+      // writes — atomicity unchanged, the cap respected.
+      const entities = rows.map(
+        (row) =>
+          ({
+            id: randomUUID(),
+            jobId,
+            lineNumber: row.lineNumber,
+            invoice: row.invoice,
+            fields: row.fields,
+            outcome: row.outcome.kind,
+            reason: row.outcome.kind === 'READY' ? null : row.outcome.reason,
+            shipmentId: null,
+            createdAt: now,
+          }) as never,
       );
+      for (let at = 0; at < entities.length; at += 500) {
+        await this.bulk.insertRows(manager, entities.slice(at, at + 500));
+      }
     });
 
     // PENDING -> VALIDATING -> PREVIEW collapses: parsing IS validation here,

@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-04 · COD collect + ledger + settlement proven live end to end
+**Last updated:** 2026-10-05 · 10,000-row bulk import proven live end to end
 
 ---
 
@@ -501,7 +501,7 @@ a human.
 - [x] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — proven live 2026-10-04:
       endpoint registered, secret issued, signed `shipment.delivered` received 200
 
-### 🔄 Bulk import — live-proven 2026-10-05 (2-row walk; 10k load pending)
+### ✅ Bulk import — live-proven 2026-10-05 (2-row walk + 10k load)
 
 - [x] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
       (`/upload` stores the preview, `/accept` enqueues 100-row chunks)
@@ -544,7 +544,12 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
       (live 2026-10-04/05: dead endpoint climbed 1m → 5m → 15m → 1h → 6h with one immutable
       row per attempt, `fetch failed`, attempt-6 enqueued in the delayed set; per-attempt rows
       are the merchant-visible failed state — `terminal` flips on attempt 6)
-- [ ] 10,000-row import completes without a timeout and yields a downloadable row-level result
+- [x] 10,000-row import completes without a timeout and yields a downloadable row-level result
+      (live 2026-10-05: upload 0.9s → 100 chunks → `COMPLETED` 10000/10000 in ~96s, zero
+      failures; result CSV downloadable, 10000 rows each with a shipment id, zero orphans.
+      Found and fixed live: JSON body limit raised to 10MB, upload insert batched at 500 rows
+      for the 65535 bind-param cap, job-trigger allows counter-only updates, per-row code reads
+      single rows (O(n²) removed), retried chunks replay terminal rows instead of failing them)
 - [x] Webhook signature verifies over the **raw** body, asserted in a test
       (`webhook.spec.ts`: byte-exact input matters — whitespace/reorder breaks the signature;
       plus the live proof where the signature cryptographically verified)

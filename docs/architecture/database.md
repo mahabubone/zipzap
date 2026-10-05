@@ -13,7 +13,7 @@ One schema per module. The schema _is_ the boundary.
 | `identity`     | identity     | users, sessions, credentials, roles, permissions                 |
 | `merchant`     | merchant     | merchants, branches, addresses, contracts, credentials, webhooks |
 | `customer`     | customer     | customers, phones, addresses                                     |
-| `shipment`     | shipment     | shipments, parcels, scans                                        |
+| `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                  |
 | `pickup`       | pickup       | pickup requests, batches, assignments, attempts                  |
 | `hub`          | hub          | hubs, staff, capacity, schedules                                 |
 | `network`      | network      | zones, routes, route legs, manifests, trips, service areas       |
@@ -107,6 +107,13 @@ REVOKE UPDATE, DELETE ON tracking.events FROM zipzap_app;
 ```
 
 Enforce it in the database, not just in review.
+
+One nuance learned live (migration `0019`): a status guard on a working table must allow
+_counter-only_ updates. `shipment.bulk_jobs` moves forward through its lifecycle, but the chunk
+processor also bumps `processed_rows` / `succeeded_rows` without moving status — the first
+version of the trigger rejected those as `PROCESSING → PROCESSING` and killed a 10k import.
+Same-status updates are counter writes, not lifecycle moves; the guard allows them and still
+rejects every illegal status change.
 
 ## Idempotency
 

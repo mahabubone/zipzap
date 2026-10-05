@@ -8,6 +8,7 @@
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './common/exception.filter';
@@ -15,7 +16,13 @@ import { config } from './config';
 
 async function bootstrap(): Promise<void> {
   const { port, isProduction } = config();
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false });
+
+  // Bulk CSV uploads ride inside JSON (the CSV text is what matters, not its
+  // transport encoding). A 10,000-row file is ~850KB — the default 100KB JSON
+  // limit would reject it before validation runs. 10MB covers the exit gate;
+  // the DTO still caps `csv` at 10M chars.
+  app.useBodyParser('json', { limit: '10mb' });
 
   // The single place a domain error becomes an HTTP response.
   app.useGlobalFilters(new DomainExceptionFilter());
