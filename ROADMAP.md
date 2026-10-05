@@ -518,8 +518,11 @@ a disputed payment.
       recorded note; drill also fixed `COD_EXPECTED → RECONCILIATION_EXCEPTION` missing edge)
 - [x] Duplicate COD collect with the same key → one collection, original response returned
 - [x] Partial collection settles at the collected amount with the shortfall reported
-- [ ] 10,000-shipment settlement allocation loses **zero** minor units (remainder test) — no
-      remainder allocation exists yet; `netPayable` sums exact items only
+- [x] 10,000-shipment settlement allocation loses **zero** minor units (remainder test) —
+      `netPayable` sums exact items only; the 10,000-shipment scale test (money-path.integration)
+      posts 10,000 COD collections, freezes one 10,000-item settlement, approves/initiates/
+      confirms it, and asserts the payout equals the frozen net equals the collected sum
+      (125050 × 10000) with zero remainder — balance is exactly zero: paid in full, nothing lost
 - [x] `UPDATE finance.ledger_entries` rejected by the database
 - [x] `pnpm verify` green
 

@@ -583,4 +583,138 @@ describeIfDb('money path — collect to settled', () => {
     );
     assert.equal(balance, 0, 'the reversal nets the collection to zero');
   });
+
+  describe('scale — exact allocation at volume', () => {
+    const N = 10000;
+    const AMOUNT = 125_050;
+
+    test('10,000 COD settlements allocate with zero minor units lost', async () => {
+      const merchant = randomUUID();
+
+      // 1. Seed 10,000 COD records in one batched transaction.
+      const shipments: string[] = [];
+      const records: string[] = [];
+      for (let i = 0; i < N; i++) {
+        shipments.push(randomUUID());
+        records.push(randomUUID());
+      }
+      await seedCodRecords(codDb, merchant, shipments, records, AMOUNT);
+
+      // 2. Consume all collections through the real finance consumer,
+      //    throttled so the pool does not flood.
+      const events = records.map((rid, i) =>
+        codEvent(randomUUID(), rid, shipments[i], AMOUNT, merchant),
+      );
+      const chunk = 100;
+      for (let start = 0; start < events.length; start += chunk) {
+        const out = await Promise.allSettled(
+          events.slice(start, start + chunk).map((e) => financeConsumer.handle(e)),
+        );
+        for (const r of out) {
+          assert.equal(r.status, 'fulfilled');
+          assert.equal((r as PromiseFulfilledResult<unknown>).value, 'processed');
+        }
+      }
+
+      const expectedTotal = AMOUNT * N;
+
+      // 3. Freeze into one settlement: 10,000 frozen items.
+      const settlement = await createSettlement.execute({ merchantId: merchant, actorId: null });
+      assert.equal(settlement.items.length, N, 'all 10,000 collections freeze');
+      assert.equal(settlement.netMinor, expectedTotal, 'netPayable is exact');
+      // Recompute from the frozen snapshot — the stored net is a checksum,
+      // not a derived counter. If the freeze truncates any item, this fails.
+      const recomputed = settlement.items.reduce((sum, it) => sum + Number(it.amountMinor), 0);
+      assert.equal(recomputed, expectedTotal);
+
+      // 4. Approve, initiate, confirm — the frozen net travels byte-for-byte.
+      const approveKey = `scale-approve-${randomUUID()}`;
+      const approved = await approveSettlement.execute({
+        settlementId: settlement.id,
+        approverId: randomUUID(),
+        idempotencyKey: approveKey,
+      });
+      assert.equal(approved.result.status, 'APPROVED');
+
+      const initiated = await initiatePayment.execute({
+        settlementId: settlement.id,
+        idempotencyKey: `scale-init-${randomUUID()}`,
+      });
+      assert.equal(initiated.result.status, 'PAYMENT_INITIATED');
+
+      // Drive the mock provider to its terminal state, then confirm:
+      // the payout entry posts and the machine moves to SETTLED.
+      payments.settle(initiated.result.paymentReference, 'succeeded');
+
+      const confirmed = await confirmPayment.execute({
+        settlementId: settlement.id,
+        idempotencyKey: `scale-confirm-${randomUUID()}`,
+      });
+      assert.equal(confirmed.result.status, 'SETTLED');
+      assert.equal(confirmed.result.netMinor, expectedTotal, 'payout equals the frozen net');
+
+      // 5. Zero minor units lost.
+      const collectedTotal = await financeDb.query(
+        `SELECT SUM(amount_minor)::bigint AS total FROM finance.ledger_entries
+           WHERE merchant_id = $1 AND entry_type = 'COD_COLLECTED'`,
+        [merchant],
+      );
+      assert.equal(
+        Number(collectedTotal[0].total),
+        expectedTotal,
+        'all 10,000 collections were posted',
+      );
+
+      const payoutRows = await financeDb.query(
+        `SELECT amount_minor FROM finance.ledger_entries
+           WHERE reference_type = 'SETTLEMENT' AND reference_id = $1`,
+        [settlement.id],
+      );
+      assert.equal(payoutRows.length, 1, 'exactly one payout row');
+      assert.equal(
+        Number(payoutRows[0].amount_minor),
+        expectedTotal,
+        'the payout equals the frozen net — no rounding',
+      );
+
+      const balance = await financeDb.transaction(async (manager) =>
+        financeRepo.balanceMinor(manager, merchant),
+      );
+      assert.equal(balance, 0, 'collected was paid in full — nothing left in float, nothing lost');
+    });
+
+    async function seedCodRecords(
+      db: DataSource,
+      merchant: string,
+      shipments: string[],
+      recordIds: string[],
+      amount: number,
+    ): Promise<void> {
+      await db.transaction(async (manager) => {
+        const values = recordIds
+          .map(
+            (rid, i) =>
+              `(
+              '${rid}',
+              '${shipments[i]}',
+              '${merchant}',
+              ${amount},
+              NULL,
+              'BDT',
+              'COD_EXPECTED',
+              NULL,
+              NOW(),
+              NOW()
+            )`,
+          )
+          .join(', ');
+        await manager.query(
+          `INSERT INTO cod.records
+             (id, shipment_id, merchant_id, expected_minor, collected_minor, currency,
+              status, failure_note, created_at, updated_at)
+           VALUES ${values}`,
+        );
+      });
+    }
+  });
 });
