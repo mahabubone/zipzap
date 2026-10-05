@@ -54,7 +54,13 @@ export class RateLimitGuard implements CanActivate {
 
     const { key, limit, windowSeconds } = rateLimitKey(
       this.tier,
-      principal?.credentialId ?? null,
+      principal
+        ? {
+            credentialId: principal.credentialId,
+            merchantId: principal.merchantId,
+            rateLimitPerMin: principal.rateLimitPerMin,
+          }
+        : null,
       request.ip ?? 'unknown',
     );
 

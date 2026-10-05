@@ -55,6 +55,7 @@ export class AuthenticateApiKeyService {
       merchantId: credential.merchantId,
       scopes: credential.scopes as ApiScope[],
       credentialId: credential.id,
+      rateLimitPerMin: credential.rateLimitPerMin,
     };
   }
 }

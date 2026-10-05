@@ -22,6 +22,8 @@ export interface FoundCredential {
   readonly secretHash: string;
   readonly scopes: string[];
   readonly revokedAt: Date | null;
+  /** Per-contract override, req/min. NULL = tier default (migration 0022). */
+  readonly rateLimitPerMin: number | null;
 }
 
 @Injectable()
@@ -39,7 +41,8 @@ export class FindCredentialService {
               c.scopes,
               c.revoked_at,
               m.name       AS merchant_name,
-              m.status     AS merchant_status
+              m.status     AS merchant_status,
+              m.rate_limit_per_min
          FROM merchant.api_credentials c
          JOIN merchant.merchants m ON m.id = c.merchant_id
         WHERE c.key_id = $1`,
@@ -57,6 +60,7 @@ export class FindCredentialService {
       secretHash: row.secret_hash,
       scopes: row.scopes ?? [],
       revokedAt: row.revoked_at,
+      rateLimitPerMin: row.rate_limit_per_min ?? null,
     };
   }
 

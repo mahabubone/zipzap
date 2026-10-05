@@ -22,24 +22,49 @@ export const RATE_LIMIT_TIERS = {
 
 export type RateLimitTier = keyof typeof RATE_LIMIT_TIERS;
 
+/** What the guard knows about the caller. Public traffic has none (anonymous). */
+export interface RateLimitCaller {
+  readonly credentialId: string;
+  readonly merchantId: string | null;
+  /** Per-contract override, req/min. Applies to the merchant tier only. */
+  readonly rateLimitPerMin?: number | null;
+}
+
 export interface RateLimitKey {
-  /** Redis key suffix. Per credential for merchants, per IP for public. */
+  /** Redis key suffix. */
   readonly key: string;
   readonly limit: number;
   readonly windowSeconds: number;
 }
 
-/** Credential-bound callers share nothing across merchants; anonymous callers share per IP. */
+/**
+ * The counter subject: merchant tiers count PER MERCHANT, public counts per IP.
+ *
+ * Keying a merchant tier by credential would give a merchant N× its contract
+ * limit for N keys — the limit is a property of the contract, not of how many
+ * keys were issued. The contract override (merchants.rate_limit_per_min) only
+ * means something if the counter is merchant-scoped.
+ *
+ * The override is clamped: a contract typo must not create a 0-limit deadlock
+ * or a million-req/min hole. The DB CHECK rejects ≤0; this clamps the ceiling.
+ */
+const MAX_OVERRIDE_PER_MIN = 100_000;
+
 export function rateLimitKey(
   tier: RateLimitTier,
-  credentialId: string | null,
+  caller: RateLimitCaller | null,
   ip: string,
 ): RateLimitKey {
   const policy = RATE_LIMIT_TIERS[tier];
-  const subject = credentialId ?? `ip:${ip}`;
+  const subject =
+    tier === 'public' || !caller ? `ip:${ip}` : (caller.merchantId ?? caller.credentialId);
+  let limit: number = policy.limit;
+  if (tier === 'merchant' && caller?.rateLimitPerMin != null) {
+    limit = Math.max(1, Math.min(caller.rateLimitPerMin, MAX_OVERRIDE_PER_MIN));
+  }
   return {
     key: `ratelimit:${tier}:${subject}`,
-    limit: policy.limit,
+    limit,
     windowSeconds: policy.windowSeconds,
   };
 }

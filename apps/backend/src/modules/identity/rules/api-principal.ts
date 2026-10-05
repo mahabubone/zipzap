@@ -21,6 +21,8 @@ export interface ApiPrincipal {
   readonly merchantId: string | null;
   readonly scopes: readonly ApiScope[];
   readonly credentialId: string;
+  /** Per-contract rate limit override (req/min), from the merchant. Absent = tier default. */
+  readonly rateLimitPerMin?: number | null;
 }
 
 export function hasScope(principal: ApiPrincipal, scope: ApiScope): boolean {

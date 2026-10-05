@@ -82,6 +82,14 @@ status for both.
 Limits live in the merchant contract. A large merchant with 50,000 shipments a day is not
 malicious and should not be throttled like one sending 50.
 
+**Implemented** (migration 0022, live 2026-10-05): `merchant.merchants.rate_limit_per_min` is
+the per-contract override for the `merchant` tier — NULL means the tier default, a value
+replaces it (clamped 1…100000 in code, `> 0` in a DB CHECK). The counter itself is keyed by
+**merchant**, not by credential: two API keys of one merchant share one budget, because the
+limit belongs to the contract, not to how many keys were issued. Proven live: override 3/min,
+credential A → remaining 2, credential B (same merchant) → remaining 1, fourth call → 429 with
+`Retry-After`.
+
 `last_used_at` on the credential is what tells you who is actually near their limit, and it is
 worth reviewing before tightening a default.
 

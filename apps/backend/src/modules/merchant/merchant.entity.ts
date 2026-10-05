@@ -15,6 +15,13 @@ export class MerchantEntity {
   @Column('text', { unique: true })
   contactEmail!: string;
 
+  /**
+   * Per-contract rate limit, requests per minute. NULL = tier default.
+   * Configuration, not history — see migration 0022.
+   */
+  @Column('integer', { nullable: true })
+  rateLimitPerMin!: number | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

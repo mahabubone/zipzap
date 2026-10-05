@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · OpenAPI + api-client + contract tests live-proven
+**Last updated:** 2026-10-05 · Phase 4 exit gate green — per-merchant rate limits live; Phases 5–6 scoped with build order
 
 ---
 
@@ -32,9 +32,9 @@ file is the build view and is the one to follow when implementing.
 | **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live        |
 | **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 in progress: pickup, rider, delivery live-proven       |
 | **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven |
-| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔲                                                        |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲                                                        |
-| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲                                                        |
+| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                 |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲 scoped — build order recorded below                    |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                    |
 
 **The spine: one shipment, end to end.**
 
@@ -486,11 +486,18 @@ a human.
       (live 2026-10-05: shipment detail + cancel, webhook list, pickup/returns/COD/settlement
       lists — five cursor-paginated collections + two bounded reads; COD walk 1600 rows zero
       repeats; doc table now marks ✅/🔲/decision per route)
-- [ ] API key auth with scopes and per-merchant rate limits
+- [x] API key auth with scopes and per-merchant rate limits
+      (auth + per-route scope guards live since 2026-10-05; per-merchant limits live 2026-10-05:
+      counters keyed by **merchant** — two keys share one budget — plus `rate_limit_per_min`
+      per-contract override (migration 0022). Proof: override 3/min → cred A remaining 2,
+      cred B same merchant remaining 1, 4th call 429 + `Retry-After` + `RATE_LIMITED`)
 - [x] Cursor pagination on every unbounded collection, total ordering
       (shipments, pickups, returns, COD records, settlements — all `created_at DESC, id DESC`;
       webhook endpoints bounded, deliberately unpaginated per docs/api/pagination.md)
-- [ ] Error envelope on every path, from the single filter
+- [x] Error envelope on every path, from the single filter
+      (registered exactly once in `main.ts`; `domain-error.spec` asserts the registry is
+      exhaustive over subclasses — an unmapped error is a test failure, not a 500.
+      Contract suite asserts the envelope shape on 400/401/404/429 live)
 - [x] `RateLimit-*` headers, `Retry-After` on 429
       (live 2026-10-05: merchant list → `RateLimit-Limit: 600`, public track →
       `100`; 105 rapid hits → 96×200 + 9×429 with `RATE_LIMITED` envelope)
@@ -578,13 +585,30 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
       FAILED. Fixed live: the throw path hardcoded `terminal: false`, so an outage could never
       reach a visible terminal state; past the last rung the message now marks FAILED
       (DEAD_LETTERED on carrier policy 0))
-- [ ] `pnpm verify` green
+- [x] `pnpm verify` green
+      (2026-10-05: boundaries + format + typecheck + 1098 backend tests + 5 client tests)
 
 ---
 
 ## Phase 5 — Advanced logistics
 
 Depth in the network model. Every item here has a trigger; none is needed for the flagship demo.
+
+**Build order (scoped 2026-10-05)** — ground truth: no `network`/`hub` schema exists yet;
+`rider` exists with deterministic, explainable `rank()`; no rider mobile app exists. Therefore:
+
+1. **Network schema + coverage-as-data** first — `serviceable`/`estimated_days`/`COD_available`
+   as rows, never `if (city === 'Dhaka')`. Closes Phase 2's still-open gate box
+   ("unserviceable destination rejected at creation") as a side effect, because
+   serviceability has nowhere to live until this exists.
+2. **Routing legs** (fixed topology: pickup zone → origin → regional → destination →
+   delivery point) on that schema, with the manifest/reconciliation lifecycle.
+3. **SLA**: Asia/Dhaka cutoffs + holiday calendar, computed against the route legs.
+4. **Offline sync — server contract first** (device command queue, ordered replay by
+   `created_at`, explicit rejection of a command invalidated while offline). The mobile app
+   is a separate, later surface; the contract is testable without it.
+5. **Utilisation as a measured KPI, then optimised** — the box's own order. Measure with
+   today's `rank()`; only then add workload/capacity signals and record before/after.
 
 ### 🔲 Routing and serviceability
 
@@ -619,6 +643,23 @@ Depth in the network model. Every item here has a trigger; none is needed for th
 ## Phase 6 — Operations
 
 Running it at volume, and proving it.
+
+**Build order (scoped 2026-10-05)** — ground truth: no `analytics` schema, no `/metrics`,
+no desktop shell exist yet. Therefore:
+
+1. **Control tower live counts** first — cross-module read contracts only (each module
+   exposes its own counts; nobody joins across schemas). This is the simultaneity
+   demonstration the architecture exists for, and it needs no new tables.
+2. **`/metrics` on three entrypoints** — cards its own box, and every later alert links to
+   a dashboard built from it. Cardinality rule enforced at the collector.
+3. **Analytics schema + `analytics:rebuild`** — projections fed by events only; the rebuild
+   command is the acceptance test that they are not authoritative by accident.
+4. **Simulator** through the real state machine and real outbox (never direct status
+   writes), then **seed profiles** `demo`/`load` deterministic from a fixed seed.
+5. **Reliability drills** (docs/operations/reliability.md) induced and asserted, then
+   **replace the performance hypotheses** with measured numbers.
+6. **`apps/desktop` last** — UI over a console that is already proven; building it earlier
+   would demo a projection nobody trusts.
 
 ### 🔲 Control tower
 
