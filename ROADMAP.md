@@ -401,9 +401,15 @@ Movement. This is where the product stops being an order form and becomes a cour
       (integration test 2026-10-05: stuck parcel → `MANIFEST_INCOMPLETE` 422 naming its id,
       status holds at `RECEIVED`, zero `ManifestReconciled` events; after the parcel
       arrives the identical call returns `RECONCILED`)
-- [ ] Assignment is deterministic — the same inputs assign the same rider 100 times
-- [ ] Return creates a reversing ledger request, not a second parcel
-- [ ] `pnpm verify` green
+- [x] Assignment is deterministic — the same inputs assign the same rider 100 times
+      (rider rules spec: 100 rotations of the same pool, exactly one winner; plus the
+      existing order-independence and rider_id tie-break tests)
+- [x] Return creates a reversing ledger request, not a second parcel
+      (same claim proven live in Phase 3: collect +125000 → return → `ADJUSTMENT −125000`,
+      both rows visible, no second parcel — see the Return reversal section above)
+- [x] `pnpm verify` green
+      (2026-10-05: boundaries + format + typecheck + 1110 backend tests + 5 client tests;
+      full integration suite 50/50, serialized)
 
 ### Risks
 

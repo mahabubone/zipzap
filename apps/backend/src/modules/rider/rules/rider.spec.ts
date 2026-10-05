@@ -70,6 +70,23 @@ describe('rider assignment scoring', () => {
     );
   });
 
+  it('the same inputs assign the same rider 100 times (every input rotation)', () => {
+    const pool = [
+      rider({ riderId: 'r-1', distanceMetres: 3000, activeJobs: 1 }),
+      rider({ riderId: 'r-2', distanceMetres: 1500, recentRefusals: 2 }),
+      rider({ riderId: 'r-3', distanceMetres: 1500, recentRefusals: 2 }),
+      rider({ riderId: 'r-4', distanceMetres: 7000 }),
+    ];
+    const winners = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      // Rotate the input — deterministic, no Math.random — so every run sees a
+      // different iteration order. Same inputs must still pick the same rider.
+      const rotated = [...pool.slice(i % pool.length), ...pool.slice(0, i % pool.length)];
+      winners.add(rank(rotated)[0]!.riderId);
+    }
+    expect(winners.size, 'same winner across 100 input orderings').toBe(1);
+  });
+
   it('returns an empty list when nobody is eligible — the job waits', () => {
     expect(rank([])).toEqual([]);
     expect(rank([rider({ activeJobs: 5, capacity: 3 })])).toEqual([]);
