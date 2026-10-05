@@ -43,7 +43,7 @@ function subjectsOf(types: readonly string[]): Set<string> {
   );
 }
 
-function subscribed(consumer: 'tracking' | 'finance' | 'webhook'): Set<string> {
+function subscribed(consumer: 'tracking' | 'finance' | 'webhook' | 'notification'): Set<string> {
   return new Set(SUBSCRIPTIONS.filter((s) => s.consumer === consumer).map((s) => s.subject));
 }
 
@@ -58,5 +58,11 @@ describe('subscription parity', () => {
 
   it('webhook subscribes to exactly its wire-mapped events', () => {
     expect(subscribed('webhook')).toEqual(subjectsOf(Object.keys(WEBHOOK_EVENTS)));
+  });
+
+  it('notification subscribes to exactly its template-mapped events', () => {
+    expect(subscribed('notification')).toEqual(
+      subjectsOf(['ShipmentCreated', 'DeliveryOutForDelivery', 'DeliveryCompleted']),
+    );
   });
 });

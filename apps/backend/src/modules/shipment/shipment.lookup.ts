@@ -46,4 +46,10 @@ export class ShipmentLookup {
       return this.shipments.findMerchantId(manager, shipmentId);
     });
   }
+
+  async findRecipient(shipmentId: string): Promise<{ name: string; phone: string } | null> {
+    return this.shipmentDataSource.transaction(async (manager) => {
+      return this.shipments.findRecipient(manager, shipmentId);
+    });
+  }
 }

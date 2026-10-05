@@ -20,6 +20,10 @@ export class ShipmentEntity {
   @Column('text')
   trackingCode!: string;
 
+  /** The merchant's own invoice reference. The bulk dedupe anchor; null for single creates. */
+  @Column('text', { nullable: true })
+  merchantReference!: string | null;
+
   /** An identifier, not a foreign key. See ADR-0002. */
   @Column('uuid')
   merchantId!: string;

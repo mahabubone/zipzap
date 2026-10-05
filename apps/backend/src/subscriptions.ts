@@ -8,7 +8,7 @@
  * which is exactly how `CODCollected` missed the public timeline until 2026-10-04.
  */
 
-export type SubscriptionConsumer = 'tracking' | 'finance' | 'webhook';
+export type SubscriptionConsumer = 'tracking' | 'finance' | 'webhook' | 'notification';
 
 export interface NatsSubscription {
   readonly consumer: SubscriptionConsumer;
@@ -37,4 +37,7 @@ export const SUBSCRIPTIONS: readonly NatsSubscription[] = [
   { consumer: 'webhook', subject: 'zipzap.settlement.completed' },
   { consumer: 'webhook', subject: 'zipzap.return.requested' },
   { consumer: 'webhook', subject: 'zipzap.return.completed' },
+  { consumer: 'notification', subject: 'zipzap.shipment.created' },
+  { consumer: 'notification', subject: 'zipzap.delivery.out_for_delivery' },
+  { consumer: 'notification', subject: 'zipzap.delivery.completed' },
 ];

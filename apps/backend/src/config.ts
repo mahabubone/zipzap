@@ -18,6 +18,12 @@ export interface Config {
   readonly paystationUrl: string;
   readonly paystationMerchantId: string;
   readonly paystationPassword: string;
+  /** SMS rail: mock sends nothing; mimsms talks to the fake or the gateway. */
+  readonly smsProvider: 'mock' | 'mimsms';
+  readonly mimsmsUrl: string;
+  readonly mimsmsApiKey: string;
+  readonly mimsmsUserName: string;
+  readonly mimsmsSenderName: string;
 }
 
 function required(name: string): string {
@@ -51,6 +57,12 @@ export function config(): Config {
       `Environment variable PAYMENT_PROVIDER must be "mock" or "paystation", received "${paymentProvider}".`,
     );
   }
+  const smsProvider = process.env.SMS_PROVIDER ?? 'mock';
+  if (smsProvider !== 'mock' && smsProvider !== 'mimsms') {
+    throw new Error(
+      `Environment variable SMS_PROVIDER must be "mock" or "mimsms", received "${smsProvider}".`,
+    );
+  }
   cached = Object.freeze({
     nodeEnv,
     isProduction: nodeEnv === 'production',
@@ -63,6 +75,11 @@ export function config(): Config {
     paystationUrl: process.env.PAYSTATION_URL ?? 'http://localhost:4010',
     paystationMerchantId: process.env.PAYSTATION_MERCHANT_ID ?? '104-1653730183',
     paystationPassword: process.env.PAYSTATION_PASSWORD ?? 'gamecoderstorepass',
+    smsProvider,
+    mimsmsUrl: process.env.MIMSMS_URL ?? 'http://localhost:4010',
+    mimsmsApiKey: process.env.MIMSMS_API_KEY ?? 'J6J68SNLDYG1SVS',
+    mimsmsUserName: process.env.MIMSMS_USERNAME ?? 'demo@mimsms.com',
+    mimsmsSenderName: process.env.MIMSMS_SENDER ?? '8809612444598',
   });
   return cached;
 }

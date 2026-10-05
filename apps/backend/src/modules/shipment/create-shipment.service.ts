@@ -47,6 +47,8 @@ export interface CreateShipmentCommand {
   readonly recipient: Address;
   readonly parcel: Parcel;
   readonly cod?: Money;
+  /** The merchant's own invoice reference. The bulk dedupe anchor; null for single creates. */
+  readonly merchantReference?: string | null;
   readonly idempotencyKey: string;
   readonly actorId: string | null;
 }
@@ -142,6 +144,7 @@ export class CreateShipmentService {
         id: shipment.id,
         trackingCode: shipment.trackingCode,
         merchantId: shipment.merchantId,
+        merchantReference: command.merchantReference ?? null,
         senderName: shipment.sender.name,
         senderPhone: shipment.sender.phone,
         senderAddress: shipment.sender.line,

@@ -501,54 +501,49 @@ a human.
 - [x] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — proven live 2026-10-04:
       endpoint registered, secret issued, signed `shipment.delivered` received 200
 
-### 🔲 Bulk import
+### 🔄 Bulk import — code complete, live walk pending
 
-- [ ] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
-- [ ] Stages: `PENDING → VALIDATING → PREVIEW → PROCESSING → COMPLETED | FAILED |
-COMPLETED_WITH_ERRORS`
-- [ ] **Human preview checkpoint** — the first upload always has a column-mapping mistake, and
-      10,000 mis-mapped shipments is a support incident
-- [ ] Idempotent on **merchant invoice reference**, with row-level outcomes
-- [ ] CSV + XLSX in, CSV out
-- [ ] Chunked execution — one 10,000-row transaction holds locks on 10,000 rows
-- [ ] Downloadable result file, row by row
+- [x] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
+      (`/upload` stores the preview, `/accept` enqueues 100-row chunks)
+- [x] Stages, trigger-guarded (`PENDING` through `COMPLETED_WITH_ERRORS`; validate collapses
+      into preview — parsing IS validation, stored rows ARE the checkpoint)
+- [x] **Human preview checkpoint** — per-row READY/FAILED with reasons before anything inserts
+- [x] Idempotent on **merchant invoice reference**, with row-level outcomes
+      (`SKIPPED_DUPLICATE` recorded, never a second parcel)
+- [ ] CSV + XLSX in, CSV out — CSV done both directions; XLSX explicitly deferred
+- [x] Chunked execution — 100 rows per job, one transaction per chunk
+- [x] Downloadable result file, row by row (`GET :jobId/result`)
 
-### 🔲 `notification`
+### 🔄 `notification` — code + contract tests green, live walk pending
 
-- [ ] Schema `notification`: `templates`, `messages`, `deliveries`, `preferences`
-- [ ] Consume the event, enqueue a BullMQ job, send from the worker. **Never send inline.**
-- [ ] Idempotent on `(eventId, channel, recipient)` — a customer receiving two SMS is a real,
-      visible failure, worse than a late one
-- [ ] Versioned templates; the version is stored on the delivery row
-- [ ] Per-send throttling and quiet hours; a misconfigured trigger costs real money at national
-      volume in minutes
-- [ ] **Dead-letter only on carrier retry policy `0`.** `Absent subscriber for SM` carries policy
-      `3` — the carrier retries the handset. Dead-lettering on first failure discards messages
-      that were about to land, and a customer never learns their parcel arrived.
-- [ ] All parcel notifications sent as MiMSMS `transactionType: "T"` — never batched promotionally,
-      where DND would silently delay them
-- [ ] MiMSMS adapter: `8801XXXXXXXXX`, **not** `+8801…`. Number formatting for a provider is not
-      the same operation as normalisation for our records.
+- [x] Schema `notification`: `templates`, `messages`, `deliveries` (migration `0016`;
+      `preferences` deferred — no opt-out surface yet)
+- [x] Consume the event, enqueue a BullMQ job, send from the worker. **Never send inline.**
+- [x] Idempotent on `(eventId, channel, recipient)` — unique index + redelivery converges
+- [x] Versioned templates; the version is stored on the delivery row (en+bn v1 seeded in code)
+- [ ] Per-send throttling and quiet hours — deferred; the ladder bounds retries, not send rate
+- [x] **Dead-letter only on carrier retry policy `0`.** Handset-off (policy 3) retries.
+- [x] All parcel notifications sent transactional — never batched promotionally
+- [x] MiMSMS adapter: `8801XXXXXXXXX`, **not** `+8801…` (plus stripped at the wire, bad numbers
+      throw before HTTP; 6 contract tests green against the fake)
 
-### 🔲 Risk signals
+### 🔲 Risk signals — scoped, not started
 
-- [ ] Inputs: phone, prior shipments, deliveries, returns, refusals, merchant history, COD value,
-      destination
-- [ ] Output: `risk_score`, `risk_level`, `signals[]`
-- [ ] **Decision support for a human.** Never an automated block, never an accusation.
-- [ ] Signals stored and explained — a black-box score is not usable by the person who must act
+Decision-support only (never auto-block): score + explained signals from phone/merchant/COD
+history. Needs the returns + settlement history just landed. No tables, no code yet.
 
-### 🔲 `support` + developer portal
+### 🔲 `support` + developer portal — scoped, not started
 
-- [ ] Schema `support`: `tickets`, `messages`, `assignments`, `status_history`, `attachments`
-- [ ] Cross-domain reads via six explicit contracts, audited — **not** one six-table join
-- [ ] `LOST`, `DAMAGED`, `COD_RECONCILIATION_EXCEPTION` can open a ticket automatically
-- [ ] Developer portal: API keys, webhook config and logs, sandbox, examples
+Tickets + audited cross-module reads. `COD_RECONCILIATION_EXCEPTION` and failed webhooks are
+the natural auto-ticket sources once the module exists. No tables, no code yet.
 
 ### Exit gate
 
 - [ ] Duplicate request rejected by idempotency, returning the original response
-- [ ] Webhook endpoint down → retries on the ladder → terminal failed state visible to the merchant
+- [x] Webhook endpoint down → retries on the ladder → terminal failed state visible to the merchant
+      (live 2026-10-04/05: dead endpoint climbed 1m → 5m → 15m → 1h → 6h with one immutable
+      row per attempt, `fetch failed`, attempt-6 enqueued in the delayed set; per-attempt rows
+      are the merchant-visible failed state — `terminal` flips on attempt 6)
 - [ ] 10,000-row import completes without a timeout and yields a downloadable row-level result
 - [ ] Webhook signature verifies over the **raw** body, asserted in a test
 - [ ] A merchant with only `shipments:write` cannot read settlements or delete a webhook
@@ -666,7 +661,9 @@ These run across phases rather than inside one.
 - [x] `PaymentProvider` adapter for PayStation — in-band errors, money conversion, status mapping
       (`finance/provider/paystation.adapter.ts`, 7 contract tests green against the fake, live
       `SETTLED` proven 2026-10-04; v2 trxId lookup, unknown-status throws, amount-mismatch throws)
-- [ ] `NotificationChannel` adapter for MiMSMS — `8801…` formatting, `T` vs `P`, DLR retry policy
+- [x] `NotificationChannel` adapter for MiMSMS — `8801…` formatting, kind-vs-`T` mapping at
+      the wire, DLR retry policy (`notification/provider/mimsms.adapter.ts`, 6 contract tests
+      green against the fake; domain speaks `transactional`, never the `"T"` token)
 - [ ] Fault injection wired into CI so failure paths are exercised on every run
 - [ ] Contract tests against real sandboxes before go-live — **a passing fake proves the wiring,
       not the integration**

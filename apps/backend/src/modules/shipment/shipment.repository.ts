@@ -24,6 +24,20 @@ export class ShipmentRepository {
   }
 
   /**
+   * The bulk dedupe anchor: merchant + their invoice reference. One row per
+   * merchant invoice, ever — re-uploads skip instead of doubling parcels.
+   */
+  findByMerchantReference(
+    manager: EntityManager,
+    merchantId: string,
+    reference: string,
+  ): Promise<ShipmentEntity | null> {
+    return manager
+      .getRepository(ShipmentEntity)
+      .findOneBy({ merchantId, merchantReference: reference });
+  }
+
+  /**
    * The tracking boundary's read: a shipment id in, its tracking code out. The only thing the
    * consumer may learn, and the only thing it needs. Returns null for a deleted-or-never
    * shipment, which the consumer treats as ignorable rather than fatal — a missing parcel is
@@ -69,6 +83,25 @@ export class ShipmentRepository {
       .where('s.id = :id', { id: shipmentId })
       .getRawOne<{ merchantId: string }>();
     return row?.merchantId ?? null;
+  }
+
+  /**
+   * The notification boundary's read: a shipment id in, its recipient contact out.
+   * Same contract shape as the reads above — the consumer needs the phone, and
+   * must not open this connection directly.
+   */
+  async findRecipient(
+    manager: EntityManager,
+    shipmentId: string,
+  ): Promise<{ name: string; phone: string } | null> {
+    const row = await manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .select('s.recipientName', 'name')
+      .addSelect('s.recipientPhone', 'phone')
+      .where('s.id = :id', { id: shipmentId })
+      .getRawOne<{ name: string; phone: string }>();
+    if (!row) return null;
+    return { name: row.name, phone: row.phone };
   }
 
   /**
