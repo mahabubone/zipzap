@@ -61,6 +61,25 @@ later, after the parcel is on a truck, is an operational cost the check exists t
 
 ## Routes
 
+An estimated delivery date is computed at serviceability time from the zone's `estimated_days`
+counted in business days, adjusted for the Asia/Dhaka pickup cutoff and the holiday calendar.
+Phase 5 rung 3.
+
+```
+coverage.estimated_days  -- business days from dispatch to delivery (data, not code)
+network.zone_cutoffs     -- pickup_cutoff / delivery_cutoff per zone (18:00 / 20:00 default)
+network.holidays         -- non-weekend non-working days
+```
+
+`NetworkService.estimateDelivery(zone, now)` normalizes `now` to Asia/Dhaka: if it is past the
+zone's `pickup_cutoff` (default 18:00) the dispatch slides to the next business day; the
+`estimated_days` are then counted forward, skipping Bangladesh workweek holidays
+(Sunday-Thursday workweek, holidays in `network.holidays`). The result is a due-by date, not a
+time — a 2026-10-05 19:00 Dhaka request with `estimated_days = 1` and a holiday on the next
+business day returns the day after that.
+
+## Routes
+
 ```
 Pickup zone → Origin hub → Regional hub → Destination hub → Delivery point → Customer
 ```

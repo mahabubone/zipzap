@@ -683,7 +683,11 @@ exists. Therefore:
 ### 🔲 Routing and serviceability
 
 - [ ] Network routing: pickup zone → origin → regional → destination → delivery point
-- [ ] Timezone- and holiday-aware SLA. **Asia/Dhaka**, with cutoff times and a holiday calendar.
+- [x] Timezone- and holiday-aware SLA. **Asia/Dhaka**, with cutoff times and a holiday calendar.
+      (1759000000027: `network.holidays` + `network.zone_cutoffs`; `NetworkService.estimateDelivery`
+      normalizes `now` to Asia/Dhaka — past 18:00 pickup cutoff slides to the next business day,
+      `estimated_days` counted forward skipping the Sunday-Thursday workweek; holiday + cutoff +
+      weekend shifts all asserted in 6 integration tests)
 - [ ] Serviceability depth: capacity-aware and multi-stop rider routing
 
 ### 🔲 Rider optimisation

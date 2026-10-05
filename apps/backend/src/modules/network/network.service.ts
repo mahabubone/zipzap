@@ -9,7 +9,14 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { ResourceNotFoundError } from '../../common/domain-error.ts';
 import type { DataSource } from 'typeorm';
+import {
+  estimateDelivery as computeEstimate,
+  dateKey,
+  type Holiday,
+  type ZoneCutoffs,
+} from './rules/sla.js';
 
 export interface CoverageCheck {
   readonly zone: string;
@@ -20,6 +27,16 @@ export interface CoverageCheck {
   readonly pickupAvailable: boolean;
   readonly deliveryAvailable: boolean;
   readonly codAvailable: boolean;
+}
+
+/** Timezone- and holiday-aware SLA estimate for a zone (Phase 5 rung 3). */
+export interface SLAEstimate {
+  readonly zone: string;
+  /** `yyyy-mm-dd` in Asia/Dhaka — the parcel is due by end of this date. */
+  readonly estimatedDate: string;
+  readonly businessDaysInFlight: number;
+  readonly pickupShifted: boolean;
+  readonly skippedHolidays: string[];
 }
 
 @Injectable()
@@ -64,5 +81,63 @@ export class NetworkService {
       deliveryAvailable: row.delivery_available,
       codAvailable: row.cod_available,
     };
+  }
+
+  /**
+   * Timezone- and holiday-aware delivery estimate for a zone. Asia/Dhaka wall-clock time;
+   * holidays (network.holidays) and cutoffs (network.zone_cutoffs) come from the coverage
+   * data, never from a hardcoded city check. `now` defaults to the current moment — pass a
+   * fixed date in tests.
+   */
+  async estimateDelivery(zone: string, now: Date = new Date()): Promise<SLAEstimate> {
+    const coverage = await this.checkZone(zone);
+    if (!coverage.serviceable) {
+      throw new ResourceNotFoundError(`Zone "${zone}" is not serviceable.`);
+    }
+    if (coverage.estimatedDays === null) {
+      throw new ResourceNotFoundError(`No SLA estimated_days for zone "${zone}".`);
+    }
+
+    const cutoffs = await this.cutoffsForZone(zone);
+    const holidays = await this.holidays();
+
+    const result = computeEstimate(now, coverage.estimatedDays, holidays, cutoffs);
+    return {
+      zone: coverage.zone,
+      estimatedDate: dateKey(result.estimatedDate),
+      businessDaysInFlight: result.businessDaysInFlight,
+      pickupShifted: result.pickupShifted,
+      skippedHolidays: [...result.skippedHolidays],
+    };
+  }
+
+  /** Holidays ordered by date,
+      estimatedDate: dateKey(result.estimatedDate),
+      businessDaysInFlight: result.businessDaysInFlight,
+      pickupShifted: result.pickupShifted,
+      skippedHolidays: [...result.skippedHolidays],
+    };
+  }
+
+  /** Holidays ordered by date (stable reading for the same transaction).
+      `date::text` normalizes Postgres's DATE parsing (which can return a timezone-adjusted
+      Date) into a clean yyyy-mm-dd string for comparison against the rule's dateKey. */
+  private async holidays(): Promise<readonly Holiday[]> {
+    const rows = await this.network.query(
+      `SELECT date::text AS date, reason FROM network.holidays ORDER BY date`,
+    );
+    return rows as unknown as Holiday[];
+  }
+
+  private async cutoffsForZone(zone: string): Promise<ZoneCutoffs> {
+    const rows = await this.network.query(
+      `SELECT zone, pickup_cutoff, delivery_cutoff FROM network.zone_cutoffs WHERE zone = $1`,
+      [zone],
+    );
+    const row = rows[0] as
+      { zone: string; pickup_cutoff: string | null; delivery_cutoff: string | null } | undefined;
+    return row
+      ? { zone, pickupCutoff: row.pickup_cutoff, deliveryCutoff: row.delivery_cutoff }
+      : { zone, pickupCutoff: null, deliveryCutoff: null };
   }
 }
