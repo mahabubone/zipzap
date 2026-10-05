@@ -20,6 +20,7 @@ import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { PickupRepository } from './pickup.repository.ts';
 import { AssignRiderService } from '../rider/assign-rider.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import type { AssignmentCandidate } from '../rider/rules/rider.ts';
 import { hashRequest } from '../../common/idempotency.ts';
 import { claim } from '../system/idempotency.store.ts';
@@ -50,6 +51,7 @@ export class AssignPickupService {
     @Inject(PickupRepository) private readonly pickups: PickupRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
     @Inject(AssignRiderService) private readonly riders: AssignRiderService,
+    @Inject(ShipmentAdvanceService) private readonly advance: ShipmentAdvanceService,
   ) {}
 
   async execute(command: AssignPickupCommand): Promise<{
@@ -96,6 +98,7 @@ export class AssignPickupService {
 
       const now = new Date();
       for (const shipmentId of row.shipmentIds) {
+        await this.advance.advance(manager, shipmentId, 'PICKUP_ASSIGNED');
         await this.tracking.append(manager, {
           id: randomUUID(),
           shipmentId,

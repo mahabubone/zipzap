@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · Phase 4 exit gate green; Phase 5 rungs 1–2 complete (coverage, geography, routes, manifests, reconciliation exception)
+**Last updated:** 2026-10-05 · **Flagship story runs to DELIVERED** — ShipmentAdvanceService is the single validated status write path
 
 ---
 
@@ -26,15 +26,15 @@ file is the build view and is the one to follow when implementing.
 
 ## Where we are
 
-| Phase                      | Scope                                                         | State                                                     |
-| -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
-| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                   |
-| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live        |
-| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 in progress: pickup, rider, delivery live-proven       |
-| **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven |
-| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                 |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)      |
-| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                    |
+| Phase                      | Scope                                                         | State                                                           |
+| -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                         |
+| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live              |
+| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 flagship story proven live; failure story + hub batches open |
+| **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven       |
+| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                       |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)            |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                          |
 
 **The spine: one shipment, end to end.**
 
@@ -340,7 +340,10 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] **Batching**: one assignment covers many parcels. Bounded by count, weight, or time window.
 - [ ] Idempotency-keyed requests
 - [ ] `ExpirePickupRequest` scheduled job
-- [ ] Scan required per parcel to complete
+- [x] Scan required per parcel to complete
+      (`ScanParcelService`: each scan advances that shipment to `PICKED_UP` and the pickup
+      only flips `IN_PROGRESS → COMPLETED` when EVERY member shipment has been scanned —
+      completeness read on the same transaction's manager; duplicate scan 409s)
 
 ### 🔲 `rider`
 
@@ -360,6 +363,9 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] Schema `hub`: `hubs`, `zones`, `staff`, `capacity`, `schedules`, `routes`
 - [ ] Types `REGIONAL_HUB` · `DISTRICT_HUB` · `LOCAL_HUB` · `DELIVERY_POINT`
 - [ ] Inbound scan-in → sort → destination; outbound dispatch batch → manifest → scan-out
+      (parcel-level scans landed 2026-10-05: `INBOUND → SORT → OUTBOUND → DEPARTED → ARRIVED`
+      with tracking events and the machine validating every edge — the **batch/manifest**
+      linkage and scan-out as an ops surface still open)
 - [ ] Capacity modelled, so "hub backlog" is actionable rather than decorative
 - [ ] Discrepancies raise: received-not-on-manifest, manifested-not-received, received-twice
 
@@ -390,7 +396,14 @@ Movement. This is where the product stops being an order form and becomes a cour
 
 ### Exit gate
 
-- [ ] The **flagship story** runs to `DELIVERED` in a seeded network
+- [x] The **flagship story** runs to `DELIVERED` in a seeded network
+      (integration test 2026-10-05: create → pickup request → assign → parcel scan →
+      hub corridor INBOUND/SORT/OUTBOUND/DEPARTED/ARRIVED on seeded hub codes → delivery
+      accept → dispatch → complete → `DELIVERED`, with shipment status asserted after EVERY
+      step, COD collected at 125050, each of 10 timeline facts exactly once, and every
+      outbox event present. Out-of-order scan rejected by the machine with nothing written.
+      Built the missing link: `ShipmentAdvanceService` — before it, no code path ever moved
+      a shipment past `CREATED`)
 - [ ] The **failure story** runs too: refused → retry → refused → return → merchant receives it
 - [x] An unserviceable destination is rejected at creation with a reason
       (live 2026-10-05: zone `atlantis-01` → 422 `SERVICEABILITY_FAILED`

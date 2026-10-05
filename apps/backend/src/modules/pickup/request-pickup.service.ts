@@ -21,6 +21,7 @@ import { hashRequest } from '../../common/idempotency.ts';
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { PickupRepository } from './pickup.repository.ts';
 import { validateBatch, type PickupStatus } from './rules/pickup.ts';
 
@@ -48,6 +49,7 @@ export class RequestPickupService {
     @InjectDataSource('pickup') private readonly pickupDataSource: DataSource,
     @Inject(PickupRepository) private readonly pickups: PickupRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
+    @Inject(ShipmentAdvanceService) private readonly advance: ShipmentAdvanceService,
   ) {}
 
   async execute(command: RequestPickupCommand): Promise<{
@@ -102,6 +104,9 @@ export class RequestPickupService {
       // assigning — PICKUP_ASSIGNED is emitted by the assignment transition, which lives here
       // as assignPickup once the rider contract exists.
       for (const shipmentId of command.shipmentIds) {
+        // The parcel's aggregate moves with the pickup request that caused it —
+        // rule 6: through the advance contract, never a bare UPDATE.
+        await this.advance.advance(manager, shipmentId, 'PICKUP_REQUESTED');
         await this.tracking.append(manager, {
           id: randomUUID(),
           shipmentId,

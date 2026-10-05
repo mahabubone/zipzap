@@ -4,6 +4,7 @@ import { AssignPickupService } from './assign-pickup.service.ts';
 import { PickupRepository } from './pickup.repository.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { AssignRiderService } from '../rider/assign-rider.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 
 /**
  * The assign transaction, minus the databases.
@@ -30,6 +31,13 @@ function fakeManager(row: Record<string, unknown>) {
     manager: {
       createQueryBuilder: () => lockChain,
       query: (sql: string) => {
+        if (sql.includes('shipment.shipments')) {
+          // The advance contract reads status FOR UPDATE then writes it.
+          written.push('shipment.status');
+          return Promise.resolve(
+            sql.includes('SELECT') ? [{ id: 's-x', status: 'PICKUP_REQUESTED' }] : [],
+          );
+        }
         if (sql.includes('FOR UPDATE')) written.push('lock:pickup.pickups');
         else if (sql.includes('idempotency_keys')) written.push('claim:system.idempotency_keys');
         else if (sql.includes('tracking.events')) written.push('tracking.events');
@@ -84,6 +92,7 @@ describe('AssignPickupService orchestration', () => {
       new PickupRepository(),
       tracking,
       riders,
+      new ShipmentAdvanceService(),
     );
 
     const { result, replayed } = await service.execute({
@@ -100,6 +109,8 @@ describe('AssignPickupService orchestration', () => {
     expect(result.status).toBe('ASSIGNED');
     // One tracking event per member shipment of the batch.
     expect(appendSpy).toHaveBeenCalledTimes(2);
+    // Each member shipment's aggregate advanced through the contract.
+    expect(fake.written.filter((w) => w === 'shipment.status')).toHaveLength(4);
     // The rider contract was called, never a rider table.
     expect(riders.assign).toHaveBeenCalledOnce();
     expect(riders.assign).toHaveBeenCalledWith(expect.objectContaining({ jobId: 'p-1' }));
@@ -130,6 +141,7 @@ describe('AssignPickupService orchestration', () => {
       new PickupRepository(),
       new AppendTrackingEventService(),
       { assign: vi.fn() } as unknown as AssignRiderService,
+      new ShipmentAdvanceService(),
     );
 
     await expect(

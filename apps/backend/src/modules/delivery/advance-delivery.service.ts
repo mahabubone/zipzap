@@ -20,6 +20,7 @@ import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
 import { ShipmentLookup, SHIPMENT_LOOKUP } from '../shipment/shipment.lookup.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { CollectCodService } from '../cod/collect-cod.service.ts';
 import { assertTransition, type DeliveryStatus } from './rules/delivery.ts';
 
@@ -30,6 +31,7 @@ export class AdvanceDeliveryService {
     @Inject(DeliveryRepository) private readonly jobs: DeliveryRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
     @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
+    @Inject(ShipmentAdvanceService) private readonly advance: ShipmentAdvanceService,
     @Inject(CollectCodService) private readonly cod: CollectCodService,
   ) {}
 
@@ -61,6 +63,9 @@ export class AdvanceDeliveryService {
       assertTransition(job.status as DeliveryStatus, 'OUT_FOR_DELIVERY');
       job.status = 'OUT_FOR_DELIVERY';
       await this.jobs.save(manager, job);
+
+      // The parcel itself heads out: AT_DESTINATION_HUB → OUT_FOR_DELIVERY.
+      await this.advance.advance(manager, job.shipmentId, 'OUT_FOR_DELIVERY');
 
       const now = new Date();
       await this.tracking.append(manager, {
@@ -105,6 +110,10 @@ export class AdvanceDeliveryService {
       assertTransition('ATTEMPTED', 'DELIVERED');
       job.status = 'DELIVERED';
       await this.jobs.save(manager, job);
+
+      // The parcel is delivered: OUT_FOR_DELIVERY → DELIVERED. COD collection
+      // below runs in this same transaction — money and status agree or neither.
+      await this.advance.advance(manager, job.shipmentId, 'DELIVERED');
 
       const now = new Date();
       await this.tracking.append(manager, {

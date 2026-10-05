@@ -21,6 +21,7 @@ import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentDetailController } from './shipment-detail.controller.ts';
 import { CancelShipmentService } from './cancel-shipment.service.ts';
+import { ShipmentAdvanceService } from './advance-shipment.service.ts';
 
 @Module({
   imports: [
@@ -47,11 +48,12 @@ import { CancelShipmentService } from './cancel-shipment.service.ts';
     CancelShipmentService,
     ListShipmentsService,
     AppendTrackingEventService,
+    ShipmentAdvanceService,
     { provide: SHIPMENT_LOOKUP, useClass: ShipmentLookup },
     BulkRepository,
     BulkImportService,
     BulkProcessor,
   ],
-  exports: [SHIPMENT_LOOKUP],
+  exports: [SHIPMENT_LOOKUP, ShipmentAdvanceService],
 })
 export class ShipmentModule {}

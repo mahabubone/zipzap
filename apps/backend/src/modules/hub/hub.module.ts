@@ -1,15 +1,21 @@
 import { Module } from '@nestjs/common';
 import { forModule } from '../../database/module-connection.ts';
+import { ShipmentModule } from '../shipment/shipment.module.ts';
+import { TrackingModule } from '../tracking/tracking.module.ts';
+import { HubScanService } from './hub-scan.service.ts';
 
 /**
- * hub — the `hub` schema owner. Rung 2b ships the `hubs` table (migration 0025,
- * seeded) and nothing else: staff, capacity, schedules and the scan workflow
- * arrive with their first consumer. Nobody may read `hub.*` but this module —
- * route legs reference hubs by bare identifier, per ADR-0002.
+ * hub — the `hub` schema owner. Rung 2b shipped the `hubs` table (migration
+ * 0025, seeded); the flagship story added the scan workflow: inbound → sort →
+ * outbound → departed → arrived, advancing the shipment through the machine
+ * via shipment's advance contract and appending tracking events directly.
+ *
+ * One direction only: hub imports shipment + tracking; neither imports hub.
+ * Staff, capacity and schedules arrive with their first consumer.
  */
 @Module({
-  imports: [forModule('hub', [])],
-  providers: [],
-  exports: [],
+  imports: [forModule('hub', []), ShipmentModule, TrackingModule],
+  providers: [HubScanService],
+  exports: [HubScanService],
 })
 export class HubModule {}

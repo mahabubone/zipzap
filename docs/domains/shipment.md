@@ -27,6 +27,10 @@ Shipment
 1. **The status machine owns the status.** Never `UPDATE shipment.shipments SET status`. The
    full transition table is in
    [../architecture/state-machines.md](../architecture/state-machines.md#shipment).
+   Cross-module callers (pickup, hub scans, delivery) go through
+   `ShipmentAdvanceService` — it takes the caller's transaction manager, locks the row,
+   asserts the transition and writes qualified SQL. It writes the status column only: the
+   operation that caused the movement announces the fact through its own outbox event.
 2. **Tracking codes are unique, non-sequential, and non-guessable.** `ZP-8F32A1`. A guessable
    code is a customer-address enumeration vector on a public endpoint.
 3. **A return references the original shipment.** Never create a second, unrelated parcel.
