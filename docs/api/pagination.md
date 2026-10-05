@@ -49,9 +49,12 @@ interface ShipmentCursor {
 Opaque means the client cannot parse it, which means we can change its contents without breaking
 anyone. Versioned means we can.
 
-Signed or encrypted? Sign it. An unsigned cursor lets a client hand-craft one to read outside
-its own ordering — and, more practically, a malformed cursor should produce a clean 400 rather
-than a SQL error.
+Signed or encrypted? Neither — deliberately. A forged cursor buys nothing: every list
+query is scoped to the caller's `merchant_id`, so a hand-crafted cursor only repositions
+within your own list. The merchant scope is the security boundary, not the cursor — signing
+would add a secret for no threat. What the cursor must do is fail cleanly: a malformed or
+non-UUID cursor produces a 400 with a named reason, never a SQL error. (Proven live 2026-10-05
+on `GET /v1/shipments`: forged non-UUID → 400, foreign UUID → empty page.)
 
 ## Ordering must be total
 

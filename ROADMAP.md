@@ -258,7 +258,10 @@ starting three more phases.
 
 ### 🔲 Cross-module
 
-- [ ] `GET /v1/shipments` with cursor pagination, total ordering (`created_at DESC, id DESC`)
+- [x] `GET /v1/shipments` with cursor pagination, total ordering (`created_at DESC, id DESC`)
+      (live 2026-10-05: 6000 rows over 30 cursor hops, zero repeats; bad cursor → 400,
+      forged non-UUID → 400, foreign UUID → empty page (own-list scope); cross-merchant
+      list returns only own rows)
 - [ ] Error envelope on every failure path, mapped once
 - [ ] `Idempotency-Key` honoured and its response stored
 - [ ] OpenAPI generated; `packages/api-client` generated from it
