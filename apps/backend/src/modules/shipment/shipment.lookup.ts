@@ -12,6 +12,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { ShipmentRepository } from './shipment.repository.ts';
+import { ShipmentEntity } from './shipment.entity.ts';
+import { hasArrived, type ShipmentStatus } from './rules/state-machine.ts';
 
 export const SHIPMENT_LOOKUP = Symbol('SHIPMENT_LOOKUP');
 
@@ -51,5 +53,24 @@ export class ShipmentLookup {
     return this.shipmentDataSource.transaction(async (manager) => {
       return this.shipments.findRecipient(manager, shipmentId);
     });
+  }
+
+  /**
+   * The manifest reconciliation question: has this shipment reached the
+   * destination side of the network? Network asks this contract rather than
+   * reading the shipment table or its status vocabulary. An unknown id is
+   * "not arrived" — cargo nobody can find is missing, by definition.
+   */
+  async hasArrived(shipmentId: string): Promise<boolean> {
+    const status = await this.shipmentDataSource.transaction(async (manager) => {
+      const row = await manager
+        .createQueryBuilder(ShipmentEntity, 's')
+        .select('s.status', 'status')
+        .where('s.id = :id', { id: shipmentId })
+        .getRawOne<{ status: string }>();
+      return row?.status ?? null;
+    });
+    if (status === null) return false;
+    return hasArrived(status as ShipmentStatus);
   }
 }

@@ -2,11 +2,18 @@
 
 Physical logistics nodes and the work done inside them. Phase 2.
 
+**Landed 2026-10-05**: the `hubs` table (migration 0025) — code, kind, `geography(Point, 4326)`
+location with GiST, seeded with 6 hubs on the Dhaka/Chattogram/Sylhet corridors. The module
+owns the schema; staff, capacity, schedules and the scan workflow arrive with their first
+consumer. Nobody outside this module reads `hub.*` — route legs reference hubs by bare
+identifier (ADR-0002).
+
 ---
 
 ## Owns
 
-`hub` schema: `hubs`, `zones`, `staff`, `capacity`, `schedules`, `routes`.
+`hub` schema: `hubs` (landed); `zones`, `staff`, `capacity`, `schedules`, `routes` still to
+come.
 
 ## Types
 

@@ -30,8 +30,9 @@ import { CancelShipmentService } from './cancel-shipment.service.ts';
     CodModule,
     IdentityModule,
     // Serviceability: shipment consumes network's coverage contract (injected
-    // service, never a cross-schema read).
-    NetworkModule,
+    // service, never a cross-schema read). forwardRef: network imports this
+    // module back for manifest reconciliation — same cycle shape as tracking.
+    forwardRef(() => NetworkModule),
     BullModule.registerQueue({ name: BULK_QUEUE }),
   ],
   controllers: [

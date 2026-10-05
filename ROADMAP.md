@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · Phase 4 exit gate green; Phase 5 rungs 1–2a (coverage + geo hierarchy) live-proven
+**Last updated:** 2026-10-05 · Phase 4 exit gate green; Phase 5 rungs 1–2 complete (coverage, geography, routes, manifests, reconciliation exception)
 
 ---
 
@@ -33,7 +33,7 @@ file is the build view and is the one to follow when implementing.
 | **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 in progress: pickup, rider, delivery live-proven       |
 | **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven |
 | **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                 |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2a landed (coverage, geo hierarchy)            |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)      |
 | **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                    |
 
 **The spine: one shipment, end to end.**
@@ -315,10 +315,21 @@ Movement. This is where the product stops being an order form and becomes a cour
       (gate in `CreateShipmentService` inside the transaction after the replay check:
       replays return stored responses, rejections roll back the key claim so the
       `Idempotency-Key` is not burned; COD also gated on `cod_available`)
-- [ ] Route → RouteLeg → Trip. Fixed topology first.
-- [ ] Manifest lifecycle `DRAFT → SEALED → DISPATCHED → RECEIVED → RECONCILED`
-- [ ] **A missing shipment at reconciliation becomes an exception.** Silence is never the answer.
-- [ ] Seed: 8 divisions, 64 districts, sample upazilas and hubs
+- [x] Route → RouteLeg → Trip. Fixed topology first.
+      (migration 0026: `routes`/`route_legs`/`trips`, 2 seeded line-haul corridors
+      DAC-CGP + DAC-SYL × 3 legs each — district → regional → regional → district;
+      hub ids on legs are bare identifiers per ADR-0002. Integration test asserts
+      the exact leg sequence against resolved `hub.hubs` rows)
+- [x] Manifest lifecycle `DRAFT → SEALED → DISPATCHED → RECEIVED → RECONCILED`
+      (pure `rules/manifest.ts` machine — exhaustive 5×5 test, forward-only; service
+      transitions lock → assert → save → outbox in one transaction; full walk proven
+      live against Postgres with all five outbox events in order)
+- [x] **A missing shipment at reconciliation becomes an exception.** Silence is never the answer.
+      (reconcile asks `SHIPMENT_LOOKUP.hasArrived` per cargo item inside the transaction:
+      missing → `MANIFEST_INCOMPLETE` 422 naming the ids, status stays `RECEIVED`, no
+      `ManifestReconciled` outbox row — and the same call passes once the parcel arrives)
+- [x] Seed: 8 divisions, 64 districts, sample upazilas and hubs
+      (migrations 0024/0025: hierarchy 8/64/20 + 6 seeded hubs with geography points)
       (hierarchy landed 2026-10-05: 8/64/20 as rows — **hubs still missing**: they need
       the `hub` module, which does not exist yet; rung 2b)
 
@@ -386,7 +397,10 @@ Movement. This is where the product stops being an order form and becomes a cour
       `No coverage for zone "atlantis-01"`, zero rows written, same key retries fine;
       covered zone creates normally from the seeded row)
 - [ ] Two riders scanning simultaneously produce exactly one transition and one tracking event
-- [ ] A manifest missing a shipment raises an exception at reconciliation
+- [x] A manifest missing a shipment raises an exception at reconciliation
+      (integration test 2026-10-05: stuck parcel → `MANIFEST_INCOMPLETE` 422 naming its id,
+      status holds at `RECEIVED`, zero `ManifestReconciled` events; after the parcel
+      arrives the identical call returns `RECONCILED`)
 - [ ] Assignment is deterministic — the same inputs assign the same rider 100 times
 - [ ] Return creates a reversing ledger request, not a second parcel
 - [ ] `pnpm verify` green
@@ -624,10 +638,10 @@ exists. Therefore:
    where a point is first queried).
 2. **Routing legs** (fixed topology: pickup zone → origin → regional → destination →
    delivery point) on that schema, with the manifest/reconciliation lifecycle.
-   ✅ part 1 landed 2026-10-05 (migration 0024): the Bangladesh hierarchy + `geography`
-   column + GiST — the ground routes are drawn on. Remaining: the `hub` module (a hub is
-   where a leg bends), Route/RouteLeg/Trip tables, manifests + the reconciliation
-   exception.
+   ✅ **complete 2026-10-05**: hierarchy + geography (0024), `hub` module + 6 hubs (0025),
+   Route/RouteLeg/Trip + manifest lifecycle + the reconciliation exception (0026). The
+   Phase 2 boxes this rung owned — routes, manifests, the missing-cargo exception, the
+   hub seed — are all ticked.
 3. **SLA**: Asia/Dhaka cutoffs + holiday calendar, computed against the route legs.
 4. **Offline sync — server contract first** (device command queue, ordered replay by
    `created_at`, explicit rejection of a command invalidated while offline). The mobile app

@@ -15,6 +15,7 @@ import {
   CodRecordNotFoundError,
   RateLimitedError,
   ReconciliationExceptionError,
+  ManifestIncompleteError,
   ResourceNotFoundError,
   ServiceabilityFailedError,
   ShipmentNotFoundError,
@@ -46,6 +47,7 @@ const ALL_ERROR_CLASSES = [
   InvalidTransitionError,
   ServiceabilityFailedError,
   ReconciliationExceptionError,
+  ManifestIncompleteError,
   RateLimitedError,
   DependencyUnavailableError,
 ] as const;

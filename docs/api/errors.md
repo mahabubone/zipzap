@@ -49,6 +49,7 @@ asserts that.
 | `SERVICEABILITY_FAILED`    | 422    | destination not serviceable                     |
 | `INSUFFICIENT_COD`         | 422    | collected below expected                        |
 | `RECONCILIATION_EXCEPTION` | 422    | cash does not reconcile                         |
+| `MANIFEST_INCOMPLETE`      | 422    | manifest cargo has not all arrived              |
 | `RATE_LIMITED`             | 429    | see [rate-limits.md](rate-limits.md)            |
 | `DEPENDENCY_UNAVAILABLE`   | 503    | Postgres or another required dependency is down |
 | `INTERNAL_ERROR`           | 500    | a bug — never branch on it                      |

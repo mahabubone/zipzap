@@ -7,6 +7,7 @@ import {
   allowedFrom,
   assertTransition,
   canTransition,
+  hasArrived,
   isForwardTerminal,
   isTerminal,
   type ShipmentStatus,
@@ -202,5 +203,43 @@ describe('shipment aggregate', () => {
   test('release is invalid outside ON_HOLD', () => {
     const created = transition(createShipment(input), 'CREATED');
     assert.throws(() => release(created), /only valid from ON_HOLD/);
+  });
+});
+
+describe('hasArrived — the manifest reconciliation question', () => {
+  test('everything before the destination hub has not arrived', () => {
+    for (const status of [
+      'DRAFT',
+      'CREATED',
+      'PICKUP_REQUESTED',
+      'PICKUP_ASSIGNED',
+      'PICKED_UP',
+      'AT_ORIGIN_HUB',
+      'SORTING',
+      'DISPATCHED',
+      'IN_TRANSIT',
+    ] as const) {
+      assert.equal(hasArrived(status), false, `${status} is still on the way`);
+    }
+  });
+
+  test('stuck or lost cargo counts as not arrived — reconciliation must not pass in silence', () => {
+    assert.equal(hasArrived('EXCEPTION'), false);
+    assert.equal(hasArrived('LOST'), false);
+  });
+
+  test('destination-side and handled states count as arrived', () => {
+    for (const status of [
+      'AT_DESTINATION_HUB',
+      'OUT_FOR_DELIVERY',
+      'DELIVERED',
+      'DELIVERY_FAILED',
+      'RETRY_SCHEDULED',
+      'ON_HOLD',
+      'CANCELLED',
+      'RETURNED',
+    ] as const) {
+      assert.equal(hasArrived(status), true, `${status} has an answer`);
+    }
   });
 });

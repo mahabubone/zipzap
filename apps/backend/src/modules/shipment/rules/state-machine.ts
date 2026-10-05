@@ -105,6 +105,35 @@ export function isForwardTerminal(status: ShipmentStatus): boolean {
   return (FORWARD_TERMINAL_STATUSES as readonly ShipmentStatus[]).includes(status);
 }
 
+/**
+ * Has this shipment physically progressed past the origin network?
+ *
+ * The manifest reconciliation question, asked in shipment vocabulary so the
+ * network module never imports this table or this enum — it asks the lookup
+ * contract a yes/no question. Everything before the destination hub counts as
+ * not-arrived; EXCEPTION and LOST count too, because reconciling a manifest
+ * whose cargo is stuck or lost is exactly the silence this check exists to
+ * prevent. Terminal handling states (CANCELLED, ON_HOLD, return leg, delivered)
+ * count as arrived: the answer for those shipments is known.
+ */
+const PRE_DESTINATION: readonly ShipmentStatus[] = [
+  'DRAFT',
+  'CREATED',
+  'PICKUP_REQUESTED',
+  'PICKUP_ASSIGNED',
+  'PICKED_UP',
+  'AT_ORIGIN_HUB',
+  'SORTING',
+  'DISPATCHED',
+  'IN_TRANSIT',
+  'EXCEPTION',
+  'LOST',
+];
+
+export function hasArrived(status: ShipmentStatus): boolean {
+  return !PRE_DESTINATION.includes(status);
+}
+
 export function allowedFrom(status: ShipmentStatus): readonly ShipmentStatus[] {
   return TRANSITIONS[status];
 }

@@ -18,7 +18,7 @@
     "db:revert": "node --env-file-if-exists=../../.env dist/database/cli.js revert",
     "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed",
     "openapi:export": "node --env-file-if-exists=../../.env scripts/export-openapi.mjs",
-    "test:integration": "node --experimental-transform-types --test \"test/integration/*.test.ts\"",
+    "test:integration": "node --experimental-transform-types --test --test-concurrency=1 \"test/integration/*.test.ts\"",
     "test:watch": "vitest"
   },
   "dependencies": {

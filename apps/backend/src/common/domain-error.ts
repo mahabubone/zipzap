@@ -168,6 +168,26 @@ export class ReconciliationExceptionError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+/**
+ * A manifest whose cargo has not all arrived. 422, not 409: the manifest is
+ * fine, the world has not caught up yet — a business-rule rejection that a
+ * later retry can pass, never a state conflict the client caused.
+ */
+export class ManifestIncompleteError extends DomainError {
+  readonly spec = {
+    code: 'MANIFEST_INCOMPLETE',
+    status: 422,
+    title: 'Manifest incomplete',
+  } satisfies DomainErrorSpec;
+
+  constructor(readonly shipmentIds: readonly string[] = []) {
+    super(
+      `Manifest is missing ${shipmentIds.length} shipment(s) at reconciliation: ` +
+        `${shipmentIds.slice(0, 5).join(', ')}${shipmentIds.length > 5 ? ', …' : ''}`,
+    );
+  }
+}
+
 export class RateLimitedError extends DomainError {
   readonly spec = {
     code: 'RATE_LIMITED',
@@ -219,6 +239,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [InvalidTransitionError, new InvalidTransitionError('A', 'B').spec],
   [ServiceabilityFailedError, new ServiceabilityFailedError('reason').spec],
   [ReconciliationExceptionError, new ReconciliationExceptionError().spec],
+  [ManifestIncompleteError, new ManifestIncompleteError([]).spec],
   [RateLimitedError, new RateLimitedError(60).spec],
   [DependencyUnavailableError, new DependencyUnavailableError().spec],
 ]);

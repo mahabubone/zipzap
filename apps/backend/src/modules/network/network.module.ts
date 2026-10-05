@@ -1,18 +1,22 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { forModule } from '../../database/module-connection.ts';
 import { ServiceAreaEntity } from './service-area.entity.ts';
 import { NetworkService } from './network.service.ts';
+import { ManifestService } from './manifest.service.ts';
+import { ShipmentModule } from '../shipment/shipment.module.ts';
 
 /**
- * network — zones, routes, coverage. Rung 1 ships coverage-as-data plus the
- * serviceability contract; routes/manifests/geo arrive with rung 2.
+ * network — coverage, geography, routes, trips, manifests.
  *
- * No controllers yet: serviceability is consumed by shipment at creation, not
- * called over HTTP. The schema is its own from migration 0000.
+ * Cycle with shipment is inherent, not accidental: shipment imports network
+ * for serviceability, network imports shipment for the reconciliation read
+ * (SHIPMENT_LOOKUP.hasArrived). forwardRef on both edges, matching the
+ * shipment <-> tracking precedent. Nobody reads another schema's tables —
+ * the lookup contract is the sanctioned seam.
  */
 @Module({
-  imports: [forModule('network', [ServiceAreaEntity])],
-  providers: [NetworkService],
-  exports: [NetworkService],
+  imports: [forModule('network', [ServiceAreaEntity]), forwardRef(() => ShipmentModule)],
+  providers: [NetworkService, ManifestService],
+  exports: [NetworkService, ManifestService],
 })
 export class NetworkModule {}

@@ -1,20 +1,22 @@
 # network
 
-Zones, routes, manifests, and the geographic model. Phase 2 / Phase 5 rungs 1–2a.
+Zones, routes, manifests, and the geographic model. Phase 2 / Phase 5 rungs 1–2.
 
 **Landed 2026-10-05**: `service_areas` coverage table (migration 0023) + the serviceability
 gate at shipment creation; `geo_areas` hierarchy (migration 0024) — 8 divisions, 64
-districts, 20 sample upazilas as parented rows, `boundary geography(MultiPolygon, 4326)` with
-a GiST index (boundaries NULL until real boundary data is imported). Routes, manifests,
-hubs and the rest of rung 2 still to come.
+districts, 20 sample upazilas, `boundary geography(MultiPolygon, 4326)` with a GiST index
+(boundaries NULL until real boundary data is imported); routes, trips and manifests
+(migration 0026) — two seeded line-haul corridors, the five-edge manifest machine, and the
+reconciliation check that refuses to pass while cargo is missing. Still to come: `zones`,
+`transports`, real boundary polygons, SLA maths.
 
 ---
 
 ## Owns
 
-`network` schema: `service_areas` and `geo_areas` (landed), and — still to come — `zones`,
-`routes`, `route_legs`, `transports`, `trips`, `manifests`, `manifest_items`, and hub
-locations.
+`network` schema: `service_areas`, `geo_areas`, `routes`, `route_legs`, `trips`,
+`manifests`, `manifest_items` (landed); `zones`, `transports` and route geometry still to
+come.
 
 ---
 

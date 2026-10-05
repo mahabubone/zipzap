@@ -14,6 +14,7 @@ import { FinanceModule } from './modules/finance/finance.module.ts';
 import { ReturnsModule } from './modules/returns/returns.module.ts';
 import { NotificationModule } from './modules/notification/notification.module.ts';
 import { NetworkModule } from './modules/network/network.module.ts';
+import { HubModule } from './modules/hub/hub.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -38,6 +39,7 @@ import { NetworkModule } from './modules/network/network.module.ts';
     ReturnsModule,
     NotificationModule,
     NetworkModule,
+    HubModule,
   ],
   controllers: [HealthController],
 })
