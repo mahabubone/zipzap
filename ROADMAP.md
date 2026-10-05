@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · **Flagship story runs to DELIVERED** — ShipmentAdvanceService is the single validated status write path
+**Last updated:** 2026-10-05 · **Phase 2 exit gate green** — flagship + failure stories, concurrent-scan race, all eight boxes ticked
 
 ---
 
@@ -26,15 +26,15 @@ file is the build view and is the one to follow when implementing.
 
 ## Where we are
 
-| Phase                      | Scope                                                         | State                                                           |
-| -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
-| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                         |
-| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live              |
-| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 flagship story proven live; failure story + hub batches open |
-| **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven       |
-| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                       |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)            |
-| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                          |
+| Phase                      | Scope                                                         | State                                                                      |
+| -------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                                    |
+| **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live                         |
+| **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | ✅ exit gate green 2026-10-05 (section boxes partly stale — audit pending) |
+| **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven                  |
+| **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                                  |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)                       |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                                     |
 
 **The spine: one shipment, end to end.**
 
@@ -414,7 +414,11 @@ Movement. This is where the product stops being an order form and becomes a cour
       (live 2026-10-05: zone `atlantis-01` → 422 `SERVICEABILITY_FAILED`
       `No coverage for zone "atlantis-01"`, zero rows written, same key retries fine;
       covered zone creates normally from the seeded row)
-- [ ] Two riders scanning simultaneously produce exactly one transition and one tracking event
+- [x] Two riders scanning simultaneously produce exactly one transition and one tracking event
+      (race test, stable over repeated runs 2026-10-05: two `INBOUND` scans via
+      `Promise.allSettled` — exactly one fulfils, the loser 409s `Cannot move from…`,
+      status `AT_ORIGIN_HUB`, one `ARRIVED_AT_HUB` row, one `ShipmentScanned` outbox row
+      because the loser rolled back. The shipment row lock does the serialising)
 - [x] A manifest missing a shipment raises an exception at reconciliation
       (integration test 2026-10-05: stuck parcel → `MANIFEST_INCOMPLETE` 422 naming its id,
       status holds at `RECEIVED`, zero `ManifestReconciled` events; after the parcel

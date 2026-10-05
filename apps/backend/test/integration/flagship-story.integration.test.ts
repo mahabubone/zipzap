@@ -361,4 +361,85 @@ describeIfDb('the flagship story — merchant order to DELIVERED', () => {
     assert.equal(unknown.code, 'VALIDATION_FAILED');
     assert.match(String(unknown.issues?.[0]?.message), /unknown scan/);
   });
+
+  test('two riders scanning simultaneously: exactly one transition, one tracking event', async () => {
+    // Get a parcel to the gate: create → request → assign → scanned (PICKED_UP).
+    const created = await createShipment.execute({
+      merchantId: MERCHANT,
+      merchantPlan: 'standard',
+      zone: 'dhaka-metro',
+      remoteArea: false,
+      fragile: false,
+      packagingKind: null,
+      sender: { name: 'Ayesha', phone: '+8801700000000', line: 'Dhaka' },
+      recipient: { name: 'Rina', phone: '+8801800000000', line: 'Dhaka' },
+      parcel: { weightGrams: 700, description: 'Race fixture' },
+      cod: money(0),
+      idempotencyKey: `race-${randomUUID()}`,
+      actorId: null,
+    });
+    const shipmentId = created.result.id;
+
+    const pickup = await requestPickup.execute({
+      merchantId: MERCHANT,
+      shipmentIds: [shipmentId],
+      totalWeightGrams: 700,
+      idempotencyKey: `race-${randomUUID()}`,
+      actorId: null,
+    });
+    const rider = await new RegisterRiderService(riderDb, new RiderRepository()).execute({
+      displayName: 'Racer',
+      phone: `+88017${String(Date.now()).slice(-8)}`,
+      capacity: 3,
+    });
+    await assignPickup.execute({
+      pickupId: pickup.result.id,
+      candidates: [
+        {
+          riderId: rider.id,
+          distanceMetres: 500,
+          activeJobs: 0,
+          capacity: 3,
+          recentRefusals: 0,
+        },
+      ],
+      idempotencyKey: `race-${randomUUID()}`,
+      actorId: null,
+    });
+    await scanParcel.execute({ pickupId: pickup.result.id, shipmentId, actorId: rider.id });
+    assert.equal(await shipmentStatus(shipmentId), 'PICKED_UP');
+
+    // Two riders scan the same parcel into the origin hub at the same moment.
+    // The shipment row lock (SELECT … FOR UPDATE) serialises them: one commits
+    // the transition, the other re-reads and 409s through the machine.
+    const outcomes = await Promise.allSettled([
+      hubScan.execute({ shipmentId, scan: 'INBOUND', hubCode: 'DAC-D', actorId: rider.id }),
+      hubScan.execute({ shipmentId, scan: 'INBOUND', hubCode: 'DAC-D', actorId: null }),
+    ]);
+    const won = outcomes.filter((o) => o.status === 'fulfilled');
+    const lost = outcomes.filter((o) => o.status === 'rejected');
+    assert.equal(won.length, 1, 'exactly one scan wins');
+    assert.equal(lost.length, 1, 'exactly one scan loses');
+    assert.match(
+      String((lost[0] as PromiseRejectedResult).reason),
+      /Cannot move from/,
+      'the loser is rejected by the machine, not silently dropped',
+    );
+
+    assert.equal(await shipmentStatus(shipmentId), 'AT_ORIGIN_HUB', 'one transition, not two');
+
+    const rows = (await trackingDb.query(
+      `SELECT event_type, count(*)::int AS n FROM tracking.events
+        WHERE shipment_id = $1 AND event_type = 'ARRIVED_AT_HUB' GROUP BY event_type`,
+      [shipmentId],
+    )) as { n: number }[];
+    assert.equal(rows[0]?.n, 1, 'exactly one tracking event');
+
+    const scans = (await systemDb.query(
+      `SELECT count(*)::int AS n FROM system.outbox_events
+        WHERE aggregate_type = 'shipment' AND aggregate_id = $1 AND event_type = 'ShipmentScanned'`,
+      [shipmentId],
+    )) as { n: number }[];
+    assert.equal(scans[0]?.n, 1, 'one outbox announcement — the loser rolled back');
+  });
 });
