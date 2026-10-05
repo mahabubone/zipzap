@@ -501,7 +501,7 @@ a human.
 - [x] Endpoints CRUD over HTTP (`POST /v1/webhooks`, rotate/pause/resume) — proven live 2026-10-04:
       endpoint registered, secret issued, signed `shipment.delivered` received 200
 
-### 🔄 Bulk import — code complete, live walk pending
+### 🔄 Bulk import — live-proven 2026-10-05 (2-row walk; 10k load pending)
 
 - [x] `POST /v1/shipments/bulk` → `202` with a job id, never a synchronous insert of thousands
       (`/upload` stores the preview, `/accept` enqueues 100-row chunks)
@@ -545,10 +545,15 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
       row per attempt, `fetch failed`, attempt-6 enqueued in the delayed set; per-attempt rows
       are the merchant-visible failed state — `terminal` flips on attempt 6)
 - [ ] 10,000-row import completes without a timeout and yields a downloadable row-level result
-- [ ] Webhook signature verifies over the **raw** body, asserted in a test
-- [ ] A merchant with only `shipments:write` cannot read settlements or delete a webhook
+- [x] Webhook signature verifies over the **raw** body, asserted in a test
+      (`webhook.spec.ts`: byte-exact input matters — whitespace/reorder breaks the signature;
+      plus the live proof where the signature cryptographically verified)
+- [x] A merchant with only `shipments:write` cannot read settlements or delete a webhook
+      (live 2026-10-05: shipments-scoped credential → 403 Missing scope; guard is per route)
 - [ ] Notification provider outage → retries → dead-letter visible, and **the transaction that
-      triggered it still succeeded**
+      triggered it still succeeded** (half-proven: send-throw retries unit-tested; triggering
+      shipment commits before any send by construction — full outage drill against a killed
+      fake still pending)
 - [ ] `pnpm verify` green
 
 ---

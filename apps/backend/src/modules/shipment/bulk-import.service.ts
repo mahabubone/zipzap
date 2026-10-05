@@ -108,7 +108,7 @@ export class BulkImportService {
         id: jobId,
         merchantId,
         filename,
-        status: 'PREVIEW',
+        status: 'PENDING',
         totalRows: rows.length,
         processedRows: 0,
         succeededRows: 0,

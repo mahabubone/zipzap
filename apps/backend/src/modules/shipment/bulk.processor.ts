@@ -78,63 +78,87 @@ export class BulkProcessor extends WorkerHost {
     rowId: string,
     merchantId: string,
   ): Promise<'succeeded' | 'failed' | 'skipped'> {
-    return this.shipments.transaction(async (manager) => {
+    // No wrapping transaction: createShipment.execute owns its own (the
+    // idempotency claim commits with the work). Nesting same-connection
+    // transactions aborts. Snapshot, check, call, record — separate boundaries.
+    const snapshot = await this.shipments.transaction(async (manager) => {
       const rows = await this.bulk.findRows(manager, jobId);
       const row = rows.find((r) => r.id === rowId);
-      if (!row || row.outcome !== 'READY') return 'failed';
+      if (!row || row.outcome !== 'READY') return null;
+      return {
+        invoice: row.invoice,
+        fields: row.fields as Record<string, string>,
+      };
+    });
+    if (!snapshot) return 'failed';
 
-      // Dedupe on merchant invoice: re-uploads skip, never double.
-      const existing = await manager
+    const duplicate = await this.shipments.transaction((manager) =>
+      manager
         .getRepository('shipments' as never)
-        .findOneBy({ merchantId, merchantReference: row.invoice } as never)
-        .catch(() => null);
-      if (existing) {
+        .findOneBy({ merchantId, merchantReference: snapshot.invoice } as never)
+        .catch(() => null),
+    );
+    if (duplicate) {
+      await this.shipments.transaction(async (manager) => {
+        const rows = await this.bulk.findRows(manager, jobId);
+        const row = rows.find((r) => r.id === rowId);
+        if (!row) return;
         row.outcome = 'SKIPPED_DUPLICATE';
         row.reason = 'shipment already exists';
         await this.bulk.saveRow(manager, row);
-        return 'skipped';
-      }
+      });
+      return 'skipped';
+    }
 
-      const fields = row.fields as Record<string, string>;
-      const weight = Number(fields.parcel_weight ?? '') || 1000;
-      const codRaw = (fields.cod_amount ?? '').trim();
-      const codMinor = codRaw ? Number.parseInt(codRaw, 10) : 0;
+    const weight = Number(snapshot.fields.parcel_weight ?? '') || 1000;
+    const codRaw = (snapshot.fields.cod_amount ?? '').trim();
+    const codMinor = codRaw ? Number.parseInt(codRaw, 10) : 0;
 
-      try {
-        const { result } = await this.createShipment.execute({
-          merchantId,
-          merchantPlan: 'standard',
-          zone: (fields.destination_area ?? '').trim() || 'dhaka-metro',
-          remoteArea: false,
-          fragile: false,
-          packagingKind: null,
-          sender: { name: 'Bulk', phone: '+8801700000000', line: 'Bulk upload' },
-          recipient: {
-            name: (fields.recipient_name ?? '').trim() || 'Bulk',
-            phone: (fields.recipient_phone ?? '').trim(),
-            line: (fields.recipient_address ?? '').trim(),
-          },
-          parcel: {
-            weightGrams: weight,
-            description: (fields.item_description ?? '').trim() || 'Bulk upload',
-          },
-          cod: money(codMinor),
-          merchantReference: row.invoice,
-          idempotencyKey: `bulk:${jobId}:${row.invoice}`,
-          actorId: null,
-        });
+    try {
+      const { result } = await this.createShipment.execute({
+        merchantId,
+        merchantPlan: 'standard',
+        zone: (snapshot.fields.destination_area ?? '').trim() || 'dhaka-metro',
+        remoteArea: false,
+        fragile: false,
+        packagingKind: null,
+        sender: { name: 'Bulk', phone: '+8801700000000', line: 'Bulk upload' },
+        recipient: {
+          name: (snapshot.fields.recipient_name ?? '').trim() || 'Bulk',
+          phone: (snapshot.fields.recipient_phone ?? '').trim(),
+          line: (snapshot.fields.recipient_address ?? '').trim(),
+        },
+        parcel: {
+          weightGrams: weight,
+          description: (snapshot.fields.item_description ?? '').trim() || 'Bulk upload',
+        },
+        cod: money(codMinor),
+        merchantReference: snapshot.invoice,
+        idempotencyKey: `bulk:${jobId}:${snapshot.invoice}`,
+        actorId: null,
+      });
+      await this.shipments.transaction(async (manager) => {
+        const rows = await this.bulk.findRows(manager, jobId);
+        const row = rows.find((r) => r.id === rowId);
+        if (!row) return;
         row.outcome = 'CREATED';
         row.shipmentId = result.id;
         await this.bulk.saveRow(manager, row);
-        return 'succeeded';
-      } catch (error) {
+      });
+      return 'succeeded';
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+      await this.shipments.transaction(async (manager) => {
+        const rows = await this.bulk.findRows(manager, jobId);
+        const row = rows.find((r) => r.id === rowId);
+        if (!row) return;
         row.outcome = 'FAILED';
-        row.reason =
-          error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+        row.reason = reason;
         await this.bulk.saveRow(manager, row);
-        return 'failed';
-      }
-    });
+      });
+      return 'failed';
+    }
   }
 
   @OnWorkerEvent('failed')
