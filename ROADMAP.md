@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · 10,000-row bulk import proven live end to end
+**Last updated:** 2026-10-05 · OpenAPI + api-client + contract tests live-proven
 
 ---
 
@@ -489,8 +489,12 @@ a human.
 - [x] `RateLimit-*` headers, `Retry-After` on 429
       (live 2026-10-05: merchant list → `RateLimit-Limit: 600`, public track →
       `100`; 105 rapid hits → 96×200 + 9×429 with `RATE_LIMITED` envelope)
-- [ ] OpenAPI generated; `packages/api-client` generated from it; both committed together
-- [ ] Contract tests asserting the spec matches observed behaviour
+- [x] OpenAPI generated; `packages/api-client` generated from it; both committed together
+      (live 2026-10-05: export deterministic + DB-free, 33 paths; client binds generated DTO
+      types, `ZipZapApiError` carries the §87 envelope + Retry-After; regen wired into CI)
+- [x] Contract tests asserting the spec matches observed behaviour
+      (8 green: spec↔live path parity both directions, 401 + envelope, RateLimit headers,
+      bad cursor 400, unknown tracking 404-not-401, idempotent create replay)
 
 ### 🔄 Webhooks — skeleton live 2026-10-04; replay on demand open
 

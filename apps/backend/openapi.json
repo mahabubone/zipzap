@@ -1,0 +1,1411 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "HealthController_healthz",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Liveness — the process is up",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "HealthController_readyz",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Readiness — Postgres is reachable",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/webhooks": {
+      "post": {
+        "operationId": "WebhookController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register a webhook endpoint; secret returned once",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/v1/webhooks/{id}/rotate": {
+      "post": {
+        "operationId": "WebhookController_rotate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rotate the signing secret; new secret returned once",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/v1/webhooks/{id}/pause": {
+      "post": {
+        "operationId": "WebhookController_pause",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Pause delivery to an endpoint",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/v1/webhooks/{id}/resume": {
+      "post": {
+        "operationId": "WebhookController_resume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Resume delivery to an endpoint",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/v1/webhooks/deliveries/{deliveryId}/replay": {
+      "post": {
+        "operationId": "WebhookController_replayDelivery",
+        "parameters": [
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Replay a terminal delivery with a fresh delivery id",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/track/{trackingCode}": {
+      "get": {
+        "operationId": "PublicTrackingController_track",
+        "parameters": [
+          {
+            "name": "trackingCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Public shipment tracking",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/v1/shipments": {
+      "post": {
+        "operationId": "CreateShipmentController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShipmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a shipment",
+        "tags": [
+          "shipments"
+        ]
+      },
+      "get": {
+        "operationId": "ListShipmentsController_listShipments",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your shipments, newest first",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/bulk/upload": {
+      "post": {
+        "operationId": "BulkImportController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBulkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload CSV, get the human preview checkpoint",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/bulk/accept": {
+      "post": {
+        "operationId": "BulkImportController_accept",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptBulkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Accept the preview — enqueue chunked processing",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/bulk/{jobId}": {
+      "get": {
+        "operationId": "BulkImportController_progress",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Poll job progress",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/bulk/{jobId}/result": {
+      "get": {
+        "operationId": "BulkImportController_result",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download the row-level result CSV",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/pricing/quote": {
+      "post": {
+        "operationId": "PricingController_quote",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Quote a shipment price",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/cod/collect": {
+      "post": {
+        "operationId": "CollectCodController_collect",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectCodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Record a COD collection",
+        "tags": [
+          "cod"
+        ]
+      }
+    },
+    "/v1/cod/reconcile": {
+      "post": {
+        "operationId": "ReconcileCodController_reconcile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileCodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Resolve a COD mismatch after human review",
+        "tags": [
+          "cod"
+        ]
+      }
+    },
+    "/v1/pickups": {
+      "post": {
+        "operationId": "RequestPickupController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPickupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Request a pickup",
+        "tags": [
+          "pickups"
+        ]
+      }
+    },
+    "/v1/pickups/{id}/assign": {
+      "post": {
+        "operationId": "AssignPickupController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPickupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Assign a rider to a pickup",
+        "tags": [
+          "pickups"
+        ]
+      }
+    },
+    "/v1/riders": {
+      "post": {
+        "operationId": "RegisterRiderController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRiderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register a rider",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
+    "/v1/deliveries/{id}/attempts": {
+      "post": {
+        "operationId": "RecordAttemptController_record",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAttemptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Record a failed delivery attempt",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/deliveries": {
+      "post": {
+        "operationId": "CreateDeliveryController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Open a delivery job",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/deliveries/{id}/accept": {
+      "post": {
+        "operationId": "AdvanceDeliveryController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rider accepts a delivery job",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/deliveries/{id}/dispatch": {
+      "post": {
+        "operationId": "AdvanceDeliveryController_dispatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Rider heads out for delivery",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/deliveries/{id}/complete": {
+      "post": {
+        "operationId": "AdvanceDeliveryController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm delivery and collect COD",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/settlements": {
+      "post": {
+        "operationId": "CreateSettlementController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSettlementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Freeze unsettled entries into a settlement",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/settlements/{id}/approve": {
+      "post": {
+        "operationId": "ApproveSettlementController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveSettlementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Approve a settlement — the point of no return",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/merchants/{id}/balance": {
+      "get": {
+        "operationId": "BalanceController_balance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Derived merchant balance in minor units",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/settlements/{id}/initiate-payment": {
+      "post": {
+        "operationId": "SettlementPaymentController_initiatePayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Initiate the provider payout for an approved settlement",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/settlements/{id}/confirm-payment": {
+      "post": {
+        "operationId": "SettlementPaymentController_confirmPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm the provider payout and settle",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/returns": {
+      "post": {
+        "operationId": "ReturnController_request",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Request a return against the original shipment",
+        "tags": [
+          "returns"
+        ]
+      }
+    },
+    "/v1/returns/{id}/approve": {
+      "post": {
+        "operationId": "ReturnController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Approve a return — the merchant decision",
+        "tags": [
+          "returns"
+        ]
+      }
+    },
+    "/v1/returns/{id}/reject": {
+      "post": {
+        "operationId": "ReturnController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Reject a return — the merchant decision",
+        "tags": [
+          "returns"
+        ]
+      }
+    },
+    "/v1/returns/{id}/advance": {
+      "post": {
+        "operationId": "ReturnController_advance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Walk one transit leg toward the merchant",
+        "tags": [
+          "returns"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "ZipZap API",
+    "description": "Logistics operating system for e-commerce fulfillment and last-mile delivery.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization"
+      }
+    },
+    "schemas": {
+      "CreateWebhookDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "events"
+        ]
+      },
+      "CreateShipmentDto": {
+        "type": "object",
+        "properties": {
+          "senderName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "senderPhone": {
+            "type": "string",
+            "pattern": "^\\+8801[3-9]\\d{8}$"
+          },
+          "senderAddress": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "recipientName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "recipientPhone": {
+            "type": "string",
+            "pattern": "^\\+8801[3-9]\\d{8}$"
+          },
+          "recipientAddress": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "parcelWeightGrams": {
+            "type": "number",
+            "minimum": 1
+          },
+          "parcelDescription": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "codAmountMinor": {
+            "type": "number",
+            "description": "Money as integer minor units. A decimal here is a bug, not a convenience.",
+            "minimum": 1
+          },
+          "codCurrency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "zone": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "remoteArea": {
+            "type": "boolean"
+          },
+          "fragile": {
+            "type": "boolean"
+          },
+          "packagingKind": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "merchantPlan": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "senderName",
+          "senderPhone",
+          "senderAddress",
+          "recipientName",
+          "recipientPhone",
+          "recipientAddress",
+          "parcelWeightGrams",
+          "parcelDescription",
+          "zone",
+          "remoteArea",
+          "fragile",
+          "merchantPlan"
+        ]
+      },
+      "UploadBulkDto": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "maxLength": 10000000
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "csv",
+          "filename"
+        ]
+      },
+      "AcceptBulkDto": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId"
+        ]
+      },
+      "QuoteDto": {
+        "type": "object",
+        "properties": {
+          "weightGrams": {
+            "type": "number",
+            "minimum": 1
+          },
+          "codAmountMinor": {
+            "type": "number",
+            "minimum": 0
+          },
+          "zone": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "remoteArea": {
+            "type": "boolean"
+          },
+          "fragile": {
+            "type": "boolean"
+          },
+          "packagingKind": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "merchantPlan": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "BDT"
+            ],
+            "pattern": "^[A-Z]{3}$"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "weightGrams",
+          "codAmountMinor",
+          "zone",
+          "remoteArea",
+          "fragile",
+          "merchantPlan"
+        ]
+      },
+      "CollectCodDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "collectedMinor": {
+            "type": "number",
+            "description": "Integer minor units. A decimal here is a bug, not a convenience.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "shipmentId",
+          "collectedMinor"
+        ]
+      },
+      "ReconcileCodDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "shipmentId",
+          "note"
+        ]
+      },
+      "RequestPickupDto": {
+        "type": "object",
+        "properties": {
+          "shipmentIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "totalWeightGrams": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "shipmentIds",
+          "totalWeightGrams"
+        ]
+      },
+      "AssignmentCandidateDto": {
+        "type": "object",
+        "properties": {
+          "riderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "distanceMetres": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "activeJobs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "capacity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "recentRefusals": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "riderId"
+        ]
+      },
+      "AssignPickupDto": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentCandidateDto"
+            }
+          }
+        },
+        "required": [
+          "candidates"
+        ]
+      },
+      "RegisterRiderDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+8801[3-9]\\d{8}$"
+          },
+          "capacity": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "displayName",
+          "phone"
+        ]
+      },
+      "RecordAttemptDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER_UNAVAILABLE",
+              "WRONG_ADDRESS",
+              "PHONE_UNREACHABLE",
+              "CUSTOMER_REFUSED",
+              "ADDRESS_INCOMPLETE",
+              "PAYMENT_ISSUE",
+              "DAMAGED_PACKAGE",
+              "WEATHER",
+              "OPERATIONAL_EXCEPTION"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreateDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "riderId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "shipmentId"
+        ]
+      },
+      "CompleteDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "collectedMinor": {
+            "type": "number",
+            "description": "Integer minor units collected at the door. A decimal here is a bug, not a convenience.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "collectedMinor"
+        ]
+      },
+      "CreateSettlementDto": {
+        "type": "object",
+        "properties": {
+          "merchantId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "merchantId"
+        ]
+      },
+      "ApproveSettlementDto": {
+        "type": "object",
+        "properties": {
+          "approverId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "approverId"
+        ]
+      },
+      "RequestReturnDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER_REFUSED",
+              "CUSTOMER_UNAVAILABLE",
+              "WRONG_ADDRESS",
+              "DAMAGED",
+              "MERCHANT_REQUEST",
+              "OTHER"
+            ]
+          }
+        },
+        "required": [
+          "shipmentId",
+          "reason"
+        ]
+      },
+      "DecideReturnDto": {
+        "type": "object",
+        "properties": {
+          "approverId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "approverId",
+          "note"
+        ]
+      }
+    }
+  }
+}

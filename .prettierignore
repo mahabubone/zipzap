@@ -5,3 +5,7 @@ pnpm-lock.yaml
 infra/compose/**/data
 *.log
 .env
+# Generated contract artefacts: the generators own their formatting, and a
+# prettier rewrite would churn every quote on each regeneration.
+apps/backend/openapi.json
+packages/api-client/src/generated.d.ts
