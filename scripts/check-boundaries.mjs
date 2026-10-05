@@ -35,6 +35,7 @@ const OWNED = {
   finance: 'finance',
   returns: 'returns',
   notification: 'notification',
+  network: 'network',
 };
 
 const MODULES_DIR = join(SRC_ROOT, 'modules');

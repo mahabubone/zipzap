@@ -21,12 +21,16 @@ import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { money, type Money } from '../../common/money.ts';
 import { hashRequest } from '../../common/idempotency.ts';
-import { InvalidIdempotencyKeyError } from '../../common/domain-error.ts';
+import {
+  InvalidIdempotencyKeyError,
+  ServiceabilityFailedError,
+} from '../../common/domain-error.ts';
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
 import { PricingService } from '../pricing/pricing.service.ts';
 import { EnsureCodRecordService } from '../cod/ensure-cod-record.service.ts';
+import { NetworkService } from '../network/network.service.ts';
 import {
   createShipment,
   generateTrackingCode,
@@ -72,6 +76,7 @@ export class CreateShipmentService {
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
     @Inject(PricingService) private readonly pricing: PricingService,
     @Inject(EnsureCodRecordService) private readonly cod: EnsureCodRecordService,
+    @Inject(NetworkService) private readonly network: NetworkService,
   ) {}
 
   async execute(command: CreateShipmentCommand): Promise<{
@@ -111,6 +116,18 @@ export class CreateShipmentService {
           result: claimed.decision.responseBody as CreatedShipment,
           replayed: true,
         };
+      }
+
+      // Serviceability: coverage rows answer, before anything is written. A replay
+      // above already returned — a rejection here rolls back the claim too, so the
+      // idempotency key stays usable after coverage is fixed. Unknown zone = no row
+      // = not serviceable, with the zone named in the reason (Phase 2 exit gate).
+      const coverage = await this.network.checkZone(command.zone);
+      if (!coverage.serviceable) {
+        throw new ServiceabilityFailedError(coverage.reason ?? 'Destination not serviceable.');
+      }
+      if ((command.cod?.amountMinor ?? 0) > 0 && !coverage.codAvailable) {
+        throw new ServiceabilityFailedError(`COD is not available in zone "${command.zone}".`);
       }
 
       // DRAFT -> CREATED, validated. A caller cannot set a status directly.

@@ -13,6 +13,7 @@ import { CodModule } from './modules/cod/cod.module.ts';
 import { FinanceModule } from './modules/finance/finance.module.ts';
 import { ReturnsModule } from './modules/returns/returns.module.ts';
 import { NotificationModule } from './modules/notification/notification.module.ts';
+import { NetworkModule } from './modules/network/network.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -36,6 +37,7 @@ import { NotificationModule } from './modules/notification/notification.module.t
     FinanceModule,
     ReturnsModule,
     NotificationModule,
+    NetworkModule,
   ],
   controllers: [HealthController],
 })

@@ -300,9 +300,14 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] Bangladesh hierarchy: division → district → upazila → union → ward → delivery point
 - [ ] `geography(Point|MultiPolygon, 4326)`, **not** `geometry` — metres, not coordinate units
 - [ ] `GIST` index on every geometry column
-- [ ] **Coverage as data**: `serviceable`, `estimated_days`, `pickup_available`,
+- [x] **Coverage as data**: `serviceable`, `estimated_days`, `pickup_available`,
       `delivery_available`, `COD_available`. Never `if (city === 'Dhaka')`.
-- [ ] Serviceability check **before** shipment creation, with a reason
+      (migration 0023: `network.service_areas`, 8 division-capital rows; absence of a row
+      is itself the answer — not serviceable, zone named in the reason)
+- [x] Serviceability check **before** shipment creation, with a reason
+      (gate in `CreateShipmentService` inside the transaction after the replay check:
+      replays return stored responses, rejections roll back the key claim so the
+      `Idempotency-Key` is not burned; COD also gated on `cod_available`)
 - [ ] Route → RouteLeg → Trip. Fixed topology first.
 - [ ] Manifest lifecycle `DRAFT → SEALED → DISPATCHED → RECEIVED → RECONCILED`
 - [ ] **A missing shipment at reconciliation becomes an exception.** Silence is never the answer.
@@ -367,7 +372,10 @@ Movement. This is where the product stops being an order form and becomes a cour
 
 - [ ] The **flagship story** runs to `DELIVERED` in a seeded network
 - [ ] The **failure story** runs too: refused → retry → refused → return → merchant receives it
-- [ ] An unserviceable destination is rejected at creation with a reason
+- [x] An unserviceable destination is rejected at creation with a reason
+      (live 2026-10-05: zone `atlantis-01` → 422 `SERVICEABILITY_FAILED`
+      `No coverage for zone "atlantis-01"`, zero rows written, same key retries fine;
+      covered zone creates normally from the seeded row)
 - [ ] Two riders scanning simultaneously produce exactly one transition and one tracking event
 - [ ] A manifest missing a shipment raises an exception at reconciliation
 - [ ] Assignment is deterministic — the same inputs assign the same rider 100 times
@@ -594,13 +602,17 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
 
 Depth in the network model. Every item here has a trigger; none is needed for the flagship demo.
 
-**Build order (scoped 2026-10-05)** — ground truth: no `network`/`hub` schema exists yet;
-`rider` exists with deterministic, explainable `rank()`; no rider mobile app exists. Therefore:
+**Build order (scoped 2026-10-05)** — ground truth: `network` had no tables until rung 1
+landed `service_areas` (0023); the geography hierarchy, geometry columns and routes still do
+not exist. `rider` exists with deterministic, explainable `rank()`; no rider mobile app
+exists. Therefore:
 
-1. **Network schema + coverage-as-data** first — `serviceable`/`estimated_days`/`COD_available`
-   as rows, never `if (city === 'Dhaka')`. Closes Phase 2's still-open gate box
-   ("unserviceable destination rejected at creation") as a side effect, because
-   serviceability has nowhere to live until this exists.
+1. **Network schema + coverage-as-data** first — ✅ landed 2026-10-05: `service_areas` with
+   `serviceable`/`estimated_days`/`COD_available` as rows, never `if (city === 'Dhaka')`,
+   plus the pre-creation gate with a reason — which closed Phase 2's exit-gate box
+   ("unserviceable destination rejected at creation"). Still open from this rung: the
+   Bangladesh hierarchy, `geography` columns + `GIST`, and the 64-district seed (rung 2,
+   where a point is first queried).
 2. **Routing legs** (fixed topology: pickup zone → origin → regional → destination →
    delivery point) on that schema, with the manifest/reconciliation lifecycle.
 3. **SLA**: Asia/Dhaka cutoffs + holiday calendar, computed against the route legs.

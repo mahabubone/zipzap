@@ -293,6 +293,37 @@ describeIfServer('openapi contract — observed behaviour', () => {
     assert.equal(stranger.status, 404);
   });
 
+  test('an unserviceable zone is rejected at creation with a reason (422)', async () => {
+    if (!databaseUrl) return;
+    const { header } = await mintCredential();
+    const response = await fetch(`${apiBaseUrl}/v1/shipments`, {
+      method: 'POST',
+      headers: {
+        Authorization: header,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': `contract-${randomUUID()}`,
+      },
+      body: JSON.stringify({
+        senderName: 'Contract',
+        senderPhone: '+8801700000000',
+        senderAddress: 'Dhaka',
+        recipientName: 'Probe',
+        recipientPhone: '+8801800000000',
+        recipientAddress: 'Nowhere',
+        parcelWeightGrams: 1000,
+        parcelDescription: 'serviceability probe',
+        zone: 'atlantis-01',
+        remoteArea: false,
+        fragile: false,
+        merchantPlan: 'standard',
+      }),
+    });
+    assert.equal(response.status, 422);
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.code, 'SERVICEABILITY_FAILED');
+    assert.match(String(body.detail), /No coverage for zone "atlantis-01"/);
+  });
+
   test('cancel moves CREATED to CANCELLED; repeat is a 409, not a double-apply', async () => {
     if (!databaseUrl) return;
     const { header } = await mintCredential();

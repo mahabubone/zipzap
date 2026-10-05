@@ -39,6 +39,27 @@ function fakePricing(version = 1) {
   };
 }
 
+/** Coverage stand-in: serviceable everywhere unless a test opts a zone out. */
+function fakeNetwork(
+  overrides: Record<string, { serviceable?: boolean; codAvailable?: boolean }> = {},
+) {
+  return {
+    checkZone: vi.fn(async (zone: string) => {
+      const override = overrides[zone] ?? {};
+      const serviceable = override.serviceable ?? true;
+      return {
+        zone,
+        serviceable,
+        reason: serviceable ? null : `No coverage for zone "${zone}".`,
+        estimatedDays: 1,
+        pickupAvailable: serviceable,
+        deliveryAvailable: serviceable,
+        codAvailable: override.codAvailable ?? serviceable,
+      };
+    }),
+  };
+}
+
 /** In-memory stand-in for the transaction manager. Records every SQL table touched, in order. */
 function fakeManager() {
   const touched: string[] = [];
@@ -90,6 +111,7 @@ describe('CreateShipmentService orchestration', () => {
       new AppendTrackingEventService(),
       fakePricing() as never,
       { ensure: async () => null } as never,
+      fakeNetwork() as never,
     );
 
     const { result, replayed } = await service.execute({ ...COMMAND, cod: undefined });
@@ -110,6 +132,7 @@ describe('CreateShipmentService orchestration', () => {
       new AppendTrackingEventService(),
       fakePricing() as never,
       { ensure: async () => null } as never,
+      fakeNetwork() as never,
     );
 
     const { result } = await service.execute({
@@ -139,10 +162,61 @@ describe('CreateShipmentService orchestration', () => {
       new AppendTrackingEventService(),
       pricing as never,
       { ensure: async () => null } as never,
+      fakeNetwork() as never,
     );
 
     await service.execute({ ...COMMAND, idempotencyKey: 'key-3' });
     expect(pricing.quote).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an unserviceable zone with a reason before any write', async () => {
+    const fake = fakeManager();
+    const fakeDs = { transaction: (fn: (m: unknown) => Promise<unknown>) => fn(fake.manager) };
+    const service = new CreateShipmentService(
+      fakeDs as never,
+      new ShipmentRepository(),
+      new AppendTrackingEventService(),
+      fakePricing() as never,
+      { ensure: async () => null } as never,
+      fakeNetwork({ 'atlantis-01': { serviceable: false } }) as never,
+    );
+
+    const failure = (await service
+      .execute({ ...COMMAND, idempotencyKey: 'key-unserv', zone: 'atlantis-01' })
+      .catch((error: unknown) => error as Error)) as Error;
+
+    expect(failure.message).toContain('No coverage for zone "atlantis-01"');
+    // The claim row is written first and rolls back with the rejection in the real
+    // transaction (proven in test/integration against Postgres); here we assert the
+    // thing the fake can observe: no shipment, tracking or outbox write happened.
+    expect(fake.touched).not.toContain('shipment.shipments');
+    expect(fake.touched).not.toContain('tracking.events');
+    expect(fake.touched).not.toContain('system.outbox_events');
+  });
+
+  it('rejects COD in a zone whose coverage disables it', async () => {
+    const fake = fakeManager();
+    const fakeDs = { transaction: (fn: (m: unknown) => Promise<unknown>) => fn(fake.manager) };
+    const service = new CreateShipmentService(
+      fakeDs as never,
+      new ShipmentRepository(),
+      new AppendTrackingEventService(),
+      fakePricing() as never,
+      { ensure: async () => null } as never,
+      fakeNetwork({ 'sylhet-metro': { codAvailable: false } }) as never,
+    );
+
+    const failure = (await service
+      .execute({
+        ...COMMAND,
+        idempotencyKey: 'key-nocod',
+        zone: 'sylhet-metro',
+        cod: { amountMinor: 50_000, currency: 'BDT' },
+      })
+      .catch((error: unknown) => error as Error)) as Error;
+
+    expect(failure.message).toContain('COD is not available in zone "sylhet-metro"');
+    expect(fake.touched).not.toContain('shipment.shipments');
   });
 
   it('resolves through the real Nest container with a mocked DataSource boundary', async () => {

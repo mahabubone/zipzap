@@ -15,6 +15,7 @@ import { TrackingModule } from '../tracking/tracking.module.ts';
 import { PricingModule } from '../pricing/pricing.module.ts';
 import { CodModule } from '../cod/cod.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
+import { NetworkModule } from '../network/network.module.ts';
 import { CreateShipmentController } from './create-shipment.controller.ts';
 import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
@@ -28,6 +29,9 @@ import { CancelShipmentService } from './cancel-shipment.service.ts';
     PricingModule,
     CodModule,
     IdentityModule,
+    // Serviceability: shipment consumes network's coverage contract (injected
+    // service, never a cross-schema read).
+    NetworkModule,
     BullModule.registerQueue({ name: BULK_QUEUE }),
   ],
   controllers: [

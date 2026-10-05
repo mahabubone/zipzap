@@ -26,6 +26,8 @@ import { PricingRepository } from '../../dist/modules/pricing/pricing.repository
 import { PricingVersionEntity } from '../../dist/modules/pricing/pricing-version.entity.js';
 import { EnsureCodRecordService } from '../../dist/modules/cod/ensure-cod-record.service.js';
 import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
+import { NetworkService } from '../../dist/modules/network/network.service.js';
+import { ServiceAreaEntity } from '../../dist/modules/network/service-area.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
@@ -39,6 +41,7 @@ let trackingDb: DataSource;
 let systemDb: DataSource;
 let pricingDb: DataSource;
 let codDb: DataSource;
+let networkDb: DataSource;
 let service: CreateShipmentService;
 
 const command = (key: string) => ({
@@ -66,6 +69,7 @@ before(async () => {
   systemDb = await connectModuleDataSource('system', []);
   pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
   codDb = await connectModuleDataSource('cod', [CodRecordEntity]);
+  networkDb = await connectModuleDataSource('network', [ServiceAreaEntity]);
 
   service = new CreateShipmentService(
     shipmentDb,
@@ -73,6 +77,7 @@ before(async () => {
     new AppendTrackingEventService(),
     new PricingService(pricingDb, new PricingRepository()),
     new EnsureCodRecordService(codDb),
+    new NetworkService(networkDb),
   );
 });
 
@@ -82,6 +87,7 @@ after(async () => {
   await systemDb?.destroy();
   await pricingDb?.destroy();
   await codDb?.destroy();
+  await networkDb?.destroy();
 });
 
 describeIfDb('CreateShipment — one transaction, four writes', () => {
@@ -140,6 +146,17 @@ describeIfDb('CreateShipment — one transaction, four writes', () => {
         }),
       },
       cod: { ensure: async () => 'cod-stub-id' },
+      network: {
+        checkZone: async () => ({
+          zone: input.zone,
+          serviceable: true,
+          reason: null,
+          estimatedDays: 1,
+          pickupAvailable: true,
+          deliveryAvailable: true,
+          codAvailable: true,
+        }),
+      },
       tracking: {
         append: async () => {
           throw new Error('simulated failure after the aggregate insert');
@@ -242,6 +259,41 @@ describeIfDb('Idempotency', () => {
     assert.equal(a.replayed, false);
     assert.equal(b.replayed, false, 'one merchant must never see another merchant response');
     assert.notEqual(a.result.id, b.result.id);
+  });
+});
+
+describeIfDb('serviceability — coverage rows answer, before any write', () => {
+  test('a zone with no coverage row is rejected with a reason', async () => {
+    const input = { ...command(`key-${randomUUID()}`), zone: 'atlantis-01' };
+
+    await assert.rejects(
+      () => service.execute(input),
+      (error: Error) => error.message.includes('No coverage for zone "atlantis-01"'),
+    );
+
+    const shipments = await shipmentDb.query(
+      'SELECT id FROM shipment.shipments WHERE merchant_id = $1',
+      [input.merchantId],
+    );
+    assert.equal(shipments.length, 0, 'the rejection wrote nothing');
+
+    // Same key, valid zone: the claim rolled back with the rejection, so the key
+    // is not burned by a request that never happened.
+    const retry = await service.execute({ ...input, zone: 'dhaka-metro' });
+    assert.equal(retry.replayed, false);
+    assert.equal(retry.result.status, 'CREATED');
+  });
+
+  test('a covered zone creates normally — the seeded row is the policy', async () => {
+    const rows = await networkDb.query(
+      `SELECT zone, serviceable, estimated_days FROM network.service_areas WHERE zone = 'dhaka-metro'`,
+    );
+    assert.equal(rows.length, 1, 'dhaka-metro coverage exists as data, not as code');
+    assert.equal(rows[0].serviceable, true);
+    assert.equal(rows[0].estimated_days, 1);
+
+    const { result } = await service.execute({ ...command(`key-${randomUUID()}`) });
+    assert.equal(result.status, 'CREATED');
   });
 });
 
