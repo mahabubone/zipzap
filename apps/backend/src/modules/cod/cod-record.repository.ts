@@ -40,4 +40,31 @@ export class CodRecordRepository {
   save(manager: EntityManager, entity: CodRecordEntity): Promise<CodRecordEntity> {
     return manager.getRepository(CodRecordEntity).save(entity);
   }
+
+  /**
+   * One merchant-scoped page, newest first. Total order is (created_at, id)
+   * both DESC — created_at alone is not unique, and the cursor then repeats
+   * or skips a row. The composite WHERE keeps the page stable under writes:
+   * rows created after paging started sort before the cursor, never inside it.
+   */
+  async pageByMerchant(
+    manager: EntityManager,
+    merchantId: string,
+    after: { createdAt: string; id: string } | null,
+    take: number,
+  ): Promise<CodRecordEntity[]> {
+    const query = manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .where('c.merchantId = :merchantId', { merchantId })
+      .orderBy('c.createdAt', 'DESC')
+      .addOrderBy('c.id', 'DESC')
+      .take(take);
+    if (after) {
+      query.andWhere('(c.createdAt, c.id) < (:createdAt, :id)', {
+        createdAt: after.createdAt,
+        id: after.id,
+      });
+    }
+    return query.getMany();
+  }
 }

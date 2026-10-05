@@ -18,6 +18,8 @@ import { IdentityModule } from '../identity/identity.module.ts';
 import { CreateShipmentController } from './create-shipment.controller.ts';
 import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
+import { ShipmentDetailController } from './shipment-detail.controller.ts';
+import { CancelShipmentService } from './cancel-shipment.service.ts';
 
 @Module({
   imports: [
@@ -28,10 +30,16 @@ import { ListShipmentsService } from './list-shipments.service.ts';
     IdentityModule,
     BullModule.registerQueue({ name: BULK_QUEUE }),
   ],
-  controllers: [CreateShipmentController, ListShipmentsController, BulkImportController],
+  controllers: [
+    CreateShipmentController,
+    ListShipmentsController,
+    ShipmentDetailController,
+    BulkImportController,
+  ],
   providers: [
     ShipmentRepository,
     CreateShipmentService,
+    CancelShipmentService,
     ListShipmentsService,
     AppendTrackingEventService,
     { provide: SHIPMENT_LOOKUP, useClass: ShipmentLookup },

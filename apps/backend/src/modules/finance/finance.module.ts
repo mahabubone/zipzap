@@ -10,6 +10,8 @@ import { FinanceConsumer } from './finance-consumer.service.ts';
 import { CreateSettlementController } from './create-settlement.controller.ts';
 import { ApproveSettlementController } from './approve-settlement.controller.ts';
 import { BalanceController } from './balance.controller.ts';
+import { ListSettlementsController } from './list-settlements.controller.ts';
+import { ListSettlementsService } from './list-settlements.service.ts';
 import { SettlementPaymentController } from './settlement-payment.controller.ts';
 import { InitiateSettlementPaymentService } from './initiate-settlement-payment.service.ts';
 import { ConfirmSettlementPaymentService } from './confirm-settlement-payment.service.ts';
@@ -22,12 +24,14 @@ import { IdentityModule } from '../identity/identity.module.ts';
     CreateSettlementController,
     ApproveSettlementController,
     BalanceController,
+    ListSettlementsController,
     SettlementPaymentController,
   ],
   providers: [
     FinanceRepository,
     PostLedgerEntryService,
     CreateSettlementService,
+    ListSettlementsService,
     ApproveSettlementService,
     InitiateSettlementPaymentService,
     ConfirmSettlementPaymentService,

@@ -482,9 +482,14 @@ a human.
 
 ### 🔲 Public API v1
 
-- [ ] Full `/v1` surface per [docs/api/_index.md](docs/api/_index.md)
+- [x] Full `/v1` surface per [docs/api/_index.md](docs/api/_index.md)
+      (live 2026-10-05: shipment detail + cancel, webhook list, pickup/returns/COD/settlement
+      lists — five cursor-paginated collections + two bounded reads; COD walk 1600 rows zero
+      repeats; doc table now marks ✅/🔲/decision per route)
 - [ ] API key auth with scopes and per-merchant rate limits
-- [ ] Cursor pagination on every unbounded collection, total ordering
+- [x] Cursor pagination on every unbounded collection, total ordering
+      (shipments, pickups, returns, COD records, settlements — all `created_at DESC, id DESC`;
+      webhook endpoints bounded, deliberately unpaginated per docs/api/pagination.md)
 - [ ] Error envelope on every path, from the single filter
 - [x] `RateLimit-*` headers, `Retry-After` on 429
       (live 2026-10-05: merchant list → `RateLimit-Limit: 600`, public track →
@@ -548,7 +553,9 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
 
 ### Exit gate
 
-- [ ] Duplicate request rejected by idempotency, returning the original response
+- [x] Duplicate request rejected by idempotency, returning the original response
+      (contract test, live 2026-10-05: same key + same body → 201 replayed with the same id;
+      same key + different body → 400 `INVALID_IDEMPOTENCY_KEY`, never a silent replay)
 - [x] Webhook endpoint down → retries on the ladder → terminal failed state visible to the merchant
       (live 2026-10-04/05: dead endpoint climbed 1m → 5m → 15m → 1h → 6h with one immutable
       row per attempt, `fetch failed`, attempt-6 enqueued in the delayed set; per-attempt rows

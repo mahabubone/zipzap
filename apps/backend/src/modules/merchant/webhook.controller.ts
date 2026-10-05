@@ -6,7 +6,7 @@
  * be one.
  */
 
-import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -35,6 +35,13 @@ export class WebhookController {
   private merchantId(request: AuthenticatedRequest): string {
     // ApiKeyGuard guarantees a merchant-scoped principal for this scope set.
     return request.principal!.merchantId!;
+  }
+
+  @Get()
+  @UseGuards(new ScopeGuard('webhooks:manage'))
+  @ApiOperation({ summary: 'List your webhook endpoints' })
+  async list(@Req() request: AuthenticatedRequest): Promise<EndpointView[]> {
+    return this.endpoints.list(this.merchantId(request));
   }
 
   @Post()

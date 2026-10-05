@@ -6,13 +6,15 @@ import { RequestPickupService } from './request-pickup.service.ts';
 import { RequestPickupController } from './request-pickup.controller.ts';
 import { AssignPickupService } from './assign-pickup.service.ts';
 import { AssignPickupController } from './assign-pickup.controller.ts';
+import { ListPickupsService } from './list-pickups.service.ts';
+import { ListPickupsController } from './list-pickups.controller.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 import { RiderModule } from '../rider/rider.module.ts';
 
 @Module({
   imports: [forModule('pickup', [PickupEntity]), TrackingModule, IdentityModule, RiderModule],
-  controllers: [RequestPickupController, AssignPickupController],
-  providers: [PickupRepository, RequestPickupService, AssignPickupService],
+  controllers: [RequestPickupController, AssignPickupController, ListPickupsController],
+  providers: [PickupRepository, RequestPickupService, AssignPickupService, ListPickupsService],
 })
 export class PickupModule {}

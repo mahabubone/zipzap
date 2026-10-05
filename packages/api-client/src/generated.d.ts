@@ -45,7 +45,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List your webhook endpoints */
+        get: operations["WebhookController_list"];
         put?: never;
         /** Register a webhook endpoint; secret returned once */
         post: operations["WebhookController_create"];
@@ -152,6 +153,40 @@ export interface paths {
         put?: never;
         /** Create a shipment */
         post: operations["CreateShipmentController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shipments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one of your shipments */
+        get: operations["ShipmentDetailController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shipments/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a shipment that has not shipped yet */
+        post: operations["ShipmentDetailController_cancelShipment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -277,6 +312,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cod": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your COD records, newest first */
+        get: operations["ListCodRecordsController_listCodRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pickups": {
         parameters: {
             query?: never;
@@ -284,7 +336,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List your pickups, newest first */
+        get: operations["ListPickupsController_listPickups"];
         put?: never;
         /** Request a pickup */
         post: operations["RequestPickupController_create"];
@@ -420,7 +473,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List your settlements, newest first */
+        get: operations["ListSettlementsController_listSettlements"];
         put?: never;
         /** Freeze unsettled entries into a settlement */
         post: operations["CreateSettlementController_create"];
@@ -505,7 +559,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List your returns, newest first */
+        get: operations["ListReturnsController_listReturns"];
         put?: never;
         /** Request a return against the original shipment */
         post: operations["ReturnController_request"];
@@ -720,6 +775,23 @@ export interface operations {
             };
         };
     };
+    WebhookController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     WebhookController_create: {
         parameters: {
             query?: never;
@@ -879,6 +951,44 @@ export interface operations {
             };
         };
     };
+    ShipmentDetailController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ShipmentDetailController_cancelShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     BulkImportController_upload: {
         parameters: {
             query?: never;
@@ -1017,6 +1127,46 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListCodRecordsController_listCodRecords: {
+        parameters: {
+            query?: {
+                limit?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListPickupsController_listPickups: {
+        parameters: {
+            query?: {
+                limit?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1204,6 +1354,26 @@ export interface operations {
             };
         };
     };
+    ListSettlementsController_listSettlements: {
+        parameters: {
+            query?: {
+                limit?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CreateSettlementController_create: {
         parameters: {
             query?: never;
@@ -1304,6 +1474,26 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListReturnsController_listReturns: {
+        parameters: {
+            query?: {
+                limit?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

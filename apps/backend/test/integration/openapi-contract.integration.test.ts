@@ -206,4 +206,133 @@ describeIfServer('openapi contract — observed behaviour', () => {
     assert.equal(second.replayed, true);
     assert.equal(second.id, first.id, 'same key returns the same shipment');
   });
+
+  test('same key with a different body is rejected, not replayed', async () => {
+    if (!databaseUrl) return;
+    const { header } = await mintCredential();
+    const key = `contract-${randomUUID()}`;
+    const payload = {
+      senderName: 'Contract',
+      senderPhone: '+8801700000000',
+      senderAddress: 'Dhaka',
+      recipientName: 'Probe',
+      recipientPhone: '+8801800000000',
+      recipientAddress: 'Chattogram',
+      parcelWeightGrams: 1000,
+      parcelDescription: 'contract probe',
+      codAmountMinor: 125_050,
+      codCurrency: 'BDT',
+      zone: 'dhaka-metro',
+      remoteArea: false,
+      fragile: false,
+      merchantPlan: 'standard',
+    };
+    const headers = {
+      Authorization: header,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': key,
+    };
+    const once = await fetch(`${apiBaseUrl}/v1/shipments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    assert.equal(once.status, 201);
+
+    // Same key, different parcel: a client bug, surfaced as 400 — never a silent replay.
+    const tampered = await fetch(`${apiBaseUrl}/v1/shipments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...payload, parcelWeightGrams: 9999 }),
+    });
+    assert.equal(tampered.status, 400);
+    const body = (await tampered.json()) as Record<string, unknown>;
+    assert.equal(body.code, 'INVALID_IDEMPOTENCY_KEY');
+  });
+
+  test('shipment detail returns your parcel, 404s a stranger id', async () => {
+    if (!databaseUrl) return;
+    const { header } = await mintCredential();
+    const created = await fetch(`${apiBaseUrl}/v1/shipments`, {
+      method: 'POST',
+      headers: {
+        Authorization: header,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': `contract-${randomUUID()}`,
+      },
+      body: JSON.stringify({
+        senderName: 'Contract',
+        senderPhone: '+8801700000000',
+        senderAddress: 'Dhaka',
+        recipientName: 'Probe',
+        recipientPhone: '+8801800000000',
+        recipientAddress: 'Chattogram',
+        parcelWeightGrams: 1000,
+        parcelDescription: 'contract probe',
+        zone: 'dhaka-metro',
+        remoteArea: false,
+        fragile: false,
+        merchantPlan: 'standard',
+      }),
+    });
+    assert.equal(created.status, 201);
+    const { id } = (await created.json()) as { id: string };
+
+    const detail = await fetch(`${apiBaseUrl}/v1/shipments/${id}`, {
+      headers: { Authorization: header },
+    });
+    assert.equal(detail.status, 200);
+    const parcel = (await detail.json()) as { id: string; status: string };
+    assert.equal(parcel.id, id);
+    assert.equal(parcel.status, 'CREATED');
+
+    const stranger = await fetch(
+      `${apiBaseUrl}/v1/shipments/00000000-0000-0000-0000-000000000000`,
+      { headers: { Authorization: header } },
+    );
+    assert.equal(stranger.status, 404);
+  });
+
+  test('cancel moves CREATED to CANCELLED; repeat is a 409, not a double-apply', async () => {
+    if (!databaseUrl) return;
+    const { header } = await mintCredential();
+    const auth = {
+      Authorization: header,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': `contract-${randomUUID()}`,
+    };
+    const created = await fetch(`${apiBaseUrl}/v1/shipments`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({
+        senderName: 'Contract',
+        senderPhone: '+8801700000000',
+        senderAddress: 'Dhaka',
+        recipientName: 'Probe',
+        recipientPhone: '+8801800000000',
+        recipientAddress: 'Chattogram',
+        parcelWeightGrams: 1000,
+        parcelDescription: 'contract probe',
+        zone: 'dhaka-metro',
+        remoteArea: false,
+        fragile: false,
+        merchantPlan: 'standard',
+      }),
+    });
+    const { id } = (await created.json()) as { id: string };
+
+    const cancelled = await fetch(`${apiBaseUrl}/v1/shipments/${id}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: header },
+    });
+    assert.equal(cancelled.status, 201);
+    assert.equal(((await cancelled.json()) as { status: string }).status, 'CANCELLED');
+
+    const repeat = await fetch(`${apiBaseUrl}/v1/shipments/${id}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: header },
+    });
+    assert.equal(repeat.status, 409);
+    assert.equal(((await repeat.json()) as { code: string }).code, 'INVALID_TRANSITION');
+  });
 });

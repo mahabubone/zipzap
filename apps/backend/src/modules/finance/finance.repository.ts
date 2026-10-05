@@ -87,4 +87,31 @@ export class FinanceRepository {
     );
     return Number(rows[0]?.balance ?? 0);
   }
+
+  /**
+   * One merchant-scoped page, newest first. Total order is (created_at, id)
+   * both DESC — created_at alone is not unique, and the cursor then repeats
+   * or skips a row. The composite WHERE keeps the page stable under writes:
+   * rows created after paging started sort before the cursor, never inside it.
+   */
+  async pageByMerchant(
+    manager: EntityManager,
+    merchantId: string,
+    after: { createdAt: string; id: string } | null,
+    take: number,
+  ): Promise<SettlementEntity[]> {
+    const query = manager
+      .createQueryBuilder(SettlementEntity, 's')
+      .where('s.merchantId = :merchantId', { merchantId })
+      .orderBy('s.createdAt', 'DESC')
+      .addOrderBy('s.id', 'DESC')
+      .take(take);
+    if (after) {
+      query.andWhere('(s.createdAt, s.id) < (:createdAt, :id)', {
+        createdAt: after.createdAt,
+        id: after.id,
+      });
+    }
+    return query.getMany();
+  }
 }

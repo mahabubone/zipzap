@@ -32,6 +32,19 @@
       }
     },
     "/v1/webhooks": {
+      "get": {
+        "operationId": "WebhookController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your webhook endpoints",
+        "tags": [
+          "webhooks"
+        ]
+      },
       "post": {
         "operationId": "WebhookController_create",
         "parameters": [],
@@ -240,6 +253,54 @@
         ]
       }
     },
+    "/v1/shipments/{id}": {
+      "get": {
+        "operationId": "ShipmentDetailController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get one of your shipments",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/{id}/cancel": {
+      "post": {
+        "operationId": "ShipmentDetailController_cancelShipment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Cancel a shipment that has not shipped yet",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
     "/v1/shipments/bulk/upload": {
       "post": {
         "operationId": "BulkImportController_upload",
@@ -422,6 +483,38 @@
         ]
       }
     },
+    "/v1/cod": {
+      "get": {
+        "operationId": "ListCodRecordsController_listCodRecords",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your COD records, newest first",
+        "tags": [
+          "cod"
+        ]
+      }
+    },
     "/v1/pickups": {
       "post": {
         "operationId": "RequestPickupController_create",
@@ -451,6 +544,36 @@
           }
         },
         "summary": "Request a pickup",
+        "tags": [
+          "pickups"
+        ]
+      },
+      "get": {
+        "operationId": "ListPickupsController_listPickups",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your pickups, newest first",
         "tags": [
           "pickups"
         ]
@@ -712,6 +835,36 @@
         "tags": [
           "settlements"
         ]
+      },
+      "get": {
+        "operationId": "ListSettlementsController_listSettlements",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your settlements, newest first",
+        "tags": [
+          "settlements"
+        ]
       }
     },
     "/v1/settlements/{id}/approve": {
@@ -873,6 +1026,36 @@
           }
         },
         "summary": "Request a return against the original shipment",
+        "tags": [
+          "returns"
+        ]
+      },
+      "get": {
+        "operationId": "ListReturnsController_listReturns",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your returns, newest first",
         "tags": [
           "returns"
         ]

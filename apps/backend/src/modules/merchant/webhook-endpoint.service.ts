@@ -121,4 +121,12 @@ export class WebhookEndpointService {
       return toView(saved);
     });
   }
+
+  /** A merchant's own endpoints — bounded, never paginated. Secrets never included. */
+  async list(merchantId: string): Promise<EndpointView[]> {
+    const rows = await this.merchant.transaction((manager) =>
+      this.webhooks.findByMerchant(manager, merchantId),
+    );
+    return rows.map(toView);
+  }
 }

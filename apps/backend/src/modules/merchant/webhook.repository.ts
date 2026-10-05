@@ -47,6 +47,17 @@ export class WebhookRepository {
       .getMany();
   }
 
+  /**
+   * A merchant's own endpoints. Bounded — a merchant has a handful of endpoints,
+   * never thousands — so this is a plain list, not a paginated collection.
+   * See docs/api/pagination.md ("not paginated").
+   */
+  findByMerchant(manager: EntityManager, merchantId: string): Promise<WebhookEndpointEntity[]> {
+    return manager
+      .getRepository(WebhookEndpointEntity)
+      .find({ where: { merchantId }, order: { createdAt: 'ASC' } });
+  }
+
   saveEndpoint(
     manager: EntityManager,
     entity: WebhookEndpointEntity,

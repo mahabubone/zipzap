@@ -36,4 +36,31 @@ export class PickupRepository {
   save(manager: EntityManager, entity: PickupEntity): Promise<PickupEntity> {
     return manager.getRepository(PickupEntity).save(entity);
   }
+
+  /**
+   * One merchant-scoped page, newest first. Total order is (created_at, id)
+   * both DESC — created_at alone is not unique, and the cursor then repeats
+   * or skips a row. The composite WHERE keeps the page stable under writes:
+   * rows created after paging started sort before the cursor, never inside it.
+   */
+  async pageByMerchant(
+    manager: EntityManager,
+    merchantId: string,
+    after: { createdAt: string; id: string } | null,
+    take: number,
+  ): Promise<PickupEntity[]> {
+    const query = manager
+      .createQueryBuilder(PickupEntity, 'p')
+      .where('p.merchantId = :merchantId', { merchantId })
+      .orderBy('p.createdAt', 'DESC')
+      .addOrderBy('p.id', 'DESC')
+      .take(take);
+    if (after) {
+      query.andWhere('(p.createdAt, p.id) < (:createdAt, :id)', {
+        createdAt: after.createdAt,
+        id: after.id,
+      });
+    }
+    return query.getMany();
+  }
 }

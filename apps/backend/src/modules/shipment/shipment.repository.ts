@@ -19,6 +19,11 @@ export class ShipmentRepository {
     return manager.getRepository(ShipmentEntity).save(entity);
   }
 
+  /** Status moves and counter bumps join the caller's transaction. */
+  save(manager: EntityManager, entity: ShipmentEntity): Promise<ShipmentEntity> {
+    return manager.getRepository(ShipmentEntity).save(entity);
+  }
+
   findById(manager: EntityManager, id: string): Promise<ShipmentEntity | null> {
     return manager.getRepository(ShipmentEntity).findOneBy({ id });
   }
