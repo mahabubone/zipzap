@@ -8,27 +8,27 @@ PostgreSQL 16+ with PostGIS. The only source of truth in the system.
 
 One schema per module. The schema _is_ the boundary.
 
-| Schema         | Module       | Owns                                                             |
-| -------------- | ------------ | ---------------------------------------------------------------- |
-| `identity`     | identity     | users, sessions, credentials, roles, permissions                 |
-| `merchant`     | merchant     | merchants, branches, addresses, contracts, credentials, webhooks |
-| `customer`     | customer     | customers, phones, addresses                                     |
-| `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                  |
-| `pickup`       | pickup       | pickup requests, batches, assignments, attempts                  |
-| `hub`          | hub          | hubs, staff, capacity, schedules                                 |
-| `network`      | network      | zones, routes, route legs, manifests, trips, service areas       |
-| `rider`        | rider        | riders, devices, availability, performance                       |
-| `delivery`     | delivery     | delivery jobs, attempts, proof                                   |
-| `tracking`     | tracking     | tracking events (append-only)                                    |
-| `pricing`      | pricing      | pricing rules, quotes, contracts                                 |
-| `cod`          | cod          | COD records, collection attempts                                 |
-| `finance`      | finance      | ledger accounts, entries, settlements                            |
-| `returns`      | returns      | return requests, approvals                                       |
-| `notification` | notification | templates, messages, deliveries                                  |
-| `support`      | support      | tickets, messages, status history                                |
-| `warehouse`    | warehouse    | warehouses, bins, inventory, movements                           |
-| `analytics`    | analytics    | projections only                                                 |
-| `system`       | system       | outbox, idempotency keys                                         |
+| Schema         | Module       | Owns                                                                               |
+| -------------- | ------------ | ---------------------------------------------------------------------------------- |
+| `identity`     | identity     | users, sessions, credentials, roles, permissions                                   |
+| `merchant`     | merchant     | merchants, branches, addresses, contracts, credentials, webhooks                   |
+| `customer`     | customer     | customers, phones, addresses                                                       |
+| `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                                    |
+| `pickup`       | pickup       | pickup requests, batches, assignments, attempts                                    |
+| `hub`          | hub          | hubs, staff, capacity, schedules                                                   |
+| `network`      | network      | geo hierarchy (division→…→delivery point), service areas, routes, manifests, trips |
+| `rider`        | rider        | riders, devices, availability, performance                                         |
+| `delivery`     | delivery     | delivery jobs, attempts, proof                                                     |
+| `tracking`     | tracking     | tracking events (append-only)                                                      |
+| `pricing`      | pricing      | pricing rules, quotes, contracts                                                   |
+| `cod`          | cod          | COD records, collection attempts                                                   |
+| `finance`      | finance      | ledger accounts, entries, settlements                                              |
+| `returns`      | returns      | return requests, approvals                                                         |
+| `notification` | notification | templates, messages, deliveries                                                    |
+| `support`      | support      | tickets, messages, status history                                                  |
+| `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                             |
+| `analytics`    | analytics    | projections only                                                                   |
+| `system`       | system       | outbox, idempotency keys                                                           |
 
 No foreign keys across schemas. A `rider_id` in `delivery` is a bare identifier — an
 application-level reference, not a constraint. See

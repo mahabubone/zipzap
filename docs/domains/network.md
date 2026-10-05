@@ -1,18 +1,20 @@
 # network
 
-Zones, routes, manifests, and the geographic model. Phase 2 / Phase 5 rung 1.
+Zones, routes, manifests, and the geographic model. Phase 2 / Phase 5 rungs 1–2a.
 
 **Landed 2026-10-05**: `service_areas` coverage table (migration 0023) + the serviceability
-gate at shipment creation. The geography hierarchy, PostGIS geometry columns and routes are
-rung 2 — they arrive when a point is first queried.
+gate at shipment creation; `geo_areas` hierarchy (migration 0024) — 8 divisions, 64
+districts, 20 sample upazilas as parented rows, `boundary geography(MultiPolygon, 4326)` with
+a GiST index (boundaries NULL until real boundary data is imported). Routes, manifests,
+hubs and the rest of rung 2 still to come.
 
 ---
 
 ## Owns
 
-`network` schema: `service_areas` (landed), and — rung 2 — `zones`, `service_areas`
-geometry, `routes`, `route_legs`, `transports`, `trips`, `manifests`, `manifest_items`, and
-the geographic hierarchy.
+`network` schema: `service_areas` and `geo_areas` (landed), and — still to come — `zones`,
+`routes`, `route_legs`, `transports`, `trips`, `manifests`, `manifest_items`, and hub
+locations.
 
 ---
 

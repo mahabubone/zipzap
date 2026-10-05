@@ -3,7 +3,7 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · Phase 4 exit gate green — per-merchant rate limits live; Phases 5–6 scoped with build order
+**Last updated:** 2026-10-05 · Phase 4 exit gate green; Phase 5 rungs 1–2a (coverage + geo hierarchy) live-proven
 
 ---
 
@@ -33,7 +33,7 @@ file is the build view and is the one to follow when implementing.
 | **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | 🔄 in progress: pickup, rider, delivery live-proven       |
 | **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven |
 | **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                 |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔲 scoped — build order recorded below                    |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2a landed (coverage, geo hierarchy)            |
 | **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                    |
 
 **The spine: one shipment, end to end.**
@@ -297,9 +297,16 @@ Movement. This is where the product stops being an order form and becomes a cour
 
 ### 🔲 `network` — zones, routes, manifests, geo
 
-- [ ] Bangladesh hierarchy: division → district → upazila → union → ward → delivery point
-- [ ] `geography(Point|MultiPolygon, 4326)`, **not** `geometry` — metres, not coordinate units
-- [ ] `GIST` index on every geometry column
+- [x] Bangladesh hierarchy: division → district → upazila → union → ward → delivery point
+      (migration 0024: `network.geo_areas`, self-parented rows, kinds closed by DB CHECK —
+      full chain modelled, seeded 8 divisions → 64 districts → 20 sample upazilas; union /
+      ward / delivery-point rows arrive with geocoding)
+- [x] `geography(Point|MultiPolygon, 4326)`, **not** `geometry` — metres, not coordinate units
+      (`boundary geography(MultiPolygon, 4326)`; integration test asserts a distance query
+      returns ~2.3 **km in metres**, where `geometry` would return ~0.02 degrees)
+- [x] `GIST` index on every geometry column
+      (`geo_areas_boundary_gist_idx` from day one, asserted from `pg_indexes` — a GIST the
+      first spatial query does not need is cheaper than a table rewrite when it arrives late)
 - [x] **Coverage as data**: `serviceable`, `estimated_days`, `pickup_available`,
       `delivery_available`, `COD_available`. Never `if (city === 'Dhaka')`.
       (migration 0023: `network.service_areas`, 8 division-capital rows; absence of a row
@@ -312,6 +319,8 @@ Movement. This is where the product stops being an order form and becomes a cour
 - [ ] Manifest lifecycle `DRAFT → SEALED → DISPATCHED → RECEIVED → RECONCILED`
 - [ ] **A missing shipment at reconciliation becomes an exception.** Silence is never the answer.
 - [ ] Seed: 8 divisions, 64 districts, sample upazilas and hubs
+      (hierarchy landed 2026-10-05: 8/64/20 as rows — **hubs still missing**: they need
+      the `hub` module, which does not exist yet; rung 2b)
 
 ### 🔲 `pickup`
 
@@ -615,6 +624,10 @@ exists. Therefore:
    where a point is first queried).
 2. **Routing legs** (fixed topology: pickup zone → origin → regional → destination →
    delivery point) on that schema, with the manifest/reconciliation lifecycle.
+   ✅ part 1 landed 2026-10-05 (migration 0024): the Bangladesh hierarchy + `geography`
+   column + GiST — the ground routes are drawn on. Remaining: the `hub` module (a hub is
+   where a leg bends), Route/RouteLeg/Trip tables, manifests + the reconciliation
+   exception.
 3. **SLA**: Asia/Dhaka cutoffs + holiday calendar, computed against the route legs.
 4. **Offline sync — server contract first** (device command queue, ordered replay by
    `created_at`, explicit rejection of a command invalidated while offline). The mobile app
