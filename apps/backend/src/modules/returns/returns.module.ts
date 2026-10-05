@@ -9,9 +9,18 @@ import { ListReturnsController } from './list-returns.controller.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 import { CodModule } from '../cod/cod.module.ts';
+import { ShipmentModule } from '../shipment/shipment.module.ts';
 
 @Module({
-  imports: [forModule('returns', [ReturnRequestEntity]), TrackingModule, IdentityModule, CodModule],
+  imports: [
+    forModule('returns', [ReturnRequestEntity]),
+    TrackingModule,
+    IdentityModule,
+    CodModule,
+    // The advance contract: return legs move the parcel's own status. Shipment
+    // never imports returns — one direction.
+    ShipmentModule,
+  ],
   controllers: [ReturnController, ListReturnsController],
   providers: [ReturnRequestRepository, ReturnService, ListReturnsService],
   exports: [ReturnService],

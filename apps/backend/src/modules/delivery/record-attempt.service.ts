@@ -18,6 +18,8 @@ import { InvalidIdempotencyKeyError } from '../../common/domain-error.ts';
 import { hashRequest } from '../../common/idempotency.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
+import type { ShipmentStatus } from '../shipment/rules/state-machine.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
 import {
   assertTransition,
@@ -50,6 +52,7 @@ export class RecordAttemptService {
     @InjectDataSource('delivery') private readonly deliveryDataSource: DataSource,
     @Inject(DeliveryRepository) private readonly jobs: DeliveryRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
+    @Inject(ShipmentAdvanceService) private readonly advance: ShipmentAdvanceService,
   ) {}
 
   async execute(command: RecordAttemptCommand): Promise<{
@@ -99,6 +102,20 @@ export class RecordAttemptService {
       assertTransition('ATTEMPTED', next);
       job.status = next;
       await this.jobs.save(manager, job);
+
+      // The parcel tells the same story the job does: a retryable attempt
+      // parks it at RETRY_SCHEDULED ("will go out again"), a terminal one at
+      // DELIVERY_FAILED — which is where a return begins. Re-entering
+      // OUT_FOR_DELIVERY first when an earlier attempt already scheduled a
+      // retry keeps every hop on a legal machine edge.
+      const shipmentStatuses = await this.advance.statuses(manager, [job.shipmentId]);
+      const path: ShipmentStatus[] = [];
+      if (shipmentStatuses[job.shipmentId] === 'RETRY_SCHEDULED') path.push('OUT_FOR_DELIVERY');
+      path.push('DELIVERY_FAILED');
+      if (retryScheduled) path.push('RETRY_SCHEDULED');
+      for (const to of path) {
+        await this.advance.advance(manager, job.shipmentId, to);
+      }
 
       await this.tracking.append(manager, {
         id: randomUUID(),

@@ -29,6 +29,8 @@ import { AppendTrackingEventService } from '../../dist/modules/tracking/append-t
 import { ReturnService } from '../../dist/modules/returns/return.service.js';
 import { ReturnRequestRepository } from '../../dist/modules/returns/return-request.repository.js';
 import { ReturnRequestEntity } from '../../dist/modules/returns/return-request.entity.js';
+import { ShipmentAdvanceService } from '../../dist/modules/shipment/advance-shipment.service.js';
+import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
 import { LedgerEntryEntity } from '../../dist/modules/finance/ledger-entry.entity.js';
 import { SettlementEntity } from '../../dist/modules/finance/settlement.entity.js';
@@ -40,6 +42,7 @@ let codDb: DataSource;
 let financeDb: DataSource;
 let returnsDb: DataSource;
 let systemDb: DataSource;
+let shipmentDb: DataSource;
 let codRecords: CodRecordRepository;
 let collect: CollectCodService;
 let financeConsumer: FinanceConsumer;
@@ -105,6 +108,7 @@ before(async () => {
   financeDb = await connectModuleDataSource('finance', [LedgerEntryEntity, SettlementEntity]);
   returnsDb = await connectModuleDataSource('returns', [ReturnRequestEntity]);
   systemDb = await connectModuleDataSource('system', []);
+  shipmentDb = await connectModuleDataSource('shipment', [ShipmentEntity]);
 
   codRecords = new CodRecordRepository();
   collect = new CollectCodService(codDb, codRecords, new AppendTrackingEventService());
@@ -123,6 +127,7 @@ after(async () => {
   await financeDb?.destroy();
   await returnsDb?.destroy();
   await systemDb?.destroy();
+  await shipmentDb?.destroy();
 });
 
 describeIfDb('money path — collect to settled', () => {
@@ -475,6 +480,17 @@ describeIfDb('money path — collect to settled', () => {
   test('return completion reverses the collection with a compensating entry', async () => {
     const merchant = randomUUID();
     const s1 = randomUUID();
+    // A return implies a delivered (or refused) parcel: the shipment machine
+    // refuses to walk return legs from anywhere else, so the fixture is DELIVERED.
+    await shipmentDb.query(
+      `INSERT INTO shipment.shipments
+         (id, tracking_code, merchant_id, sender_name, sender_phone, sender_address,
+          recipient_name, recipient_phone, recipient_address, parcel_weight_grams,
+          parcel_description, cod_amount_minor, cod_currency, status, pricing_version)
+       VALUES ($1, $2, $3, 'T', '+8801700000000', 'Dhaka', 'R', '+8801800000000', 'CTG',
+               1000, 'fixture', 125050, 'BDT', 'DELIVERED', 1)`,
+      [s1, `ZP-REV${s1.slice(0, 8).toUpperCase()}`, merchant],
+    );
     await codDb.transaction(async (manager) =>
       new CodRecordRepository().insert(manager, {
         id: randomUUID(),
@@ -503,6 +519,7 @@ describeIfDb('money path — collect to settled', () => {
       new ReturnRequestRepository(),
       new AppendTrackingEventService(),
       new CodLookup(codDb, new CodRecordRepository()),
+      new ShipmentAdvanceService(),
     );
     const { result: requested } = await returns.request({
       shipmentId: s1,

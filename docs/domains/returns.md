@@ -20,6 +20,11 @@ custody legs from [state-machines](../architecture/state-machines.md). `TO_MERCH
 was dropped — a status masquerading as a leg. The machine in `rules/returns.ts` is
 the source; this page and the ROADMAP quote it.
 
+The shipment walks the custody legs in lockstep: each `advance` also moves
+`shipment.shipments.status` through `ShipmentAdvanceService` (injected contract — this
+module never writes shipment tables). The request row waits at APPROVAL; the parcel must
+be in a return-eligible state (delivered, refused, scheduled for retry) or the machine 409s.
+
 ## Reasons
 
 `CUSTOMER_REFUSED` · `CUSTOMER_UNAVAILABLE` · `WRONG_ADDRESS` · `DAMAGED` ·

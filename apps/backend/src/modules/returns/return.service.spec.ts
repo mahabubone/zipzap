@@ -4,6 +4,7 @@ import { AppendTrackingEventService } from '../tracking/append-tracking-event.se
 import { COD_LOOKUP } from '../cod/cod.lookup.ts';
 import { ReturnService } from './return.service.ts';
 import { ReturnRequestRepository } from './return-request.repository.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { InvalidIdempotencyKeyError, InvalidTransitionError } from '../../common/domain-error.ts';
 
 /**
@@ -36,12 +37,28 @@ function fakeRequest(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function fakeManager(request: Record<string, unknown> | null = null) {
+function fakeManager(
+  request: Record<string, unknown> | null = null,
+  initialShipmentStatus = 'DELIVERED',
+) {
   const touched: string[] = [];
+  // Advance walks RETURN_INITIATED → … → RETURNED hop by hop on the shipment
+  // machine too — the fake remembers each UPDATE or hop 2 validates stale.
+  let shipmentStatus = initialShipmentStatus;
   return {
     touched,
     manager: {
-      query: (sql: string) => {
+      query: (sql: string, params?: unknown[]) => {
+        if (sql.includes('shipment.shipments')) {
+          touched.push('shipment.status');
+          if (sql.includes('SELECT')) {
+            return Promise.resolve([{ id: 's-ret-1', status: shipmentStatus }]);
+          }
+          if (sql.includes('UPDATE')) {
+            shipmentStatus = String(params?.[1] ?? shipmentStatus);
+            return Promise.resolve([]);
+          }
+        }
         touched.push(
           sql.includes('tracking.events')
             ? 'tracking.events'
@@ -96,6 +113,7 @@ function serviceWith(
       append: vi.fn(),
     } as never,
     cod as never,
+    new ShipmentAdvanceService(),
   );
 }
 
@@ -168,7 +186,12 @@ describe('ReturnService orchestration', () => {
       ['RETURN_OUT_FOR_DELIVERY', 'RETURNED'],
     ] as const;
     for (const [from, to] of legs) {
-      const fake = fakeManager(fakeRequest({ status: from }));
+      // Each leg runs on its own fake: seed the shipment at the leg's source
+      // state (DELIVERED before the first leg, the previous leg's status after).
+      const fake = fakeManager(
+        fakeRequest({ status: from }),
+        from === 'RETURN_APPROVED' ? 'DELIVERED' : from,
+      );
       const service = serviceWith(fake, {
         collectedMinor: 125_050,
         currency: 'BDT',

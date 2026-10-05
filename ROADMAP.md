@@ -404,7 +404,12 @@ Movement. This is where the product stops being an order form and becomes a cour
       outbox event present. Out-of-order scan rejected by the machine with nothing written.
       Built the missing link: `ShipmentAdvanceService` — before it, no code path ever moved
       a shipment past `CREATED`)
-- [ ] The **failure story** runs too: refused → retry → refused → return → merchant receives it
+- [x] The **failure story** runs too: refused → retry → refused → return → merchant receives it
+      (integration test 2026-10-05: CUSTOMER_UNAVAILABLE → job retries, parcel
+      `RETRY_SCHEDULED`; CUSTOMER_REFUSED → job `FAILED`, parcel `DELIVERY_FAILED`; return
+      requested → approved → five custody legs, shipment and request status asserted in
+      lockstep every step → `RETURNED`, exactly two DELIVERY_ATTEMPTED timeline rows, one
+      RETURNED, one out-for-delivery — a refusal is never a second dispatch)
 - [x] An unserviceable destination is rejected at creation with a reason
       (live 2026-10-05: zone `atlantis-01` → 422 `SERVICEABILITY_FAILED`
       `No coverage for zone "atlantis-01"`, zero rows written, same key retries fine;

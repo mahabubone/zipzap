@@ -22,6 +22,8 @@ import { hashRequest } from '../../common/idempotency.ts';
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
+import type { ShipmentStatus } from '../shipment/rules/state-machine.ts';
 import { COD_LOOKUP, type CodLookup } from '../cod/cod.lookup.ts';
 import { ReturnRequestRepository } from './return-request.repository.ts';
 import { assertTransition, type ReturnReason, type ReturnStatus } from './rules/returns.ts';
@@ -59,6 +61,7 @@ export class ReturnService {
     @Inject(ReturnRequestRepository) private readonly requests: ReturnRequestRepository,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
     @Inject(COD_LOOKUP) private readonly cod: CodLookup,
+    @Inject(ShipmentAdvanceService) private readonly advanceShipment: ShipmentAdvanceService,
   ) {}
 
   async request(command: RequestReturnCommand): Promise<{
@@ -185,6 +188,13 @@ export class ReturnService {
       const now = new Date();
       request.status = next;
       await this.requests.save(manager, request);
+
+      // The parcel moves through the return legs alongside the request row —
+      // leg names match the shipment machine (RETURN_INITIATED → … → RETURNED),
+      // so the customer timeline and the aggregate agree on where it is. The
+      // shipment must already be in a return-eligible state (delivered, refused,
+      // scheduled for retry): anything else 409s through the machine.
+      await this.advanceShipment.advance(manager, request.shipmentId, next as ShipmentStatus);
 
       // On completion, emit what finance needs to reverse: the collected amount
       // as measured by COD, not by us. Zero/never-collected emits zero — finance

@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { RecordAttemptService } from './record-attempt.service.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
+import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 
 /**
  * The attempt transaction, minus the databases.
@@ -13,6 +14,9 @@ import { AppendTrackingEventService } from '../tracking/append-tracking-event.se
 
 function fakeManager(job: Record<string, unknown>) {
   const written: string[] = [];
+  // The advance contract walks the shipment machine hop by hop — the fake must
+  // remember each UPDATE or the second hop validates against a stale status.
+  let shipmentStatus = 'OUT_FOR_DELIVERY';
   return {
     written,
     manager: {
@@ -21,7 +25,17 @@ function fakeManager(job: Record<string, unknown>) {
           where: () => ({ getOne: () => Promise.resolve(job) }),
         }),
       }),
-      query: (sql: string) => {
+      query: (sql: string, params?: unknown[]) => {
+        if (sql.includes('shipment.shipments')) {
+          written.push('shipment.status');
+          if (sql.includes('SELECT')) {
+            return Promise.resolve([{ id: 's-1', status: shipmentStatus }]);
+          }
+          if (sql.includes('UPDATE')) {
+            shipmentStatus = String(params?.[1] ?? shipmentStatus);
+            return Promise.resolve([]);
+          }
+        }
         if (sql.includes('FOR UPDATE')) written.push('lock:delivery.jobs');
         else if (sql.includes('idempotency_keys')) written.push('claim:system.idempotency_keys');
         else written.push(sql.slice(0, 40));
@@ -60,6 +74,7 @@ describe('RecordAttemptService orchestration', () => {
       fakeDs as never,
       new DeliveryRepository(),
       new AppendTrackingEventService(),
+      new ShipmentAdvanceService(),
     );
 
     const { result } = await service.execute({
@@ -84,6 +99,7 @@ describe('RecordAttemptService orchestration', () => {
       fakeDs as never,
       new DeliveryRepository(),
       new AppendTrackingEventService(),
+      new ShipmentAdvanceService(),
     );
 
     const { result } = await service.execute({ ...BASE, jobId: 'j-2', reason: 'WRONG_ADDRESS' });
@@ -103,6 +119,7 @@ describe('RecordAttemptService orchestration', () => {
       fakeDs as never,
       new DeliveryRepository(),
       new AppendTrackingEventService(),
+      new ShipmentAdvanceService(),
     );
 
     const { result } = await service.execute({
