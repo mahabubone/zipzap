@@ -514,7 +514,7 @@ a human.
 - [x] Chunked execution — 100 rows per job, one transaction per chunk
 - [x] Downloadable result file, row by row (`GET :jobId/result`)
 
-### 🔄 `notification` — code + contract tests green, live walk pending
+### ✅ `notification` — code + contract tests green, outage drill proven live 2026-10-05
 
 - [x] Schema `notification`: `templates`, `messages`, `deliveries` (migration `0016`;
       `preferences` deferred — no opt-out surface yet)
@@ -555,10 +555,13 @@ the natural auto-ticket sources once the module exists. No tables, no code yet.
       plus the live proof where the signature cryptographically verified)
 - [x] A merchant with only `shipments:write` cannot read settlements or delete a webhook
       (live 2026-10-05: shipments-scoped credential → 403 Missing scope; guard is per route)
-- [ ] Notification provider outage → retries → dead-letter visible, and **the transaction that
-      triggered it still succeeded** (half-proven: send-throw retries unit-tested; triggering
-      shipment commits before any send by construction — full outage drill against a killed
-      fake still pending)
+- [x] Notification provider outage → retries → dead-letter visible, and **the transaction that
+      triggered it still succeeded** (live 2026-10-05: scripted 503s on every SMS send —
+      shipment created 201 mid-outage; attempts 1–2 failed non-terminal, ladder climbed 5m →
+      15m → 1h → 6h → 24h via promoted delayed jobs, attempt 6 terminal, message row QUEUED →
+      FAILED. Fixed live: the throw path hardcoded `terminal: false`, so an outage could never
+      reach a visible terminal state; past the last rung the message now marks FAILED
+      (DEAD_LETTERED on carrier policy 0))
 - [ ] `pnpm verify` green
 
 ---

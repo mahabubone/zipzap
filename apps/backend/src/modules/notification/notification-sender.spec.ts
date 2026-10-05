@@ -35,7 +35,7 @@ describe('sendSmsAttempt', () => {
             return [{ id: 'msg-1', status: 'QUEUED' }];
           }
           if (sql.includes('UPDATE notification.messages')) {
-            updated.push({ id: String(params[0]), status: 'SENT' });
+            updated.push({ id: String(params[0]), status: String(params[1] ?? 'SENT') });
           }
           return [];
         },
@@ -142,5 +142,30 @@ describe('sendSmsAttempt', () => {
     expect(outcome.terminal).toBe(false);
     expect(outcome.nextDelayMs).toBe(900_000);
     expect(inserted[0]).toMatchObject({ delivered: false, terminal: false });
+  });
+
+  it('a send throw past the last rung is terminal and fails the message visibly', async () => {
+    const channel = channelFor(
+      async () => {
+        throw new Error('socket hangup');
+      },
+      async () => ({ dlrName: null, retryPolicy: null, delivered: false }),
+    );
+    const outcome = await sendSmsAttempt(
+      notificationsDs as never,
+      repository as never,
+      channel,
+      JOB,
+      6,
+    );
+    expect(outcome).toEqual({
+      delivered: false,
+      terminal: true,
+      nextDelayMs: null,
+      carrierPolicy: null,
+    });
+    expect(inserted[0]).toMatchObject({ delivered: false, terminal: true, attempt: 6 });
+    // The message row moves QUEUED -> FAILED: a QUEUED row that will never send is a lie.
+    expect(updated).toEqual([{ id: 'msg-1', status: 'FAILED' }]);
   });
 });

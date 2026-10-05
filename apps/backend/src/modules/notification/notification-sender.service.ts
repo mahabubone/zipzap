@@ -55,22 +55,31 @@ export async function sendSmsAttempt(
     error = failure instanceof Error ? failure.message : String(failure);
   }
 
-  // The send threw: provider down or unreachable. Always retry — the message
-  // row persists and the next attempt re-fires from the queue.
+  // The send threw: provider down or unreachable. Retry while the ladder has
+  // rungs left — the message row persists and the next attempt re-fires from
+  // the queue. Past the last rung this is terminal: the chain ends here and
+  // the message is marked FAILED, which is what makes the outage visible to
+  // the merchant instead of a QUEUED row that will never send.
   if (!trackingId) {
+    const terminal = delayBeforeAttempt(attempt + 1) === null;
     await recordAttempt(notifications, repository, job, attempt, {
       delivered: false,
-      terminal: false,
+      terminal,
       trackingId: null,
       segments: null,
       dlrName: null,
       carrierPolicy: null,
       error,
     });
+    await updateMessageStatus(notifications, job.messageId, {
+      delivered: false,
+      terminal,
+      deadLettered: false,
+    });
     return {
       delivered: false,
-      terminal: false,
-      nextDelayMs: delayBeforeAttempt(attempt + 1),
+      terminal,
+      nextDelayMs: terminal ? null : delayBeforeAttempt(attempt + 1),
       carrierPolicy: null,
     };
   }
@@ -105,7 +114,11 @@ export async function sendSmsAttempt(
     error,
   });
 
-  await updateMessageStatus(notifications, job.messageId, delivered);
+  await updateMessageStatus(notifications, job.messageId, {
+    delivered,
+    terminal,
+    deadLettered: !delivered && terminal && carrierPolicy === 0,
+  });
 
   return { delivered, terminal, nextDelayMs, carrierPolicy };
 }
@@ -146,10 +159,12 @@ async function recordAttempt(
 async function updateMessageStatus(
   notifications: DataSource,
   messageId: string,
-  delivered: boolean,
+  outcome: { delivered: boolean; terminal: boolean; deadLettered: boolean },
 ): Promise<void> {
   // Status moves forward only: QUEUED -> SENT, or -> FAILED / DEAD_LETTERED at terminal.
-  // The deliveries log is the audit trail; the message row is the current state.
+  // The deliveries log is the audit trail; the message row is the current state. A terminal
+  // failure MUST move the row — QUEUED means "will send", and a message past the last ladder
+  // rung will never send. Only a replay re-queues it, explicitly.
   await notifications.transaction(async (manager) => {
     const rows = await manager.query(
       `SELECT id, status FROM notification.messages WHERE id = $1 FOR UPDATE`,
@@ -157,13 +172,14 @@ async function updateMessageStatus(
     );
     const row = rows[0] as { id: string; status: string } | undefined;
     if (!row || row.status !== 'QUEUED') return;
-    // QUEUED persists across retries; only SENT sticks. Terminal failure states
-    // land on the deliveries log (DEAD_LETTERED there); the message row stays
-    // QUEUED so a replay can still pick it up. The audit trail, not this flag,
-    // is what answers "what happened".
-    if (delivered) {
+    if (outcome.delivered) {
       await manager.query(`UPDATE notification.messages SET status = 'SENT' WHERE id = $1`, [
         messageId,
+      ]);
+    } else if (outcome.terminal) {
+      await manager.query(`UPDATE notification.messages SET status = $2 WHERE id = $1`, [
+        messageId,
+        outcome.deadLettered ? 'DEAD_LETTERED' : 'FAILED',
       ]);
     }
   });
