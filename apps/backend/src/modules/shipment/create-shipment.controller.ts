@@ -19,6 +19,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
 import { CreateShipmentService, type CreatedShipment } from './create-shipment.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 import { money } from '../../common/money.ts';
@@ -64,7 +65,7 @@ export class CreateShipmentController {
   ) {}
 
   @Post()
-  @UseGuards(new ScopeGuard('shipments:write'))
+  @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a shipment' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   async create(

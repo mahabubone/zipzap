@@ -168,6 +168,18 @@ export class ReconciliationExceptionError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class RateLimitedError extends DomainError {
+  readonly spec = {
+    code: 'RATE_LIMITED',
+    status: 429,
+    title: 'Too many requests',
+  } satisfies DomainErrorSpec;
+
+  constructor(readonly retryAfterSeconds: number) {
+    super(`Limit exceeded. Retry after ${retryAfterSeconds}s.`);
+  }
+}
+
 // --- infrastructure -----------------------------------------------------------
 
 export class DependencyUnavailableError extends DomainError {
@@ -207,6 +219,7 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [InvalidTransitionError, new InvalidTransitionError('A', 'B').spec],
   [ServiceabilityFailedError, new ServiceabilityFailedError('reason').spec],
   [ReconciliationExceptionError, new ReconciliationExceptionError().spec],
+  [RateLimitedError, new RateLimitedError(60).spec],
   [DependencyUnavailableError, new DependencyUnavailableError().spec],
 ]);
 

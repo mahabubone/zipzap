@@ -10,6 +10,7 @@ import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
 import { ListShipmentsService, type ShipmentPage } from './list-shipments.service.ts';
 
 export class ListShipmentsQuery {
@@ -29,7 +30,7 @@ export class ListShipmentsController {
   constructor(@Inject(ListShipmentsService) private readonly list: ListShipmentsService) {}
 
   @Get()
-  @UseGuards(new ScopeGuard('shipments:read'))
+  @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your shipments, newest first' })
   async listShipments(
     @Query() query: ListShipmentsQuery,

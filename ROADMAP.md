@@ -486,7 +486,9 @@ a human.
 - [ ] API key auth with scopes and per-merchant rate limits
 - [ ] Cursor pagination on every unbounded collection, total ordering
 - [ ] Error envelope on every path, from the single filter
-- [ ] `RateLimit-*` headers, `Retry-After` on 429
+- [x] `RateLimit-*` headers, `Retry-After` on 429
+      (live 2026-10-05: merchant list → `RateLimit-Limit: 600`, public track →
+      `100`; 105 rapid hits → 96×200 + 9×429 with `RATE_LIMITED` envelope)
 - [ ] OpenAPI generated; `packages/api-client` generated from it; both committed together
 - [ ] Contract tests asserting the spec matches observed behaviour
 

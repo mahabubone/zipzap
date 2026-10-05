@@ -13,6 +13,7 @@ import {
   PickupNotFoundError,
   PricingVersionNotFoundError,
   CodRecordNotFoundError,
+  RateLimitedError,
   ReconciliationExceptionError,
   ResourceNotFoundError,
   ServiceabilityFailedError,
@@ -45,6 +46,7 @@ const ALL_ERROR_CLASSES = [
   InvalidTransitionError,
   ServiceabilityFailedError,
   ReconciliationExceptionError,
+  RateLimitedError,
   DependencyUnavailableError,
 ] as const;
 

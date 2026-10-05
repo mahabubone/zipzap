@@ -8,10 +8,11 @@
  * transaction, this projection is built by the consumer a beat later.
  */
 
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
+import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
 
 interface TimelineRow {
   sequence: number;
@@ -25,6 +26,7 @@ export class PublicTrackingController {
   constructor(@InjectDataSource('tracking') private readonly tracking: DataSource) {}
 
   @Get(':trackingCode')
+  @UseGuards(new RateLimitGuard('public', false))
   @ApiOperation({ summary: 'Public shipment tracking' })
   async track(@Param('trackingCode') trackingCode: string): Promise<{
     trackingCode: string;
