@@ -19,6 +19,10 @@ async function main(): Promise<void> {
     } else if (command === 'revert') {
       await dataSource.undoLastMigration({ transaction: 'all' });
       console.log('reverted last migration');
+    } else if (command === 'seed') {
+      // Seed lives in the source tree; run it from dist so relative imports resolve.
+      // @ts-expect-error dynamic import of a .mjs script
+      await import('../../scripts/seed.mjs');
     } else {
       console.error(`unknown command "${command}" — expected migrate | revert | seed`);
       process.exitCode = 1;
