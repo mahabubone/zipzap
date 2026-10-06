@@ -142,6 +142,9 @@ export class ConfirmSettlementPaymentService {
           merchantId: settlement.merchantId,
           reference: settlement.reference,
           netMinor,
+          // Money never travels without its currency, even inside a payload
+          // (AGENTS.md rule 4): analytics.cod_summary sums by currency.
+          currency: settlement.currency,
           paymentReference: payment.reference,
           providerStatus: payment.status,
         },

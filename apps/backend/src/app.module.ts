@@ -16,6 +16,7 @@ import { NotificationModule } from './modules/notification/notification.module.t
 import { NetworkModule } from './modules/network/network.module.ts';
 import { HubModule } from './modules/hub/hub.module.ts';
 import { DashboardModule } from './modules/dashboard/dashboard.module.ts';
+import { AnalyticsModule } from './modules/analytics/analytics.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -46,6 +47,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module.ts';
     NetworkModule,
     HubModule,
     DashboardModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
 })

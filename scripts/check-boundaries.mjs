@@ -37,6 +37,7 @@ const OWNED = {
   notification: 'notification',
   network: 'network',
   hub: 'hub',
+  analytics: 'analytics',
 };
 
 const MODULES_DIR = join(SRC_ROOT, 'modules');

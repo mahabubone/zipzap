@@ -22,11 +22,28 @@ disagree with the first.
 
 ## Projections
 
-`merchant_daily_shipments` · `hub_daily_volume` · `rider_daily_performance` ·
-`delivery_success_rate` · `return_rate` · `cod_summary`
+| Table                      | Grain          | Fed by event types                                                             |
+| -------------------------- | -------------- | ------------------------------------------------------------------------------ |
+| `merchant_daily_shipments` | merchant × day | `ShipmentCreated` · `PickupParcelScanned` · `DeliveryCompleted`                |
+| `hub_daily_volume`         | hub code × day | `ShipmentScanned`                                                              |
+| `rider_daily_performance`  | rider × day    | `DeliveryCompleted` · `DeliveryAttempted`                                      |
+| `delivery_success_rate`    | day            | `DeliveryCompleted` · `DeliveryAttempted` (terminal: `retryScheduled = false`) |
+| `return_rate`              | day            | `DeliveryCompleted` · `ReturnCompleted`                                        |
+| `cod_summary`              | day × currency | `CODCollected` · `CODPartialCollection` · `SettlementCompleted`                |
 
-Consumed events: `shipment.created`, `shipment.picked_up`, `shipment.delivered`,
-`delivery.failed`, `cod.collected`, `settlement.completed`.
+Days are **Asia/Dhaka** buckets (`analytics/rules/day.ts`), never UTC — a Bangladesh
+business day is the axis every KPI below is plotted on. The two rate tables store
+integer counts, not ratios: `delivered / (delivered + failed)` is computed at read
+time, so a stored rate can never drift from its inputs. Money columns are bigint
+minor units with `currency` in the same row.
+
+Two event payloads carry fields precisely so analytics never reads a transactional
+table (rule 2): `DeliveryAttempted.riderId` (the only event with failure counts)
+and `SettlementCompleted.currency` (money without a currency would break AGENTS.md
+rule 4).
+
+Single-tenant events are consumed through the fifth NATS consumer, `analytics`
+(subscription parity is pinned in `subscriptions.spec.ts`).
 
 ## Consistency
 
@@ -68,6 +85,12 @@ pnpm --filter @zipzap/backend analytics:rebuild --from=2026-01-01
 
 It must work. If it does not, the projection has become authoritative by accident, and that is
 the bug to fix before anything else in this module.
+
+How it works: truncates all six tables and replays `system.outbox_events` — append-only, so
+it holds every event ever — from `--from` (a `yyyy-mm-dd` UTC cutoff on `occurred_at`,
+default `1970-01-01`) through the **same** `project()` function the live consumer runs, in
+one transaction. Live and rebuild cannot disagree because there is one implementation, not
+two. A crash rolls back to the pre-rebuild projections, never a half-wiped state.
 
 ## Search
 

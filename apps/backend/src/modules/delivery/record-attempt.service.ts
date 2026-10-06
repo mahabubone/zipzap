@@ -134,7 +134,16 @@ export class RecordAttemptService {
         type: 'DeliveryAttempted',
         aggregateType: 'delivery',
         aggregateId: job.id,
-        payload: { shipmentId: job.shipmentId, sequence, reason: command.reason, retryScheduled },
+        // riderId rides along for the analytics rider_daily_performance
+        // projection: the attempt row is the only signal that carries failure
+        // counts, and analytics reads no transactional schema (rule 2).
+        payload: {
+          shipmentId: job.shipmentId,
+          riderId: job.riderId,
+          sequence,
+          reason: command.reason,
+          retryScheduled,
+        },
       });
 
       const result: RecordedAttempt = {

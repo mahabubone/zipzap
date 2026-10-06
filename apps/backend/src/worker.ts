@@ -23,6 +23,7 @@ import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
 import { WebhookConsumer } from './modules/merchant/webhook.consumer.ts';
 import { NotificationConsumer } from './modules/notification/notification.consumer.ts';
+import { AnalyticsConsumer } from './modules/analytics/analytics.consumer.ts';
 import { SUBSCRIPTIONS } from './subscriptions.ts';
 import { eventDuplicateTotal, incEventConsumed, registerQueueClient } from './common/metrics';
 
@@ -58,8 +59,9 @@ async function bootstrap(): Promise<void> {
   const finance = app.get(FinanceConsumer);
   const webhook = app.get(WebhookConsumer);
   const notification = app.get(NotificationConsumer);
+  const analytics = app.get(AnalyticsConsumer);
 
-  const handlers = { tracking, finance, webhook, notification } as const;
+  const handlers = { tracking, finance, webhook, notification, analytics } as const;
 
   const open = SUBSCRIPTIONS.map(({ consumer, subject }) => {
     const subscription = nc.subscribe(subject, { queue: consumer });

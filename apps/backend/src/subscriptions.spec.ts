@@ -4,6 +4,7 @@ import { subjectFor } from './modules/system/outbox.publisher.ts';
 import { TRACKING_EVENT_MAP } from './modules/tracking/tracking.consumer.ts';
 import { FINANCE_HANDLED_TYPES } from './modules/finance/finance-consumer.service.ts';
 import { WEBHOOK_EVENTS } from './modules/merchant/rules/webhook.ts';
+import { ANALYTICS_HANDLED_TYPES } from './modules/analytics/projections.ts';
 
 /**
  * The wiring that silently dropped CODCollected from the public timeline until
@@ -21,6 +22,7 @@ const AGGREGATE_OF: Record<string, string> = {
   ShipmentCreated: 'shipment',
   PickupRequested: 'pickup',
   PickupAssigned: 'pickup',
+  PickupParcelScanned: 'pickup',
   DeliveryOutForDelivery: 'delivery',
   DeliveryAttempted: 'delivery',
   DeliveryCompleted: 'delivery',
@@ -31,6 +33,7 @@ const AGGREGATE_OF: Record<string, string> = {
   ReturnRequested: 'return',
   ReturnAdvanced: 'return',
   ReturnCompleted: 'return',
+  ShipmentScanned: 'shipment',
 };
 
 function subjectsOf(types: readonly string[]): Set<string> {
@@ -43,7 +46,9 @@ function subjectsOf(types: readonly string[]): Set<string> {
   );
 }
 
-function subscribed(consumer: 'tracking' | 'finance' | 'webhook' | 'notification'): Set<string> {
+function subscribed(
+  consumer: 'tracking' | 'finance' | 'webhook' | 'notification' | 'analytics',
+): Set<string> {
   return new Set(SUBSCRIPTIONS.filter((s) => s.consumer === consumer).map((s) => s.subject));
 }
 
@@ -64,5 +69,9 @@ describe('subscription parity', () => {
     expect(subscribed('notification')).toEqual(
       subjectsOf(['ShipmentCreated', 'DeliveryOutForDelivery', 'DeliveryCompleted']),
     );
+  });
+
+  it('analytics subscribes to exactly the events its projections consume', () => {
+    expect(subscribed('analytics')).toEqual(subjectsOf([...ANALYTICS_HANDLED_TYPES]));
   });
 });

@@ -8,7 +8,8 @@
  * which is exactly how `CODCollected` missed the public timeline until 2026-10-04.
  */
 
-export type SubscriptionConsumer = 'tracking' | 'finance' | 'webhook' | 'notification';
+export type SubscriptionConsumer =
+  'tracking' | 'finance' | 'webhook' | 'notification' | 'analytics';
 
 export interface NatsSubscription {
   readonly consumer: SubscriptionConsumer;
@@ -40,4 +41,15 @@ export const SUBSCRIPTIONS: readonly NatsSubscription[] = [
   { consumer: 'notification', subject: 'zipzap.shipment.created' },
   { consumer: 'notification', subject: 'zipzap.delivery.out_for_delivery' },
   { consumer: 'notification', subject: 'zipzap.delivery.completed' },
+  // analytics: one subject per event type its projections consume
+  // (docs/domains/analytics.md — pinned by subscriptions.spec.ts parity).
+  { consumer: 'analytics', subject: 'zipzap.shipment.created' },
+  { consumer: 'analytics', subject: 'zipzap.pickup.parcel_scanned' },
+  { consumer: 'analytics', subject: 'zipzap.delivery.completed' },
+  { consumer: 'analytics', subject: 'zipzap.delivery.attempted' },
+  { consumer: 'analytics', subject: 'zipzap.cod.collected' },
+  { consumer: 'analytics', subject: 'zipzap.cod.partial_collection' },
+  { consumer: 'analytics', subject: 'zipzap.settlement.completed' },
+  { consumer: 'analytics', subject: 'zipzap.shipment.scanned' },
+  { consumer: 'analytics', subject: 'zipzap.return.completed' },
 ];
