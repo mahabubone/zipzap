@@ -38,6 +38,68 @@ export function isAssignable(status: RiderStatus): boolean {
   return status === 'AVAILABLE';
 }
 
+/** Active jobs from the rider's own record plus a caller-supplied override (the assigning
+ * module may see work the rider entity has not yet been told about). */
+export function activeJobCount(currentJobId: string | null, activeJobs: number | null): number {
+  if (activeJobs !== null) return activeJobs;
+  return currentJobId ? 1 : 0;
+}
+
+/** Fraction of a rider's capacity currently in use, clamped to [0, 1]. */
+export function loadFactor(activeJobs: number, capacity: number): number {
+  return Math.min(1, Math.max(0, activeJobs / capacity));
+}
+
+export interface PoolLoad {
+  /** Sum of capacity across the riders considered. */
+  readonly totalCapacity: number;
+  /** Capacity currently in use: sum of active jobs. */
+  readonly inUseCapacity: number;
+  /** Mean load factor across riders. */
+  readonly meanLoadFactor: number;
+  /** Peak load factor — the rider under most pressure. */
+  readonly maxLoadFactor: number;
+  /** Lightest-loaded rider's load factor. */
+  readonly minLoadFactor: number;
+}
+
+/** Aggregate the candidate pool into one utilisation view. Empty pool -> all zeros. */
+export function poolLoad(
+  riders: readonly Pick<AssignmentCandidate, 'activeJobs' | 'capacity'>[],
+): PoolLoad {
+  if (riders.length === 0) {
+    return {
+      totalCapacity: 0,
+      inUseCapacity: 0,
+      meanLoadFactor: 0,
+      maxLoadFactor: 0,
+      minLoadFactor: 0,
+    };
+  }
+
+  let totalCapacity = 0;
+  let inUseCapacity = 0;
+  let maxLoadFactor = 0;
+  let minLoadFactor = 1;
+
+  for (const r of riders) {
+    const a = activeJobCount(null, r.activeJobs);
+    totalCapacity += r.capacity;
+    inUseCapacity += a;
+    const f = loadFactor(a, r.capacity);
+    if (f > maxLoadFactor) maxLoadFactor = f;
+    if (f < minLoadFactor) minLoadFactor = f;
+  }
+
+  return {
+    totalCapacity,
+    inUseCapacity,
+    meanLoadFactor: inUseCapacity / totalCapacity,
+    maxLoadFactor,
+    minLoadFactor,
+  };
+}
+
 export interface AssignmentCandidate {
   readonly riderId: string;
   /** Metres from the rider's last known position to the job, or null when unknown. */
@@ -56,6 +118,10 @@ export interface ScoredCandidate extends AssignmentCandidate {
 }
 
 const MAX_DISTANCE_METRES = 15_000;
+/** Spare-capacity bonus (subordinate to refusals, independent of distance). A spare rider
+ * is preferred so dispatch spreads work instead of piling it on whoever happens to be nearest.
+ */
+const SPARE_CAPACITY_BONUS = 40;
 
 /**
  * Score descending is better. The arithmetic is deliberately readable — no weights hidden in a
@@ -84,6 +150,11 @@ export function score(candidates: readonly AssignmentCandidate[]): ScoredCandida
 
       points -= candidate.activeJobs * 50;
       if (candidate.activeJobs > 0) reasons.push(`${candidate.activeJobs} active job(s)`);
+
+      const load = loadFactor(candidate.activeJobs, candidate.capacity);
+      const spareBonus = Math.floor(SPARE_CAPACITY_BONUS * (1 - load));
+      points += spareBonus;
+      if (spareBonus > 0) reasons.push(`${Math.round((1 - load) * 100)}% spare capacity`);
 
       points -= candidate.recentRefusals * 25;
       if (candidate.recentRefusals > 0)

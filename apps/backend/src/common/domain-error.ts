@@ -63,6 +63,21 @@ export class ResourceNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+export class CommandQueueFullError extends DomainError {
+  readonly spec = {
+    code: 'COMMAND_QUEUE_FULL',
+    status: 409,
+    title: 'Command queue full',
+  } satisfies DomainErrorSpec;
+
+  constructor(
+    readonly queueSize: number,
+    readonly cap: number,
+  ) {
+    super(`Command queue full: ${queueSize} pending, cap ${cap}.`);
+  }
+}
+
 export class ShipmentNotFoundError extends DomainError {
   readonly spec = {
     code: 'SHIPMENT_NOT_FOUND',

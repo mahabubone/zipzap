@@ -7,13 +7,22 @@
  *
  * Two writes, one transaction: rider status -> ON_PICKUP and currentJobId set. The pickup side
  * updates its own record in its own transaction — neither writes to the other's table.
+ *
+ * Phase 5 rung 5: the assignment records the pool load before and after, so the utilisation
+ * KPI is measured and the before/after is auditable.
  */
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { ResourceNotFoundError } from '../../common/domain-error.ts';
-import { isAssignable, rank, type AssignmentCandidate, type RiderStatus } from './rules/rider.ts';
+import {
+  isAssignable,
+  rank,
+  poolLoad,
+  type AssignmentCandidate,
+  type RiderStatus,
+} from './rules/rider.ts';
 import { RiderRepository } from './rider.repository.ts';
 
 export interface AssignRiderInput {
@@ -27,6 +36,10 @@ export interface AssignedRider {
   readonly score: number;
   readonly reasons: readonly string[];
   readonly previousStatus: RiderStatus;
+  /** Pool-wide load before the assignment. */
+  readonly poolLoadBefore: { readonly meanLoadFactor: number; readonly maxLoadFactor: number };
+  /** Load factor of the chosen rider after the assignment. */
+  readonly chosenLoadFactorAfter: number;
 }
 
 @Injectable()
@@ -56,11 +69,24 @@ export class AssignRiderService {
       }
 
       const previousStatus = rider.status as RiderStatus;
+      const poolBefore = poolLoad(input.candidates);
       rider.status = 'ON_PICKUP';
       rider.currentJobId = input.jobId;
       await this.riders.save(manager, rider);
 
-      return { riderId: rider.id, score: best.score, reasons: best.reasons, previousStatus };
+      const chosenLoadFactorAfter = Math.min(1, (best.activeJobs + 1) / best.capacity);
+
+      return {
+        riderId: rider.id,
+        score: best.score,
+        reasons: best.reasons,
+        previousStatus,
+        poolLoadBefore: {
+          meanLoadFactor: poolBefore.meanLoadFactor,
+          maxLoadFactor: poolBefore.maxLoadFactor,
+        },
+        chosenLoadFactorAfter,
+      };
     });
   }
 }

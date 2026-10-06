@@ -6,7 +6,8 @@ The people doing the work, and the software choosing their next job. Phase 2.
 
 ## Owns
 
-`rider` schema: `riders`, `profiles`, `devices`, `availability`, `assignments`, `performance`.
+`rider` schema: `riders`, `profiles`, `devices`, `availability`, `assignments`, `performance`,
+`command_queue`.
 
 ## State
 
@@ -52,16 +53,46 @@ is non-debuggable assignment.
 
 ## Offline sync
 
-A rider on a bad connection queues commands locally. Every command carries `device_id`,
-`command_id`, `created_at`, `operation`, `payload`.
+A rider on a bad connection queues mutating commands locally and replays them on reconnection.
+The server owns the authoritative order: each queued command has `device_sequence` (the device's
+monotonic clock, unique per rider) and `created_at`; pulls return pending commands ordered by
+`created_at` / `device_sequence` in a capped window (`RIDER_COMMAND_QUEUE_CAP`, default 100) that
+reports `capWarning` once the pending count passes 90%.
 
-The server dedupes on `command_id`. A scan performed twice on a flaky connection must still be
-one scan — this is the hardest consistency requirement in the product and the reason
-[../api/idempotency.md](../api/idempotency.md) is not optional.
+Every command carries `expected_state` — the aggregate snapshot at enqueue time. During ack the
+server compares it with the live rider state:
 
-Replay is ordered by `created_at`, and a command that is no longer valid (the shipment was
-cancelled while the device was offline) is rejected explicitly rather than dropped. Silence
-leaves the rider believing something happened that did not.
+```
+expected_state matches  →  mark acknowledged_at, emit RiderCommandDelivered
+expected_state stale    →  mark rejected_at + rejection_reason, emit RiderCommandRejected
+already acknowledged    →  replay the recorded outcome (already_delivered)
+already rejected        →  replay the recorded outcome (already_rejected)
+```
+
+A mismatch is a **recorded rejection with a reason**, never a silent drop — silence leaves the
+rider believing something happened that did not. Delivery or rejection is append-only:
+`acknowledged_at` or `rejected_at` (never both) plus the reason. A row with neither set is
+`PENDING`; the pending window index keeps pulls cheap.
+
+Idempotency-Key is mandatory on the ack (`scope: rider.sync-ack`): a duplicate key replays the
+stored response byte-for-byte; a key reused against a different body is rejected with
+`INVALID_IDEMPOTENCY_KEY`. This makes a retried confirm indistinguishable from a successful
+first attempt. See [ADR-0010](../ADR/0010-idempotency.md).
+
+## KPI
+
+Rider utilisation — fraction of capacity in use — is measured with the assignment scoring, then
+used to optimise it.
+
+- **Measure**: `loadFactor = activeJobs / capacity` per rider; `poolLoad` aggregates across the
+  assignable pool (`totalCapacity`, `inUseCapacity`, `meanLoadFactor`, `maxLoadFactor`, `minLoadFactor`).
+- **Surface**: read-only `GET /v1/riders/:riderId/utilisation` and `GET /v1/riders/pool-utilisation`.
+- **Record**: every assignment records `poolLoadBefore` (pool state at scoring time) and
+  `chosenLoadFactorAfter` (the chosen rider's load after the assignment) — the before/after audit
+  trail for the exit gate.
+- **Optimise**: the scoring bonus (`SPARE_CAPACITY_BONUS = 40`) rewards spare capacity, so dispatch
+  spreads work instead of piling it on the nearest rider. It is subordinate to refusals and
+  capacity-exclusion, and the existing ordering rules are unchanged.
 
 ## Emits
 
