@@ -28,6 +28,7 @@ import {
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
+import { shipmentsCreatedTotal } from '../../common/metrics';
 import { PricingService } from '../pricing/pricing.service.ts';
 import { EnsureCodRecordService } from '../cod/ensure-cod-record.service.ts';
 import { NetworkService } from '../network/network.service.ts';
@@ -212,6 +213,7 @@ export class CreateShipmentService {
           cod: { amountMinor: shipment.cod.amountMinor, currency: shipment.cod.currency },
         },
       });
+      shipmentsCreatedTotal.inc();
 
       const result: CreatedShipment = {
         id: shipment.id,

@@ -28,6 +28,7 @@ import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { CodRecordRepository } from './cod-record.repository.ts';
 import { assertTransition, nextAfterReconcile, reconcile, type CodStatus } from './rules/cod.ts';
+import { codCollectedTotal } from '../../common/metrics';
 
 export interface CollectCodCommand {
   readonly shipmentId: string;
@@ -95,6 +96,7 @@ export class CollectCodService {
       record.collectedMinor = command.collectedMinor;
       record.status = next;
       await this.records.save(manager, record);
+      codCollectedTotal.labels({ currency: record.currency }).inc(record.collectedMinor!);
 
       const now = new Date();
       await this.tracking.append(manager, {

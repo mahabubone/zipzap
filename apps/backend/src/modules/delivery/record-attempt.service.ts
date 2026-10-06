@@ -21,6 +21,7 @@ import { AppendTrackingEventService } from '../tracking/append-tracking-event.se
 import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import type { ShipmentStatus } from '../shipment/rules/state-machine.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
+import { deliveriesFailedTotal } from '../../common/metrics';
 import {
   assertTransition,
   attemptsRemain,
@@ -100,6 +101,9 @@ export class RecordAttemptService {
       const next: DeliveryStatus = retryScheduled ? 'OUT_FOR_DELIVERY' : 'FAILED';
       assertTransition(job.status as DeliveryStatus, 'ATTEMPTED');
       assertTransition('ATTEMPTED', next);
+      if (next === 'FAILED') {
+        deliveriesFailedTotal.labels({ reason: command.reason as FailureReason }).inc();
+      }
       job.status = next;
       await this.jobs.save(manager, job);
 

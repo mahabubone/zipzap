@@ -12,6 +12,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { Job, Queue } from 'bullmq';
 import type { DataSource } from 'typeorm';
 import { NOTIFICATION_QUEUE } from './notification.consumer.ts';
+import { jobFailureTotal } from '../../common/metrics';
 import type { SmsJob } from './notification-sender.service.ts';
 import { sendSmsAttempt } from './notification-sender.service.ts';
 import { NotificationRepository } from './notification.repository.ts';
@@ -49,7 +50,7 @@ export class NotificationProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  onFailed(): void {
-    // Retries are re-enqueued by process(), not by BullMQ.
+  onFailed({ job }: { job: Job }): void {
+    jobFailureTotal.labels({ queue: job.queueName }).inc();
   }
 }

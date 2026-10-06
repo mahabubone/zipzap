@@ -89,6 +89,17 @@ cod_collected_total          counter   amount, by currency
 settlements_completed_total  counter   amount, by currency
 ```
 
+**Scrape endpoints** — all three entrypoints expose `GET /metrics` in Prometheus text format:
+
+| Entrypoint      | Port                              |
+| --------------- | --------------------------------- |
+| API (`main.ts`) | `PORT` (3000) — alongside the API |
+| Worker          | `METRICS_PORT` (9090)             |
+| Publisher       | `PUBLISHER_METRICS_PORT` (9091)   |
+
+Labels are bounded: route templates, method, status, schema, operation, queue,
+consumer, subject, outcome, currency. A shipment id never reaches a label.
+
 Business metrics matter because an infrastructure dashboard tells you the system is up while the
 business is on fire. COD collection dropping to zero is an outage that no 5xx rate will show.
 

@@ -9,6 +9,7 @@
 import type { JetStreamClient, NatsConnection } from 'nats';
 import type { DataSource, EntityManager } from 'typeorm';
 import { Logger } from '@nestjs/common';
+import { incEventPublished, outboxPublishDuration, outboxPublishTotal } from '../../common/metrics';
 
 const BATCH_SIZE = 100;
 const POLL_INTERVAL_MS = 1_000;
@@ -60,6 +61,33 @@ export class OutboxPublisher {
     private readonly js: JetStreamClient,
   ) {}
 
+  /** Publish a single row with timing and outcome instrumentation. */
+  private async publishOne(row: OutboxRow): Promise<void> {
+    const start = Date.now();
+    const subject = subjectFor(row);
+    try {
+      await this.js.publish(
+        subject,
+        JSON.stringify({
+          id: String(row.id),
+          type: row.event_type,
+          version: row.event_version,
+          aggregateType: row.aggregate_type,
+          aggregateId: row.aggregate_id,
+          occurredAt: new Date(row.occurred_at as unknown as string).toISOString(),
+          data: row.payload,
+        }),
+      );
+      outboxPublishTotal.labels({ outcome: 'published' }).inc();
+      outboxPublishDuration.labels({ outcome: 'published' }).observe((Date.now() - start) / 1000);
+      incEventPublished(subject);
+    } catch (error) {
+      outboxPublishTotal.labels({ outcome: 'failed' }).inc();
+      outboxPublishDuration.labels({ outcome: 'failed' }).observe((Date.now() - start) / 1000);
+      throw error;
+    }
+  }
+
   /**
    * Publish one batch. The transaction is held across the publishes on purpose: releasing
    * the lock first would let a second publisher send the same event, and holding it means a
@@ -80,18 +108,7 @@ export class OutboxPublisher {
 
       for (const row of rows) {
         try {
-          await this.js.publish(
-            subjectFor(row),
-            JSON.stringify({
-              id: String(row.id),
-              type: row.event_type,
-              version: row.event_version,
-              aggregateType: row.aggregate_type,
-              aggregateId: row.aggregate_id,
-              occurredAt: new Date(row.occurred_at as unknown as string).toISOString(),
-              data: row.payload,
-            }),
-          );
+          await this.publishOne(row);
         } catch (error) {
           await manager.query(
             `UPDATE system.outbox_events

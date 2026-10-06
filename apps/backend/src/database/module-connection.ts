@@ -30,6 +30,7 @@ import type { DynamicModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource, type EntityTarget } from 'typeorm';
 import { config } from '../config';
+import { MetricsLogger, registerDataSource } from '../common/metrics';
 import { pgTypesConfig } from './pg-types';
 import { SnakeNamingStrategy } from './naming-strategy';
 import type { ModuleSchema } from './schemas';
@@ -49,9 +50,15 @@ export function moduleDataSourceOptions(
     entities: [...entities],
     namingStrategy: new SnakeNamingStrategy(),
     synchronize: false,
-    logging: nodeEnv === 'development' ? ['error', 'warn'] : ['error'],
     // int8 must arrive as a number for money (ADR-0009).
     extra: { types: pgTypesConfig() },
+    // Query instrumentation: logQuerySlow is only called when
+    // maxQueryExecutionTime is set (truthy); 1e-6 ms is far below any real
+    // execution time so every query is observed, while MetricsLogger swallows
+    // the console side effect and keeps production logs quiet.
+    logger: MetricsLogger,
+    maxQueryExecutionTime: 1e-6,
+    logging: nodeEnv === 'development' ? ['error', 'warn'] : ['error'],
   } as Options;
 }
 
@@ -73,5 +80,10 @@ export function forModule(
   return TypeOrmModule.forRootAsync({
     name: schema,
     useFactory: () => moduleDataSourceOptions(schema, entities),
+    dataSourceFactory: async (options) => {
+      const dataSource = new DataSource((options ?? {}) as Options);
+      registerDataSource(schema, dataSource);
+      return dataSource;
+    },
   });
 }

@@ -17,6 +17,7 @@ import type { Job } from 'bullmq';
 import type { DataSource } from 'typeorm';
 import type { Queue } from 'bullmq';
 import { WEBHOOK_QUEUE } from './webhook.consumer.ts';
+import { jobFailureTotal } from '../../common/metrics';
 import type { WebhookJob } from './webhook-sender.service.ts';
 import { WebhookRepository } from './webhook.repository.ts';
 import { sendAttempt } from './webhook-sender.service.ts';
@@ -45,8 +46,7 @@ export class WebhookProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  onFailed(): void {
-    // Retries are re-enqueued by process(), not by BullMQ: a BullMQ-level failure
-    // (processor throw) must be loud, not silently absorbed into the ladder.
+  onFailed({ job }: { job: Job }): void {
+    jobFailureTotal.labels({ queue: job.queueName }).inc();
   }
 }

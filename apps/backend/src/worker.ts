@@ -13,13 +13,18 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { Redis } from 'ioredis';
+import http from 'node:http';
 import { AppModule } from './app.module.ts';
+import { config } from './config';
+import { registry, registerProcessMetrics } from './common/metrics';
 import { connectNats, drainQuietly } from './nats.ts';
 import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
 import { WebhookConsumer } from './modules/merchant/webhook.consumer.ts';
 import { NotificationConsumer } from './modules/notification/notification.consumer.ts';
 import { SUBSCRIPTIONS } from './subscriptions.ts';
+import { eventDuplicateTotal, incEventConsumed, registerQueueClient } from './common/metrics';
 
 const logger = new Logger('worker');
 
@@ -28,6 +33,27 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const { nc } = await connectNats('zipzap-worker');
+
+  // Queue depth is surfaced on /metrics; a shared client keeps scrapes cheap.
+  const redisClient = new Redis(config().redisUrl, { maxRetriesPerRequest: null });
+  registerQueueClient(redisClient);
+
+  // The second /metrics entrypoint — a lean metrics-only HTTP server on its own
+  // port, since the worker has no other HTTP surface.
+  registerProcessMetrics();
+  const metricsServer = http.createServer(async (req, res) => {
+    if (req.url !== '/metrics') {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': registry.contentType });
+    res.end(await registry.metrics());
+  });
+  metricsServer.listen(config().metricsPort, () => {
+    logger.log(`metrics listening on :${config().metricsPort}`);
+  });
+
   const tracking = app.get(TrackingConsumer);
   const finance = app.get(FinanceConsumer);
   const webhook = app.get(WebhookConsumer);
@@ -53,19 +79,21 @@ async function bootstrap(): Promise<void> {
 
   await Promise.all(
     open.map(async (subscription, index) => {
-      const handler = handlers[SUBSCRIPTIONS[index]!.consumer];
+      const consumer = SUBSCRIPTIONS[index]!.consumer;
       for await (const message of subscription) {
+        const subject = message.subject;
         try {
-          const outcome = await handler.handle({
-            subject: message.subject,
+          const outcome = await handlers[consumer].handle({
+            subject: subject,
             payload: message.data,
           });
+          incEventConsumed(consumer, subject, outcome);
+          if (outcome === 'duplicate') eventDuplicateTotal.labels({ consumer }).inc();
           if (outcome === 'processed') {
             logger.debug({ subject: message.subject }, 'event processed');
           }
         } catch (failure) {
-          // Log and continue. Throwing out of this loop tears down the subscription and
-          // silently stops processing, which is the failure mode a consumer must never have.
+          incEventConsumed(consumer, subject, 'error');
           logger.error({ err: failure, subject: message.subject }, 'consumer handler failed');
         }
       }

@@ -24,6 +24,7 @@ import { hashRequest } from '../../common/idempotency.ts';
 import type { Currency } from '../../common/money.ts';
 import { claim } from '../system/idempotency.store.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
+import { settlementsCompletedTotal } from '../../common/metrics';
 import { FinanceRepository } from './finance.repository.ts';
 import {
   assertSettlementTransition,
@@ -146,6 +147,9 @@ export class ConfirmSettlementPaymentService {
         },
         occurredAt: now,
       });
+      if (payment.status === 'succeeded') {
+        settlementsCompletedTotal.labels({ currency: settlement.currency }).inc(netMinor);
+      }
 
       const result: ConfirmedSettlementPayment = {
         id: settlement.id,

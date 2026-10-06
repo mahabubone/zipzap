@@ -5,6 +5,7 @@
  * See docs/architecture/overview.md#why-three-entrypoints.
  */
 
+import type { Request, Response, NextFunction } from 'express';
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -13,6 +14,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './common/exception.filter';
 import { config } from './config';
+import {
+  registry,
+  httpRequestsTotal,
+  httpRequestDuration,
+  registerProcessMetrics,
+} from './common/metrics';
 
 async function bootstrap(): Promise<void> {
   const { port, isProduction } = config();
@@ -22,6 +29,24 @@ async function bootstrap(): Promise<void> {
   // transport encoding). A 10,000-row file is ~850KB — the default 100KB JSON
   // limit would reject it before validation runs. 10MB covers the exit gate;
   // the DTO still caps `csv` at 10M chars.
+  // Instrument the registry with bounded process metrics (Node runtime, GC,
+  // event loop). This is a hard dependency, not an opt-in: /metrics must work.
+  registerProcessMetrics();
+
+  // Global HTTP instrumentation: route template (never a concrete path with an
+  // id), method and status. The /metrics scrape endpoint is excluded so it does
+  // not pollute its own counters.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.url === '/metrics') return next();
+    const start = Date.now();
+    res.on('finish', () => {
+      const route = req.route?.path ?? `${req.baseUrl}${req.path}`;
+      httpRequestsTotal.labels(route, req.method, String(res.statusCode)).inc();
+      httpRequestDuration.labels(route).observe((Date.now() - start) / 1000);
+    });
+    next();
+  });
+
   app.useBodyParser('json', { limit: '10mb' });
 
   // The single place a domain error becomes an HTTP response.
@@ -44,6 +69,12 @@ async function bootstrap(): Promise<void> {
     );
     SwaggerModule.setup('docs', app, document);
   }
+
+  // Prometheus scrape endpoint — the first of three /metrics entrypoints.
+  app.use('/metrics', async (_req: Request, res: Response) => {
+    res.type('text/plain');
+    res.send(await registry.metrics());
+  });
 
   app.enableShutdownHooks();
   await app.listen(port);

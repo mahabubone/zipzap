@@ -21,6 +21,7 @@ import { BulkRepository } from './bulk.repository.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
 import { CreateShipmentService } from './create-shipment.service.ts';
 import { money } from '../../common/money.ts';
+import { jobFailureTotal } from '../../common/metrics';
 
 interface ChunkJob {
   readonly jobId: string;
@@ -168,8 +169,7 @@ export class BulkProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  onFailed(): void {
-    // Chunk failures are recorded per row, not by BullMQ: a processor throw
-    // must be loud, not silently absorbed.
+  onFailed({ job }: { job: Job }): void {
+    jobFailureTotal.labels({ queue: job.queueName }).inc();
   }
 }

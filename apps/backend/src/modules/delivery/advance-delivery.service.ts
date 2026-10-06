@@ -23,6 +23,7 @@ import { ShipmentLookup, SHIPMENT_LOOKUP } from '../shipment/shipment.lookup.ts'
 import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { CollectCodService } from '../cod/collect-cod.service.ts';
 import { assertTransition, type DeliveryStatus } from './rules/delivery.ts';
+import { shipmentsDeliveredTotal } from '../../common/metrics';
 
 @Injectable()
 export class AdvanceDeliveryService {
@@ -136,6 +137,7 @@ export class AdvanceDeliveryService {
           merchantId: await this.shipments.findMerchantId(job.shipmentId),
         },
       });
+      shipmentsDeliveredTotal.inc();
 
       // COD is collected through the injected contract, never by reading cod.records:
       // expected amount from the frozen quote, collected amount from the rider's report.
