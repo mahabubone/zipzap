@@ -27,6 +27,18 @@ export class DeliveryRepository {
     return manager.getRepository(DeliveryJobEntity).findOneBy({ id });
   }
 
+  /** The newest delivery job for a parcel — retries reuse the same job. */
+  async findLatestByShipmentId(
+    manager: EntityManager,
+    shipmentId: string,
+  ): Promise<DeliveryJobEntity | null> {
+    return manager
+      .createQueryBuilder(DeliveryJobEntity, 'd')
+      .where('d.shipment_id = :shipmentId', { shipmentId })
+      .orderBy('d.created_at', 'DESC')
+      .getOne();
+  }
+
   /**
    * Locks the row: two riders reporting the same attempt must not both advance the job.
    * A duplicate confirmation on a flaky connection produces one attempt, not two.

@@ -112,8 +112,15 @@ export class AdvanceDeliveryService {
       job.status = 'DELIVERED';
       await this.jobs.save(manager, job);
 
-      // The parcel is delivered: OUT_FOR_DELIVERY → DELIVERED. COD collection
-      // below runs in this same transaction — money and status agree or neither.
+      // The parcel is delivered. A retryable attempt parked it in RETRY_SCHEDULED,
+      // and the machine has no RETRY_SCHEDULED -> DELIVERED edge: the rider has to
+      // be "out again" first, the same hop record-attempt walks in reverse. Without
+      // this, a success after a retry — failed-then-delivered — 409s on an edge
+      // that ought to be the story's happy ending.
+      const statuses = await this.advance.statuses(manager, [job.shipmentId]);
+      if (statuses[job.shipmentId] === 'RETRY_SCHEDULED') {
+        await this.advance.advance(manager, job.shipmentId, 'OUT_FOR_DELIVERY');
+      }
       await this.advance.advance(manager, job.shipmentId, 'DELIVERED');
 
       const now = new Date();

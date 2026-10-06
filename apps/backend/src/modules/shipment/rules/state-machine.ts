@@ -54,9 +54,12 @@ export const TRANSITIONS = {
   PICKUP_ASSIGNED: ['PICKED_UP', 'CANCELLED'],
   PICKED_UP: ['AT_ORIGIN_HUB', 'EXCEPTION'],
   AT_ORIGIN_HUB: ['SORTING', 'EXCEPTION'],
-  SORTING: ['DISPATCHED', 'EXCEPTION'],
+  // Damage is discovered at inspection (hub sort) or in the network (line-haul) —
+  // the two places a courier physically finds a broken parcel. LOST stays
+  // IN_TRANSIT-only: nothing is "lost" while still in the building.
+  SORTING: ['DISPATCHED', 'EXCEPTION', 'DAMAGED'],
   DISPATCHED: ['IN_TRANSIT', 'EXCEPTION'],
-  IN_TRANSIT: ['AT_DESTINATION_HUB', 'EXCEPTION', 'LOST'],
+  IN_TRANSIT: ['AT_DESTINATION_HUB', 'EXCEPTION', 'LOST', 'DAMAGED'],
   AT_DESTINATION_HUB: ['OUT_FOR_DELIVERY', 'EXCEPTION'],
   OUT_FOR_DELIVERY: ['DELIVERED', 'DELIVERY_FAILED', 'RETURN_INITIATED', 'ON_HOLD'],
   DELIVERED: ['RETURN_INITIATED'],
@@ -128,6 +131,7 @@ const PRE_DESTINATION: readonly ShipmentStatus[] = [
   'IN_TRANSIT',
   'EXCEPTION',
   'LOST',
+  'DAMAGED',
 ];
 
 export function hasArrived(status: ShipmentStatus): boolean {

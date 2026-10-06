@@ -27,6 +27,7 @@ export const SUBSCRIPTIONS: readonly NatsSubscription[] = [
   { consumer: 'tracking', subject: 'zipzap.return.completed' },
   { consumer: 'tracking', subject: 'zipzap.return.requested' },
   { consumer: 'tracking', subject: 'zipzap.return.advanced' },
+  { consumer: 'tracking', subject: 'zipzap.shipment.exception_raised' },
   { consumer: 'finance', subject: 'zipzap.cod.collected' },
   { consumer: 'finance', subject: 'zipzap.cod.partial_collection' },
   { consumer: 'finance', subject: 'zipzap.return.completed' },

@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module, forwardRef, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { Redis } from 'ioredis';
 import { forModule } from '../../database/module-connection.ts';
@@ -16,6 +16,25 @@ import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
+/** The shared BullMQ root connection, created on first use — never at import
+ * time, so importing this module does not require env vars. BullMQ does not
+ * close a connection it did not create, so BullConnectionCloser quits it:
+ * without that, `app.close()` leaks this socket and the process never exits. */
+let bullConnection: Redis | undefined;
+
+function sharedBullConnection(): Redis {
+  bullConnection ??= new Redis(config().redisUrl, { maxRetriesPerRequest: null });
+  return bullConnection;
+}
+
+@Injectable()
+export class BullConnectionCloser implements OnModuleDestroy {
+  async onModuleDestroy(): Promise<void> {
+    await bullConnection?.quit().catch(() => undefined);
+    bullConnection = undefined;
+  }
+}
+
 @Module({
   imports: [
     forModule('merchant', [
@@ -32,9 +51,7 @@ import { IdentityModule } from '../identity/identity.module.ts';
       // Native ESM: BullMQ cannot load ioredis itself, so pass a constructed
       // client instead of connection options. maxRetriesPerRequest must be null
       // for BullMQ's blocking connections — the default (20) breaks them.
-      useFactory: () => ({
-        connection: new Redis(config().redisUrl, { maxRetriesPerRequest: null }),
-      }),
+      useFactory: () => ({ connection: sharedBullConnection() }),
     }),
     BullModule.registerQueue({ name: WEBHOOK_QUEUE }),
   ],
@@ -46,6 +63,7 @@ import { IdentityModule } from '../identity/identity.module.ts';
     WebhookReplayService,
     WebhookConsumer,
     WebhookProcessor,
+    BullConnectionCloser,
   ],
   exports: [FindCredentialService],
 })

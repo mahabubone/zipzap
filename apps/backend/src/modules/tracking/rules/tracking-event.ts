@@ -22,6 +22,9 @@ export const TRACKING_EVENT_TYPES = [
   'SHIPMENT_CANCELLED',
   'RETURN_INITIATED',
   'RETURNED',
+  // Operational exceptions (lost, damaged) — announced on the public timeline:
+  // a parcel that vanishes from the tracking page is a lie by omission.
+  'EXCEPTION_RAISED',
   'EVENT_CORRECTED',
 ] as const;
 

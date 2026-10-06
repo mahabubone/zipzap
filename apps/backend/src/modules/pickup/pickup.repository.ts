@@ -23,6 +23,15 @@ export class PickupRepository {
     return manager.getRepository(PickupEntity).findOneBy({ id });
   }
 
+  /** The pickup batch containing this parcel — a shipment belongs to at most one. */
+  async findByShipmentId(manager: EntityManager, shipmentId: string): Promise<PickupEntity | null> {
+    return manager
+      .createQueryBuilder(PickupEntity, 'p')
+      .where(':shipmentId = ANY(p.shipment_ids)', { shipmentId })
+      .orderBy('p.created_at', 'DESC')
+      .getOne();
+  }
+
   /**
    * Locks the row so two simultaneous assignments serialise. Without this, two dispatchers
    * could assign two riders to the same pickup.

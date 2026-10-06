@@ -34,6 +34,7 @@ const AGGREGATE_OF: Record<string, string> = {
   ReturnAdvanced: 'return',
   ReturnCompleted: 'return',
   ShipmentScanned: 'shipment',
+  ShipmentExceptionRaised: 'shipment',
 };
 
 function subjectsOf(types: readonly string[]): Set<string> {

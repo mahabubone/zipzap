@@ -23,6 +23,16 @@ import {
 function drive(shipment: Shipment, path: readonly ShipmentStatus[]): Shipment {
   return path.reduce(transition, shipment);
 }
+
+function expectCan(from: ShipmentStatus, to: ShipmentStatus): void {
+  assert.equal(canTransition(from, to), true, `${from} -> ${to} should be legal`);
+  assert.doesNotThrow(() => assertTransition(from, to));
+}
+
+function expectCannot(from: ShipmentStatus, to: ShipmentStatus): void {
+  assert.equal(canTransition(from, to), false, `${from} -> ${to} must be illegal`);
+  assert.throws(() => assertTransition(from, to), InvalidTransitionError);
+}
 import { InvalidTransitionError } from '../../../common/domain-error.ts';
 
 const ALL = SHIPMENT_STATUSES;
@@ -226,6 +236,27 @@ describe('hasArrived — the manifest reconciliation question', () => {
   test('stuck or lost cargo counts as not arrived — reconciliation must not pass in silence', () => {
     assert.equal(hasArrived('EXCEPTION'), false);
     assert.equal(hasArrived('LOST'), false);
+    // Damage is discovered at hub sort or in transit — always before the
+    // destination hub, so a damaged parcel never counts as arrived.
+    assert.equal(hasArrived('DAMAGED'), false);
+  });
+
+  test('damage is reachable only where a courier physically finds it', () => {
+    // The two inspection points, and nothing else: not from CREATED (the parcel
+    // is not even picked up), not from AT_DESTINATION_HUB (it already arrived),
+    // never backwards out of a return or a terminal state.
+    expectCan('SORTING', 'DAMAGED');
+    expectCan('IN_TRANSIT', 'DAMAGED');
+    expectCannot('CREATED', 'DAMAGED');
+    expectCannot('PICKED_UP', 'DAMAGED');
+    expectCannot('AT_DESTINATION_HUB', 'DAMAGED');
+    expectCannot('DELIVERED', 'DAMAGED');
+    expectCannot('RETURNED', 'DAMAGED');
+    expectCannot('LOST', 'DAMAGED');
+    // LOST stays line-haul only: nothing is lost while still in the building.
+    expectCan('IN_TRANSIT', 'LOST');
+    expectCannot('SORTING', 'LOST');
+    expectCannot('AT_ORIGIN_HUB', 'LOST');
   });
 
   test('destination-side and handled states count as arrived', () => {

@@ -151,6 +151,10 @@ export class ShipmentRepository {
     return found;
   }
 
+  findByTrackingCode(manager: EntityManager, trackingCode: string): Promise<ShipmentEntity | null> {
+    return manager.getRepository(ShipmentEntity).findOneBy({ trackingCode });
+  }
+
   /** Status counting. Each query owns only the `shipment` schema; the dashboard
    * aggregates many such single-schema reads — it never joins across schemas. */
   countByStatus(manager: EntityManager, status: ShipmentStatus): Promise<number> {

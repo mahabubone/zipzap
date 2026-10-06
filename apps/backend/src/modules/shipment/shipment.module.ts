@@ -21,6 +21,7 @@ import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentDetailController } from './shipment-detail.controller.ts';
 import { CancelShipmentService } from './cancel-shipment.service.ts';
+import { ReportExceptionService } from './report-exception.service.ts';
 import { ShipmentAdvanceService } from './advance-shipment.service.ts';
 
 @Module({
@@ -46,6 +47,7 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
     ShipmentRepository,
     CreateShipmentService,
     CancelShipmentService,
+    ReportExceptionService,
     ListShipmentsService,
     AppendTrackingEventService,
     ShipmentAdvanceService,

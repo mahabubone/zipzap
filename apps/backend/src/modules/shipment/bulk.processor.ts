@@ -169,7 +169,8 @@ export class BulkProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  onFailed({ job }: { job: Job }): void {
+  onFailed(job: Job): void {
+    // BullMQ emits (job, error, prev) positionally — Nest binds the raw listener.
     jobFailureTotal.labels({ queue: job.queueName }).inc();
   }
 }

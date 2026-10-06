@@ -50,24 +50,28 @@ DELIVERED
 
 Allowed transitions:
 
-| From                 | To                                                 |
-| -------------------- | -------------------------------------------------- |
-| `DRAFT`              | `CREATED`, `CANCELLED`                             |
-| `CREATED`            | `PICKUP_REQUESTED`, `CANCELLED`                    |
-| `PICKUP_REQUESTED`   | `PICKUP_ASSIGNED`, `CANCELLED`                     |
-| `PICKUP_ASSIGNED`    | `PICKED_UP`, `CANCELLED`                           |
-| `PICKED_UP`          | `AT_ORIGIN_HUB`, `EXCEPTION`                       |
-| `AT_ORIGIN_HUB`      | `SORTING`, `EXCEPTION`                             |
-| `SORTING`            | `DISPATCHED`, `EXCEPTION`                          |
-| `DISPATCHED`         | `IN_TRANSIT`, `EXCEPTION`                          |
-| `IN_TRANSIT`         | `AT_DESTINATION_HUB`, `EXCEPTION`, `LOST`          |
-| `AT_DESTINATION_HUB` | `OUT_FOR_DELIVERY`, `EXCEPTION`                    |
-| `OUT_FOR_DELIVERY`   | `DELIVERED`, `DELIVERY_FAILED`, `RETURN_INITIATED` |
-| `DELIVERY_FAILED`    | `RETRY_SCHEDULED`, `RETURN_INITIATED`              |
-| `RETRY_SCHEDULED`    | `OUT_FOR_DELIVERY`, `RETURN_INITIATED`             |
+| From                 | To                                                   |
+| -------------------- | ---------------------------------------------------- |
+| `DRAFT`              | `CREATED`, `CANCELLED`                               |
+| `CREATED`            | `PICKUP_REQUESTED`, `CANCELLED`                      |
+| `PICKUP_REQUESTED`   | `PICKUP_ASSIGNED`, `CANCELLED`                       |
+| `PICKUP_ASSIGNED`    | `PICKED_UP`, `CANCELLED`                             |
+| `PICKED_UP`          | `AT_ORIGIN_HUB`, `EXCEPTION`                         |
+| `AT_ORIGIN_HUB`      | `SORTING`, `EXCEPTION`                               |
+| `SORTING`            | `DISPATCHED`, `EXCEPTION`, `DAMAGED`                 |
+| `DISPATCHED`         | `IN_TRANSIT`, `EXCEPTION`                            |
+| `IN_TRANSIT`         | `AT_DESTINATION_HUB`, `EXCEPTION`, `LOST`, `DAMAGED` |
+| `AT_DESTINATION_HUB` | `OUT_FOR_DELIVERY`, `EXCEPTION`                      |
+| `OUT_FOR_DELIVERY`   | `DELIVERED`, `DELIVERY_FAILED`, `RETURN_INITIATED`   |
+| `DELIVERY_FAILED`    | `RETRY_SCHEDULED`, `RETURN_INITIATED`                |
+| `RETRY_SCHEDULED`    | `OUT_FOR_DELIVERY`, `RETURN_INITIATED`               |
 
 Administrative states reachable from most of the above: `ON_HOLD`, `CANCELLED`, `LOST`,
-`DAMAGED`, `EXCEPTION`.
+`DAMAGED`, `EXCEPTION`. Exceptions have precise in-edges, not "most of the above": `DAMAGED`
+from the two inspection points (`SORTING`, `IN_TRANSIT`) — the places a courier physically
+finds a broken parcel — and `LOST` from `IN_TRANSIT` only, nothing lost while still in the
+building. Both raise `ShipmentExceptionRaised` and the `EXCEPTION_RAISED` timeline event
+(`ReportExceptionService`), never a direct status write.
 
 Return is a parallel lifecycle on the same shipment, never a second parcel:
 
