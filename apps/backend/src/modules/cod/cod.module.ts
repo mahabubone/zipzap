@@ -24,6 +24,12 @@ import { IdentityModule } from '../identity/identity.module.ts';
     EnsureCodRecordService,
     { provide: COD_LOOKUP, useClass: CodLookup },
   ],
-  exports: [CollectCodService, ReconcileCodService, EnsureCodRecordService, COD_LOOKUP],
+  exports: [
+    CollectCodService,
+    ReconcileCodService,
+    EnsureCodRecordService,
+    CodRecordRepository,
+    COD_LOOKUP,
+  ],
 })
 export class CodModule {}

@@ -31,5 +31,6 @@ import { CodModule } from '../cod/cod.module.ts';
     CreateDeliveryService,
     AdvanceDeliveryService,
   ],
+  exports: [DeliveryRepository],
 })
 export class DeliveryModule {}

@@ -15,6 +15,7 @@ import { ReturnsModule } from './modules/returns/returns.module.ts';
 import { NotificationModule } from './modules/notification/notification.module.ts';
 import { NetworkModule } from './modules/network/network.module.ts';
 import { HubModule } from './modules/hub/hub.module.ts';
+import { DashboardModule } from './modules/dashboard/dashboard.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -22,6 +23,10 @@ import { HubModule } from './modules/hub/hub.module.ts';
  * Note the connections: `merchant`, `shipment`, `pickup`, `rider` and `tracking` each
  * register their own schema-scoped DataSource. `identity` registers none, because it owns no
  * tables. That asymmetry is intentional and is the module boundary doing real work.
+ *
+ * `dashboard` registers its own empty, schema-scoped DataSource too — it owns no data,
+ * it only reads all of it, so the schema boundary is a marker for the aggregation view,
+ * not a data store.
  */
 @Module({
   imports: [
@@ -40,6 +45,7 @@ import { HubModule } from './modules/hub/hub.module.ts';
     NotificationModule,
     NetworkModule,
     HubModule,
+    DashboardModule,
   ],
   controllers: [HealthController],
 })

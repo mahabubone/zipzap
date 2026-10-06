@@ -17,7 +17,7 @@ One schema per module. The schema _is_ the boundary.
 | `pickup`       | pickup       | pickup requests, batches, assignments, attempts                                    |
 | `hub`          | hub          | hubs, staff, capacity, schedules                                                   |
 | `network`      | network      | geo hierarchy (division→…→delivery point), service areas, routes, manifests, trips |
-| `rider`        | rider        | riders, devices, availability, performance                                         |
+| `rider`        | rider        | riders, devices, availability, performance, command_queue (offline sync)           |
 | `delivery`     | delivery     | delivery jobs, attempts, proof                                                     |
 | `tracking`     | tracking     | tracking events (append-only)                                                      |
 | `pricing`      | pricing      | pricing rules, quotes, contracts                                                   |
@@ -28,6 +28,7 @@ One schema per module. The schema _is_ the boundary.
 | `support`      | support      | tickets, messages, status history                                                  |
 | `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                             |
 | `analytics`    | analytics    | projections only                                                                   |
+| `dashboard`    | dashboard    | none — read-only control-tower surface, no tables                                  |
 | `system`       | system       | outbox, idempotency keys                                                           |
 
 No foreign keys across schemas. A `rider_id` in `delivery` is a bare identifier — an

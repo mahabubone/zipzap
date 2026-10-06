@@ -8,7 +8,9 @@
 
 import type { EntityManager } from 'typeorm';
 import { Injectable } from '@nestjs/common';
+import { In } from 'typeorm';
 import { PickupEntity } from './pickup.entity.ts';
+import { type PickupStatus } from './rules/pickup.ts';
 
 @Injectable()
 export class PickupRepository {
@@ -62,5 +64,49 @@ export class PickupRepository {
       });
     }
     return query.getMany();
+  }
+
+  /** Status counting. Each query owns only the `pickup` schema; the dashboard
+   * aggregates many such single-schema reads — it never joins across schemas. */
+  countByStatus(manager: EntityManager, status: PickupStatus): Promise<number> {
+    return manager.getRepository(PickupEntity).countBy({ status });
+  }
+
+  async countsByStatus(manager: EntityManager): Promise<Map<string, number>> {
+    const rows = await manager
+      .createQueryBuilder(PickupEntity, 'p')
+      .select('p.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('p.status')
+      .getRawMany();
+    return new Map(rows.map((r) => [r.status, Number(r.count)]));
+  }
+
+  countByStatuses(manager: EntityManager, statuses: readonly PickupStatus[]): Promise<number> {
+    return manager.getRepository(PickupEntity).count({ where: { status: In(statuses) } });
+  }
+
+  countActivePickups(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, ['REQUESTED', 'SCHEDULED', 'ASSIGNED', 'IN_PROGRESS']);
+  }
+
+  countPendingPickups(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, ['REQUESTED', 'SCHEDULED']);
+  }
+
+  countCompleted(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'COMPLETED');
+  }
+
+  countFailedPickups(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'FAILED');
+  }
+
+  countExpired(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'EXPIRED');
+  }
+
+  countCancelledPickups(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'CANCELLED');
   }
 }

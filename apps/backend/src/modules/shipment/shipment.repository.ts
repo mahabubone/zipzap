@@ -5,7 +5,9 @@
 
 import type { EntityManager } from 'typeorm';
 import { Injectable } from '@nestjs/common';
+import { In } from 'typeorm';
 import { ShipmentEntity } from './shipment.entity.ts';
+import { type ShipmentStatus } from './rules/state-machine.ts';
 
 /**
  * Takes an EntityManager on every method rather than holding a connection. That is what makes
@@ -147,5 +149,102 @@ export class ShipmentRepository {
       .where('s.id = :id', { id })
       .getOne();
     return found;
+  }
+
+  /** Status counting. Each query owns only the `shipment` schema; the dashboard
+   * aggregates many such single-schema reads — it never joins across schemas. */
+  countByStatus(manager: EntityManager, status: ShipmentStatus): Promise<number> {
+    return manager.getRepository(ShipmentEntity).countBy({ status });
+  }
+
+  /** All statuses with a count greater than zero. Missing statuses are filled with
+   * zero by the caller so the by-status map is always complete. */
+  async countsByStatus(manager: EntityManager): Promise<Map<string, number>> {
+    const rows = await manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .select('s.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('s.status')
+      .getRawMany();
+    return new Map(rows.map((r) => [r.status, Number(r.count)]));
+  }
+
+  countByStatuses(manager: EntityManager, statuses: readonly ShipmentStatus[]): Promise<number> {
+    return manager.getRepository(ShipmentEntity).count({ where: { status: In(statuses) } });
+  }
+
+  /** Calendar day boundaries for `today` counting. */
+  private todayStart(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  private todayEnd(): Date {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  countTodayShipments(manager: EntityManager): Promise<number> {
+    return manager
+      .createQueryBuilder(ShipmentEntity, 's')
+      .where('s.createdAt >= :start', { start: this.todayStart() })
+      .andWhere('s.createdAt < :end', { end: this.todayEnd() })
+      .getCount();
+  }
+
+  countInTransit(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'IN_TRANSIT');
+  }
+
+  countAtHub(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, ['AT_ORIGIN_HUB', 'AT_DESTINATION_HUB']);
+  }
+
+  countSorting(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'SORTING');
+  }
+
+  countOutForDelivery(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'OUT_FOR_DELIVERY');
+  }
+
+  countDelivered(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'DELIVERED');
+  }
+
+  countFailed(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'DELIVERY_FAILED');
+  }
+
+  countReturned(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'RETURNED');
+  }
+
+  countReturning(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, [
+      'RETURN_INITIATED',
+      'RETURN_IN_TRANSIT',
+      'RETURN_AT_HUB',
+      'RETURN_OUT_FOR_DELIVERY',
+      'RETURNED',
+    ]);
+  }
+
+  countCancelled(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'CANCELLED');
+  }
+
+  countOnHold(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'ON_HOLD');
+  }
+
+  countLostOrDamaged(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, ['LOST', 'DAMAGED']);
+  }
+
+  countException(manager: EntityManager): Promise<number> {
+    return this.countByStatus(manager, 'EXCEPTION');
   }
 }

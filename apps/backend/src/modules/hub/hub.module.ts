@@ -3,6 +3,7 @@ import { forModule } from '../../database/module-connection.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { HubScanService } from './hub-scan.service.ts';
+import { HubRepository } from './hub.repository.ts';
 
 /**
  * hub — the `hub` schema owner. Rung 2b shipped the `hubs` table (migration
@@ -15,7 +16,7 @@ import { HubScanService } from './hub-scan.service.ts';
  */
 @Module({
   imports: [forModule('hub', []), ShipmentModule, TrackingModule],
-  providers: [HubScanService],
-  exports: [HubScanService],
+  providers: [HubScanService, HubRepository],
+  exports: [HubScanService, HubRepository],
 })
 export class HubModule {}

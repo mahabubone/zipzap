@@ -32,6 +32,6 @@ import { ShipmentModule } from '../shipment/shipment.module.ts';
     ListPickupsService,
     ScanParcelService,
   ],
-  exports: [ScanParcelService],
+  exports: [ScanParcelService, PickupRepository],
 })
 export class PickupModule {}

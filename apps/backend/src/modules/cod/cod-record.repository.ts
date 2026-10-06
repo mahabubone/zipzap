@@ -4,7 +4,9 @@
 
 import type { EntityManager } from 'typeorm';
 import { Injectable } from '@nestjs/common';
+import { In } from 'typeorm';
 import { CodRecordEntity } from './cod-record.entity.ts';
+import { type CodStatus } from './rules/cod.ts';
 
 /**
  * Takes an EntityManager on every method rather than holding a connection. That is what makes
@@ -66,5 +68,54 @@ export class CodRecordRepository {
       });
     }
     return query.getMany();
+  }
+
+  /** Status counting. Each query owns only the `cod` schema; the dashboard
+   * aggregates many such single-schema reads — it never joins across schemas. */
+  countByStatus(manager: EntityManager, status: CodStatus): Promise<number> {
+    return manager.getRepository(CodRecordEntity).countBy({ status });
+  }
+
+  async countsByStatus(manager: EntityManager): Promise<Map<string, number>> {
+    const rows = await manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .select('c.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('c.status')
+      .getRawMany();
+    return new Map(rows.map((r) => [r.status, Number(r.count)]));
+  }
+
+  countByStatuses(manager: EntityManager, statuses: readonly CodStatus[]): Promise<number> {
+    return manager.getRepository(CodRecordEntity).count({ where: { status: In(statuses) } });
+  }
+
+  countOutstandingCOD(manager: EntityManager): Promise<number> {
+    return this.countByStatuses(manager, [
+      'COD_COLLECTED',
+      'COD_RECONCILED',
+      'COD_PAYABLE',
+      'SETTLEMENT_CREATED',
+      'SETTLEMENT_HOLD',
+    ]);
+  }
+
+  /** Money in collection: collected but not yet paid out to the merchant. Integer
+   * minor units, summed as bigint arithmetic — never a float. */
+  async sumOutstandingCODMinor(manager: EntityManager): Promise<bigint> {
+    const row = await manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .select('SUM(c.expectedMinor)', 'amount')
+      .where('c.status IN (:...statuses)', {
+        statuses: [
+          'COD_COLLECTED',
+          'COD_RECONCILED',
+          'COD_PAYABLE',
+          'SETTLEMENT_CREATED',
+          'SETTLEMENT_HOLD',
+        ],
+      })
+      .getRawOne<{ amount: string }>();
+    return row?.amount ? BigInt(row.amount) : BigInt(0);
   }
 }

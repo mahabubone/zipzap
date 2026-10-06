@@ -54,6 +54,6 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
     BulkImportService,
     BulkProcessor,
   ],
-  exports: [SHIPMENT_LOOKUP, ShipmentAdvanceService],
+  exports: [SHIPMENT_LOOKUP, ShipmentAdvanceService, ShipmentRepository],
 })
 export class ShipmentModule {}

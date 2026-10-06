@@ -1,6 +1,6 @@
 /**
- * The 18 module schemas, plus `system`. One schema per module — the schema IS the
- * boundary (docs/ADR/0002).
+ * The 19 module schemas, plus `system`. One schema per module — the schema IS the
+ * boundary (docs/ADR-0002).
  */
 
 export const MODULE_SCHEMAS = [
@@ -22,6 +22,7 @@ export const MODULE_SCHEMAS = [
   'support',
   'warehouse',
   'analytics',
+  'dashboard',
   'system',
 ] as const;
 
