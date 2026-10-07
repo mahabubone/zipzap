@@ -123,4 +123,60 @@ describe('ZipZapClient', () => {
     const failure = await client.track('ZP-X').catch((e: unknown) => e);
     expect((failure as ZipZapApiError).retryAfterSeconds).toBe(42);
   });
+
+  it('decodes a public tracking timeline', async () => {
+    const { client, seen } = stubFetch(() => ({
+      status: 200,
+      body: {
+        trackingCode: 'ZP-X',
+        status: 'SHIPMENT_CREATED',
+        timeline: [{ sequence: 1, event: 'SHIPMENT_CREATED', occurredAt: '2026-10-07T16:39:47.869Z' }],
+      },
+    }));
+    const tracking = await client.track('ZP-X');
+    expect(tracking.timeline).toHaveLength(1);
+    expect(tracking.timeline[0]!.event).toBe('SHIPMENT_CREATED');
+    // Public: no account, so no Authorization header may be invented for it.
+    expect(seen[0]!.url).toBe('http://api.test/track/ZP-X');
+  });
+
+  it('keeps bigint money as a decimal string on live counts', async () => {
+    const { client } = stubFetch(() => ({
+      status: 200,
+      body: {
+        timestamp: '2026-10-07T16:40:00.000Z',
+        shipments: { total: 11, byStatus: { CREATED: 11 } },
+        cod: { total: 2, outstandingAmountMinor: '184250075' },
+      },
+    }));
+    const counts = await client.liveCounts();
+    // The controller stringifies; a number here would have thrown server-side.
+    expect(counts.cod.outstandingAmountMinor).toBe('184250075');
+  });
+
+  it('returns typed shipment detail', async () => {
+    const { client, seen } = stubFetch(() => ({
+      status: 200,
+      body: {
+        id: 's-1',
+        trackingCode: 'ZP-X',
+        status: 'CREATED',
+        merchantReference: null,
+        senderName: 'Ayesha',
+        senderPhone: '+8801700000000',
+        recipientName: 'Rahim',
+        recipientPhone: '+8801800000000',
+        parcelWeightGrams: 1200,
+        parcelDescription: 'Two shirts',
+        codAmountMinor: 125050,
+        codCurrency: 'BDT',
+        pricingVersion: 1,
+        createdAt: '2026-10-07T16:39:20.017Z',
+      },
+    }));
+    const shipment = await client.getShipment('s-1');
+    expect(shipment.recipientName).toBe('Rahim');
+    expect(shipment.codAmountMinor).toBe(125050);
+    expect(seen[0]!.url).toBe('http://api.test/v1/shipments/s-1');
+  });
 });
