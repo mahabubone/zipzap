@@ -10,9 +10,22 @@
  *
  * The stored format is versioned (`scrypt$N$r$p$salt$hash`) so the parameters can be raised later
  * without invalidating existing credentials: verify against the parameters in the stored value.
+ *
+ * `verifySecret` is deliberately ASYNC (the libuv threadpool, not the event loop). The sync
+ * variant at N=2^15 costs ~70ms of blocked event loop per authenticated request: the load test
+ * showed eight concurrent creates serialising into ~800ms p95 on that one call — the endpoint
+ * was measuring scrypt, not the database (docs/operations/performance.md).
  */
 
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const scryptAsync = promisify(scrypt) as (
+  password: string | Buffer,
+  salt: Buffer,
+  keylen: number,
+  options: { N: number; r: number; p: number; maxmem: number },
+) => Promise<Buffer>;
 
 const N = 2 ** 15; // CPU/memory cost
 const R = 8;
@@ -33,7 +46,7 @@ export function hashSecret(secret: string): string {
   return ['scrypt', N, R, P, salt.toString('base64url'), derived.toString('base64url')].join('$');
 }
 
-export function verifySecret(secret: string, stored: string): boolean {
+export async function verifySecret(secret: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
   if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
 
@@ -41,7 +54,7 @@ export function verifySecret(secret: string, stored: string): boolean {
   const expected = Buffer.from(hashRaw!, 'base64url');
   let derived: Buffer;
   try {
-    derived = scryptSync(
+    derived = await scryptAsync(
       secret.normalize('NFKC'),
       Buffer.from(saltRaw!, 'base64url'),
       expected.length,

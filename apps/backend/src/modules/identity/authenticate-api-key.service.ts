@@ -39,7 +39,7 @@ export class AuthenticateApiKeyService {
     if (!credential) throw denied;
     if (credential.revokedAt !== null) throw denied;
 
-    if (!verifySecret(secret, credential.secretHash)) throw denied;
+    if (!(await verifySecret(secret, credential.secretHash))) throw denied;
 
     // A suspended merchant keeps its credential but loses the ability to create shipments.
     if (!canAcceptShipments(credential.merchantStatus)) {

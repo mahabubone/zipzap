@@ -113,6 +113,12 @@ settlement — see [../operations/demo-scenarios.md](../operations/demo-scenario
 Load fixtures exist to measure, not to demonstrate. A demo dataset that also implies scale is
 two claims, one of which will be wrong.
 
+**Fixtures and integration tests share one database and do not survive each other**: the
+integration suite clears `shipment`, `rider`, `cod`, `delivery` and `pickup` tables before it
+seeds its own state, so fixtures are gone after a full test run. Re-run
+`db:seed --profile=…` before the next `test:load` — the harness detects the empty fixture set
+and says exactly that. Profiles append (one profile run per database: rider phones are unique).
+
 ---
 
 Related: [strategy.md](strategy.md) · [../operations/demo-scenarios.md](../operations/demo-scenarios.md)

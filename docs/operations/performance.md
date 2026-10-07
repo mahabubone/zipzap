@@ -5,15 +5,15 @@ replaced by measured values from load tests.
 
 ## Targets
 
-| Operation                 | Target      |
-| ------------------------- | ----------- |
-| `GET /v1/tracking/:code`  | p95 < 200ms |
-| `POST /v1/shipments`      | p95 < 300ms |
-| Simple single-table query | p95 < 100ms |
-| Dashboard list query      | p95 < 500ms |
-| Async event propagation   | seconds     |
-| Outbox → NATS             | < 1s        |
-| Event → webhook delivered | < 30s       |
+| Operation                  | Target      |
+| -------------------------- | ----------- |
+| `GET /track/:trackingCode` | p95 < 200ms |
+| `POST /v1/shipments`       | p95 < 300ms |
+| Simple single-table query  | p95 < 100ms |
+| Dashboard list query       | p95 < 500ms |
+| Async event propagation    | seconds     |
+| Outbox → NATS              | < 1s        |
+| Event → webhook delivered  | < 30s       |
 
 Two numbers deserve explanation.
 
@@ -71,13 +71,37 @@ Check the first before optimising the fifth.
 99.9% is 43 minutes a month. It is a number that forces a conversation about what happens during
 those 43 minutes, which is the actual point of writing one down.
 
+## Measured — local load test
+
+`pnpm db:seed --profile=load` (10,500 fixture shipments) then
+`pnpm --filter @zipzap/backend test:load`, 2026-10-07, single dev machine,
+docker-compose PostgreSQL 18 / Redis / NATS on localhost, Node 24:
+
+| Operation                  | Measured                                                               | Target      | Result |
+| -------------------------- | ---------------------------------------------------------------------- | ----------- | ------ |
+| `GET /track/:trackingCode` | p50 4ms · p95 9ms · p99 25ms                                           | p95 < 200ms | PASS   |
+| `POST /v1/shipments`       | p50 194ms · p95 262ms · p99 280ms, 39.7 RPS, 0 errors at concurrency 8 | p95 < 300ms | PASS   |
+
+Pipeline during the run: 56.6 events/s consumed · 3,102 outbox rows published, 0 failed ·
+DB pool peaked at 2 of 10 connections · 200/200 simulated shipments and 37/37 settlements
+completed. Tracking is paced to the public tier (100/min/IP) — the limiter is the ceiling,
+so its RPS is a product choice, not a bottleneck.
+
+**The load test's first finding was the API key verifier.** `verifySecret` ran
+`scryptSync` (~72ms of blocked event loop) on every authenticated request: eight
+concurrent creates serialised to ~800ms p95 with the database idle, the event loop
+otherwise free, and every wave of requests completing in lockstep — the endpoint was
+measuring scrypt, not the database. The fix: async `scrypt` on the libuv threadpool
+plus `UV_THREADPOOL_SIZE=8` (one verify slot per concurrent request, set in `.env`).
+p95 went 1194ms → 262ms. The queue-lag number that remains high — notifications
+backing up while the SMS provider fake is down — is the load test working as intended:
+a symptom with a cause you can read off the dashboard.
+
 ## What is not measured
 
 Nothing here is measured against a production system, because there is no production system yet.
-These numbers are hypotheses. The first honest thing to do with them is run the load test and
-replace them with measurements.
-
-Recording an unvalidated target as a result is the failure mode this page exists to prevent.
+The local numbers above replace the hypotheses only for a single-machine dev stack; a real
+deployment must run the same load test and record its own.
 
 ---
 

@@ -338,8 +338,9 @@ describeIfDb('dashboard live counts', () => {
     assert.equal(counts.riders.offline, 1);
     assert.equal(counts.riders.suspended, 0);
 
-    // Hub: 6 seeded hubs, 0 backlog (no shipments are at hubs or sorting).
-    assert.equal(counts.hub.networkHubs, 6);
+    // Hubs: migration 0025 seeds 6; load profiles top the network up
+    // (docs/testing/fixtures.md), so the floor is the invariant, not the total.
+    assert.ok(counts.hub.networkHubs >= 6, `expected >= 6 hubs, got ${counts.hub.networkHubs}`);
     assert.equal(counts.hub.backlog, 0);
   });
 
