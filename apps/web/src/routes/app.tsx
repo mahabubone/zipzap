@@ -3,6 +3,7 @@ import { AppShell, Button, type NavGroup, type NavLinkRender } from '@zipzap/ui'
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api.ts';
 import { clearSession, readSession } from '../lib/session.ts';
+import { Logo } from '../lib/brand.tsx';
 import type { Principal } from '@zipzap/api-client';
 
 export const Route = createFileRoute('/app')({
@@ -74,7 +75,7 @@ function ConsoleLayout() {
 
   return (
     <AppShell
-      brand="ZipZap"
+      brand={<Logo />}
       nav={navFor(pathname)}
       renderLink={renderLink}
       sidebarFooter={
