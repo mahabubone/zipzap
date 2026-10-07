@@ -55,6 +55,21 @@ export class DeliveryRepository {
     return manager.getRepository(DeliveryJobEntity).save(entity);
   }
 
+  /** A rider's delivery jobs, newest first. */
+  async listByRider(
+    manager: EntityManager,
+    riderId: string,
+    take: number,
+  ): Promise<DeliveryJobEntity[]> {
+    return manager
+      .createQueryBuilder(DeliveryJobEntity, 'd')
+      .where('d.riderId = :riderId', { riderId })
+      .orderBy('d.createdAt', 'DESC')
+      .addOrderBy('d.id', 'DESC')
+      .take(take)
+      .getMany();
+  }
+
   /** Status counting. Each query owns only the `delivery` schema; the dashboard
    * aggregates many such single-schema reads — it never joins across schemas. */
   countByStatus(manager: EntityManager, status: DeliveryStatus): Promise<number> {

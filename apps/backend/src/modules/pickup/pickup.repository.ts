@@ -75,6 +75,21 @@ export class PickupRepository {
     return query.getMany();
   }
 
+  /** A rider's pickups, newest first. Total order (created_at, id) DESC, same as the merchant page. */
+  async listByRider(
+    manager: EntityManager,
+    riderId: string,
+    take: number,
+  ): Promise<PickupEntity[]> {
+    return manager
+      .createQueryBuilder(PickupEntity, 'p')
+      .where('p.riderId = :riderId', { riderId })
+      .orderBy('p.createdAt', 'DESC')
+      .addOrderBy('p.id', 'DESC')
+      .take(take)
+      .getMany();
+  }
+
   /** Status counting. Each query owns only the `pickup` schema; the dashboard
    * aggregates many such single-schema reads — it never joins across schemas. */
   countByStatus(manager: EntityManager, status: PickupStatus): Promise<number> {
