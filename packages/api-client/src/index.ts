@@ -45,8 +45,11 @@ export class ZipZapApiError extends Error {
 
 export interface ClientOptions {
   readonly baseUrl: string;
-  /** Sent as `Authorization: ApiKey <key_id>.<secret>`. */
-  readonly apiKey: string;
+  /** Sent as `Authorization: ApiKey <key_id>.<secret>` for machine principals. */
+  readonly apiKey?: string;
+  /** Sent as `Authorization: Bearer <token>` for human sessions. Exactly one of
+   *  apiKey / bearerToken must be set at call time; a client is single-principal. */
+  readonly bearerToken?: string;
   readonly fetchImpl?: typeof fetch;
 }
 
@@ -84,8 +87,11 @@ export class ZipZapClient {
   }
 
   private headers(extra?: Record<string, string>): Record<string, string> {
+    const authorization = this.options.bearerToken
+      ? `Bearer ${this.options.bearerToken}`
+      : `ApiKey ${this.options.apiKey ?? ''}`;
     return {
-      Authorization: `ApiKey ${this.options.apiKey}`,
+      Authorization: authorization,
       'Content-Type': 'application/json',
       ...extra,
     };
@@ -117,7 +123,10 @@ export class ZipZapClient {
         retryAfter ? Number(retryAfter) : null,
       );
     }
-    return { data: (await response.json()) as T, headers: response.headers };
+    return {
+      data: (response.status === 204 ? null : await response.json()) as T,
+      headers: response.headers,
+    };
   }
 
   /**
@@ -156,5 +165,28 @@ export class ZipZapClient {
       method: 'GET',
     });
     return data;
+  }
+
+  /** POST /v1/auth/login — email + scrypt password → 12h bearer session. */
+  async login(
+    email: string,
+    password: string,
+  ): Promise<{ token: string; expiresAt: string; tokenType: string }> {
+    const { data } = await this.request('/v1/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    });
+    return data as { token: string; expiresAt: string; tokenType: string };
+  }
+
+  /** GET /v1/me — what the server thinks this principal is. */
+  async getMe(): Promise<unknown> {
+    const { data } = await this.request('/v1/me', { method: 'GET' });
+    return data;
+  }
+
+  /** POST /v1/auth/logout — revoke the bearer session (204, idempotent). */
+  async logout(): Promise<void> {
+    await this.request('/v1/auth/logout', { method: 'POST' });
   }
 }

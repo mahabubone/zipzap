@@ -77,6 +77,10 @@ async function bootstrap(): Promise<void> {
   });
 
   app.enableShutdownHooks();
+  // Browsers need CORS; the API is also called server-to-server where CORS is
+  // irrelevant. WEB_ORIGIN pins the allowed origins in production; true
+  // reflects any origin for local dev only.
+  app.enableCors({ origin: process.env.WEB_ORIGIN ? process.env.WEB_ORIGIN.split(',') : true });
   await app.listen(port);
   new Logger('main').log(`api listening on :${port}`);
 }

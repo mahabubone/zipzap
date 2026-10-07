@@ -9,3 +9,4 @@ infra/compose/**/data
 # prettier rewrite would churn every quote on each regeneration.
 apps/backend/openapi.json
 packages/api-client/src/generated.d.ts
+apps/web/src/routeTree.gen.ts

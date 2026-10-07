@@ -123,6 +123,10 @@ process — import it.
   Entities `PascalCase`, fields `camelCase`, events `PastTense` (`ShipmentDelivered`).
 - **OpenAPI is generated** from controller decorators. `packages/api-client` is generated from
   it. Hand-editing either is a bug.
+- **`shots/` is the visual memory.** After any visible change (new screen, component variant,
+  layout shift), capture fresh shots — Storybook story iframes and real web routes — into
+  `shots/` with a short date-prefixed name. Check old ones in; they are the fastest way to see
+  what the product looks like without booting the stack.
 
 ## Before you commit
 
