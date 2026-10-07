@@ -24,6 +24,23 @@ snapshot:
 Each field is a sum/count over exactly one module's table — no field is synthesized from
 another module's data.
 
+## The operational report
+
+**Phase 6, rung 6.** `GET /v1/control-tower/report?from=yyyy-mm-dd&to=yyyy-mm-dd` (API-Key
+guarded, both dates inclusive, default last 30 days ending today) returns one payload with
+two time-views:
+
+- **Historical** — KPIs summed from the `analytics` projections over the day range
+  (shipments flow, delivery success rate, return rate, COD currency KPIs, rider work, hub
+  volume). Rates are `null` for an empty window, never `0` — see
+  [analytics.md](analytics.md).
+- **Live** — the point-in-time operational numbers (hub backlog, exceptions, rider counts,
+  pool utilisation), taken from the existing read contracts above, not re-implemented.
+
+The report reads projections through `ProjectionQueriesService` (owned by `AnalyticsModule`)
+and never touches a transactional schema. Deferred KPIs — duration metrics, first-attempt
+rate, settlement time — and why are documented in [analytics.md](analytics.md).
+
 ## Architecture
 
 **Cross-module reads, no cross-module writes or joins.** Each count is a single-schema

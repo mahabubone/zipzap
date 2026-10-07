@@ -77,6 +77,15 @@ hub backlog            = arrived, not dispatched
 exception rate         = exceptions / total shipments
 ```
 
+**Served by** `ProjectionQueriesService` (`projection-queries.service.ts`) — the read model
+behind `GET /v1/control-tower/report`. Rates with a zero denominator come back `null`, not
+`0`: a window with no traffic has no rate.
+
+**Not yet projected** (the report defers them): duration metrics (avg delivery time, pickup
+SLA, transit), first-attempt rate, settlement time — they need timestamps the projections do
+not carry yet. Upgrade path: payload timestamp enrichments plus accumulator columns, replayed
+through the same `project()` code path.
+
 ## Rebuild
 
 ```bash

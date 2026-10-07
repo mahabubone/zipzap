@@ -3,7 +3,9 @@
 Build order for ZipZap. Every phase has an **exit gate** — a check you can run, not a feeling. A
 phase is not done until its gate passes.
 
-**Last updated:** 2026-10-05 · **Phase 2 exit gate green** — flagship + failure stories, concurrent-scan race, all eight boxes ticked
+**Last updated:** 2026-10-07 · **Phase 6 rungs 1–6 shipped** — control tower, `/metrics`,
+analytics + rebuild, simulator + seed profiles, load harness with measured numbers replacing
+the performance hypotheses, operational report (projection KPIs + live snapshot)
 
 ---
 
@@ -28,13 +30,13 @@ file is the build view and is the one to follow when implementing.
 
 | Phase                      | Scope                                                         | State                                                                      |
 | -------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done, ⚠️ 1 open item                                                    |
+| **0 — Foundation**         | repo · docs · ADRs · infra · primitives · fakes               | ✅ done 2026-10-07 — PR workflow landed (`.github/workflows/ci.yml`)       |
 | **1 — Foundation domain**  | identity · merchant · shipment · tracking · pricing           | 🔄 in progress: pricing shipped, spine proven live                         |
 | **2 — Logistics**          | pickup · rider · hub · network · delivery · returns           | ✅ exit gate green 2026-10-05 (section boxes partly stale — audit pending) |
 | **3 — Finance**            | cod · ledger · settlement                                     | 🔄 in progress: collect→ledger→settle→approve live-proven                  |
 | **4 — Platform**           | public API · webhooks · bulk · notifications · risk · support | 🔄 exit gate green; risk + support scoped                                  |
-| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–2 done (coverage, geo, routes, manifests)                       |
-| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔲 scoped — build order recorded below                                     |
+| **5 — Advanced logistics** | routing · serviceability · rider optimisation · offline sync  | 🔄 rungs 1–3 done (coverage, geo, routes, manifests, SLA)                  |
+| **6 — Operations**         | control tower · analytics · simulation · load testing         | 🔄 rungs 1–6: load gate items green; reliability drills + desktop open     |
 
 **The spine: one shipment, end to end.**
 
@@ -145,12 +147,11 @@ Not "should work" — run and observed:
 | Scripted outage                               | 503, 503, 202                                                                                                         |
 | Both provider contracts                       | `+8801…` rejected · 2-recipient `T` rejected · Bangla segmented as UCS-2                                              |
 
-### ⚠️ Open item
+### ✅ Open item — closed
 
-- [ ] **CI workflow.** `.github/workflows/` does not exist. `pnpm verify` runs locally and is
-      green, but nothing enforces it on a pull request. This is the one gap between "Phase 0 is
-      designed" and "Phase 0 is complete". Until it exists, the phase gate below passes on a clean
-      clone but the _invariant_ is not protected against regression.
+- [x] **CI workflow.** `.github/workflows/ci.yml` runs on every PR and push to main:
+      format → boundaries grep → typecheck → unit → build → migration up/down/up against a
+      real Postgres (with PostGIS health check) → integration tests against Postgres + Redis + NATS service containers → OpenAPI contract artefact diff → API contract tests.
 
 ### ⛔ Deliberately not done in Phase 0
 
@@ -680,9 +681,12 @@ exists. Therefore:
 5. **Utilisation as a measured KPI, then optimised** — the box's own order. Measure with
    today's `rank()`; only then add workload/capacity signals and record before/after.
 
-### 🔲 Routing and serviceability
+### ✅ Routing and serviceability
 
-- [ ] Network routing: pickup zone → origin → regional → destination → delivery point
+- [x] Network routing: pickup zone → origin → regional → destination → delivery point
+      (migration `1759000000026` — `network.route_legs` with a fixed topology, two seeded
+      line-haul routes, three legs each; manifest lifecycle + reconciliation exception in the
+      same migration; `manifest-reconciliation.integration.test.ts` live-proven 2026-10-05)
 - [x] Timezone- and holiday-aware SLA. **Asia/Dhaka**, with cutoff times and a holiday calendar.
       (1759000000027: `network.holidays` + `network.zone_cutoffs`; `NetworkService.estimateDelivery`
       normalizes `now` to Asia/Dhaka — past 18:00 pickup cutoff slides to the next business day,
@@ -695,13 +699,16 @@ exists. Therefore:
 - [ ] Workload and capacity-aware assignment
 - [ ] Utilisation as a measured KPI, then optimised — **in that order**
 
-### 🔲 Offline rider mode
+### 🔲 Offline rider mode — server contract done, device app not started
 
+- [x] **Server contract**: command queue ordered by `created_at`, a command invalidated while
+      offline is **rejected explicitly** with a recorded reason and a `RiderCommandRejected`
+      event — never silently dropped (migration `1759000000028`;
+      `offline-sync.integration.test.ts` proves ordered replay, stale `expected_state`
+      rejection, and idempotent acks)
 - [ ] Local-first app: every mutating action goes through the local queue, not just the last few
 - [ ] Durable local storage with its own integrity story — a cleared cache loses queued scans
-- [ ] Ordered replay by `created_at`; a command that is no longer valid is **rejected explicitly**
-      and reported back to the device. Silently dropping it leaves the rider believing a scan
-      succeeded that did not.
+      (the server half of this is the ordered replay above; the device half needs the app)
 - [ ] Storage cap and alert — a device offline indefinitely grows without bound
 
 ### Exit gate
@@ -718,80 +725,103 @@ exists. Therefore:
 
 Running it at volume, and proving it.
 
-**Build order (scoped 2026-10-05)** — ground truth: no `analytics` schema, no `/metrics`,
-no desktop shell exist yet. Therefore:
+**Build order (re-scoped 2026-10-07; original scoping 2026-10-05)** — rungs 1–6 shipped.
+The original scoping assumed no `analytics` schema and no `/metrics`; both now exist, and the
+operational report was added as rung 6. Therefore:
 
-1. **Control tower live counts** first — cross-module read contracts only (each module
+1. ✅ **Control tower live counts** first — cross-module read contracts only (each module
    exposes its own counts; nobody joins across schemas). This is the simultaneity
    demonstration the architecture exists for, and it needs no new tables.
-2. **`/metrics` on three entrypoints** — cards its own box, and every later alert links to
+2. ✅ **`/metrics` on three entrypoints** — cards its own box, and every later alert links to
    a dashboard built from it. Cardinality rule enforced at the collector.
-3. **Analytics schema + `analytics:rebuild`** — projections fed by events only; the rebuild
+3. ✅ **Analytics schema + `analytics:rebuild`** — projections fed by events only; the rebuild
    command is the acceptance test that they are not authoritative by accident.
-4. **Simulator** through the real state machine and real outbox (never direct status
-   writes), then **seed profiles** `demo`/`load` deterministic from a fixed seed.
-5. **Reliability drills** (docs/operations/reliability.md) induced and asserted, then
-   **replace the performance hypotheses** with measured numbers.
-6. **`apps/desktop` last** — UI over a console that is already proven; building it earlier
+4. ✅ **Simulator** through the real state machine and real outbox (never direct status
+   writes), then **seed profiles** `demo`/`load` from fixed volumes.
+5. ✅ **Load harness** — **replace the performance hypotheses** with measured numbers
+   ([docs/operations/performance.md](docs/operations/performance.md)).
+6. ✅ **Operational report** — projection KPIs + live snapshot behind one read-only endpoint.
+7. 🔲 **Reliability drills** ([docs/operations/reliability.md](docs/operations/reliability.md))
+   induced and asserted.
+8. 🔲 **`apps/desktop` last** — UI over a console that is already proven; building it earlier
    would demo a projection nobody trusts.
 
-### 🔲 Control tower
+### ⚠️ Control tower — live counts shipped; map, actions, desktop open
 
-- [ ] Live counts: today's shipments, active pickups, in transit, at hub, out for delivery,
+- [x] Live counts: today's shipments, active pickups, in transit, at hub, out for delivery,
       delivered, failed, returned, COD outstanding, riders online, hub backlog
+      (`dashboard.integration.test.ts` — seeded counts, delivered increments, hub backlog)
 - [ ] Live map of hubs, riders, destinations
 - [ ] Actions: inspect, assign pickup, assign/reassign rider, transfer, hold, release, initiate
       return, inspect attempt, inspect COD, raise a ticket
-- [ ] `apps/desktop` Electron shell over the console
+- [ ] `apps/desktop` Electron shell over the console (does not exist yet — `apps/` holds
+      `backend` only)
 
-### 🔲 Analytics
+### ⚠️ Analytics — projections, rebuild and KPI docs shipped; money labelling + search open
 
-- [ ] Projections fed by events, fed by nothing else
-- [ ] **Rebuildable from scratch.** `analytics:rebuild` must work. If it does not, the projection
+- [x] Projections fed by events, fed by nothing else
+      (`analytics.integration.test.ts` — every event shape projects; redelivery changes nothing)
+- [x] **Rebuildable from scratch.** `analytics:rebuild` must work. If it does not, the projection
       has become authoritative by accident, and that is the bug to fix first.
-- [ ] KPIs with their formulas and their source events documented
+      (rebuild tests: honours `--from`, 1970 replays whole history, malformed `--from` rejected,
+      count reproduced from the outbox alone)
+- [x] KPIs with their formulas and their source events documented
+      (`docs/domains/analytics.md` — formula per KPI, sourced events listed)
 - [ ] Every dashboard showing a money figure says so, or reads from finance
 - [ ] PostgreSQL search first; a search cluster only when measured insufficient
+      (`pg_trgm`/`tsvector` decided in `docs/domains/analytics.md`, not yet in a migration)
 
-### 🔲 Simulation and seed
+### ⚠️ Simulation and seed — simulator + profiles shipped; seed not deterministic yet
 
-- [ ] `simulate shipment ZP-8F32A1 --scenario <name>`
-- [ ] Scenarios: `delivered` · `failed-then-delivered` · `customer-refused` · `returned` · `lost`
-      · `damaged`
-- [ ] The simulator goes through the **real state machine and the real outbox.** A simulator that
+- [x] `simulate shipment ZP-8F32A1 --scenario <name>` (`src/simulate.ts`)
+- [x] Scenarios: `delivered` · `failed-then-delivered` · `customer-refused` · `returned` · `lost`
+      · `damaged` (all six in `SCENARIOS`)
+- [x] The simulator goes through the **real state machine and the real outbox.** A simulator that
       writes statuses directly can demo a transition the product cannot perform.
+      (`simulation.integration.test.ts` asserts outbox rows per scenario, never a direct write)
 - [ ] Seed profiles: `demo` (small) and `load` (100 merchants, 1,000 customers, 100 riders,
-      20 hubs, 10,000 shipments), deterministic from a fixed seed
+      20 hubs, 10,000 shipments), deterministic from a fixed seed — profiles exist with exactly
+      those volumes (`scripts/seed.mjs`), but ids come from `randomUUID`, so runs are **not**
+      deterministic yet
 
-### 🔲 Observability maturity
+### ⚠️ Observability maturity — `/metrics` + cardinality shipped; dashboards + alerts open
 
-- [ ] `/metrics` on all three entrypoints
+- [x] `/metrics` on all three entrypoints (`src/common/metrics.ts` wired into `main.ts`,
+      `worker.ts`, `publisher.ts`; contract asserted in `metrics.spec.ts`)
 - [ ] Dashboards: API, database, eventing, workers, business, operations
 - [ ] Alerts on symptoms, not causes: `outbox_pending`, `nats_consumer_lag` growing, 5xx rate,
       pool saturation, job failures, **and COD collection dropping to ~0 in business hours** —
       a business outage no 5xx rate will show
-- [ ] Metric cardinality controlled: never label by shipment id, rider id, request id, or a URL
-      containing an id
+- [x] Metric cardinality controlled: never label by shipment id, rider id, request id, or a URL
+      containing an id (`labelNames` fixed at the collector; SQL classified into bounded
+      operation buckets — `metrics.spec.ts`)
 - [ ] Every alert links to a dashboard
 
-### 🔲 Load testing
+### ⚠️ Load testing — track + create measured; full phase list open
 
 - [ ] Shipment creation · tracking · merchant dashboard · bulk import · webhook processing
-- [ ] Measure RPS, p50/p95/p99, DB utilisation, queue lag, event processing rate
-- [ ] **Replace the targets in [docs/operations/performance.md](docs/operations/performance.md)
+      (harness phases today: `tracking` · `create` · `simulate` · `settle`)
+- [x] Measure RPS, p50/p95/p99, DB utilisation, queue lag, event processing rate
+      (measured table in `docs/operations/performance.md`, 2026-10-07)
+- [x] **Replace the targets in [docs/operations/performance.md](docs/operations/performance.md)
       with measurements.** Those numbers are currently hypotheses, and the first honest thing to do
-      with them is run this test.
+      with them is run this test. — done for track + create on a dev stack; the doc's
+      "What is not measured" section keeps the scope caveat honest
 
 ### Exit gate
 
 - [ ] A new engineer clones, seeds, and reproduces both the flagship and failure stories **from
       the docs alone**, in under 30 minutes
-- [ ] `analytics:rebuild` reproduces every projection exactly
+- [x] `analytics:rebuild` reproduces every projection exactly
+      (`analytics.integration.test.ts` — rebuild reproduces counts from the outbox alone;
+      honours `--from`; full-history replay)
 - [ ] Every reliability scenario in [docs/operations/reliability.md](docs/operations/reliability.md)
       induced and asserted: Postgres down, Redis down, NATS down, publisher killed, worker killed,
       duplicate event, duplicate request, rider reconnect, duplicate settlement
-- [ ] Performance targets replaced by measured numbers
-- [ ] `pnpm verify` green
+- [ ] Performance targets replaced by measured numbers — track + create measured
+      (2026-10-07); query and propagation targets in `docs/operations/performance.md` are still
+      hypotheses
+- [x] `pnpm verify` green
 
 ---
 
@@ -815,12 +845,18 @@ These run across phases rather than inside one.
 
 ### CI/CD
 
-- [ ] ⚠️ **Pull request workflow** — the one open Phase 0 item
-- [ ] Format → lint → typecheck → unit → integration → build → container → security scan
-- [ ] Integration tests with Testcontainers: Postgres, Redis, NATS
-- [ ] Module-boundary grep enforced in CI, not just documented
-- [ ] Migration applied and rolled back in CI against a real database
-- [ ] Container build and a deploy path to a single VPS
+- [x] ⚠️ **Pull request workflow** — the one open Phase 0 item — closed: `.github/workflows/ci.yml`
+      runs on `pull_request` and `push` to main
+- [ ] Format → lint → typecheck → unit → integration → build → container → security scan — all
+      present except lint: there is deliberately no ESLint yet (see AGENTS.md)
+- [ ] Integration tests with Testcontainers: Postgres, Redis, NATS — CI runs them against
+      service containers (PostGIS/Redis/NATS images) instead; the Testcontainers strategy in
+      `docs/testing/strategy.md` is not what the code does today
+- [x] Module-boundary grep enforced in CI, not just documented ("Module boundaries" step)
+- [x] Migration applied and rolled back in CI against a real database ("Migration up and down"
+      step — a migration that cannot roll back cannot be deployed safely)
+- [ ] Container build and a deploy path to a single VPS — build is in CI (`docker build` +
+      build-push-action, `push: false`); no deploy path yet
 
 ### Security
 

@@ -646,6 +646,127 @@
         ]
       }
     },
+    "/v1/riders/{riderId}/sync": {
+      "get": {
+        "operationId": "RiderSyncController_pull",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinceSeq",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Pull pending commands for an offline rider",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
+    "/v1/riders/{riderId}/sync/ack": {
+      "post": {
+        "operationId": "RiderSyncController_ack",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Acknowledge one queued command",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
+    "/v1/riders/{riderId}/utilisation": {
+      "get": {
+        "operationId": "UtilisationController_riderUtilisation",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rider's current load factor",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
+    "/v1/riders/pool-utilisation": {
+      "get": {
+        "operationId": "UtilisationController_poolUtilisation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Pool-wide rider utilisation KPI",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
     "/v1/deliveries/{id}/attempts": {
       "post": {
         "operationId": "RecordAttemptController_record",
@@ -1152,6 +1273,57 @@
           "returns"
         ]
       }
+    },
+    "/v1/control-tower/live-counts": {
+      "get": {
+        "operationId": "DashboardController_getLiveCounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Live network counts, one snapshot in time",
+        "tags": [
+          "control-tower"
+        ]
+      }
+    },
+    "/v1/control-tower/report": {
+      "get": {
+        "operationId": "ReportController_getReport",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: last 30 days.",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today.",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Operational KPI report: projection ranges plus live snapshot",
+        "tags": [
+          "control-tower"
+        ]
+      }
     }
   },
   "info": {
@@ -1466,6 +1638,17 @@
         "required": [
           "displayName",
           "phone"
+        ]
+      },
+      "AckDto": {
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandId"
         ]
       },
       "RecordAttemptDto": {

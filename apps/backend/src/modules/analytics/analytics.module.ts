@@ -10,10 +10,11 @@
 import { Module } from '@nestjs/common';
 import { forModule } from '../../database/module-connection.ts';
 import { AnalyticsConsumer } from './analytics.consumer.ts';
+import { ProjectionQueriesService } from './projection-queries.service.ts';
 
 @Module({
   imports: [forModule('analytics', [])],
-  providers: [AnalyticsConsumer],
-  exports: [AnalyticsConsumer],
+  providers: [AnalyticsConsumer, ProjectionQueriesService],
+  exports: [AnalyticsConsumer, ProjectionQueriesService],
 })
 export class AnalyticsModule {}

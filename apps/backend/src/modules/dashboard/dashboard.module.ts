@@ -10,6 +10,7 @@
  */
 
 import { Module } from '@nestjs/common';
+import { AnalyticsModule } from '../analytics/analytics.module.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 import { PickupModule } from '../pickup/pickup.module.ts';
 import { DeliveryModule } from '../delivery/delivery.module.ts';
@@ -19,9 +20,12 @@ import { HubModule } from '../hub/hub.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 import { DashboardService } from './dashboard.service.ts';
 import { DashboardController } from './dashboard.controller.ts';
+import { ReportService } from './report.service.ts';
+import { ReportController } from './report.controller.ts';
 
 @Module({
   imports: [
+    AnalyticsModule,
     ShipmentModule,
     PickupModule,
     DeliveryModule,
@@ -30,8 +34,8 @@ import { DashboardController } from './dashboard.controller.ts';
     HubModule,
     IdentityModule,
   ],
-  providers: [DashboardService],
-  controllers: [DashboardController],
+  providers: [DashboardService, ReportService],
+  controllers: [DashboardController, ReportController],
   exports: [DashboardService],
 })
 export class DashboardModule {}

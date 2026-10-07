@@ -381,6 +381,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/riders/{riderId}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pull pending commands for an offline rider */
+        get: operations["RiderSyncController_pull"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/riders/{riderId}/sync/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge one queued command */
+        post: operations["RiderSyncController_ack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/riders/{riderId}/utilisation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rider's current load factor */
+        get: operations["UtilisationController_riderUtilisation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/riders/pool-utilisation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pool-wide rider utilisation KPI */
+        get: operations["UtilisationController_poolUtilisation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/deliveries/{id}/attempts": {
         parameters: {
             query?: never;
@@ -621,6 +689,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/control-tower/live-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live network counts, one snapshot in time */
+        get: operations["DashboardController_getLiveCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/control-tower/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operational KPI report: projection ranges plus live snapshot */
+        get: operations["ReportController_getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -697,6 +799,9 @@ export interface components {
             displayName: string;
             phone: string;
             capacity?: number;
+        };
+        AckDto: {
+            commandId: string;
         };
         RecordAttemptDto: {
             /** @enum {string} */
@@ -1243,6 +1348,89 @@ export interface operations {
             };
         };
     };
+    RiderSyncController_pull: {
+        parameters: {
+            query?: {
+                sinceSeq?: string;
+                limit?: string;
+            };
+            header?: never;
+            path: {
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RiderSyncController_ack: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AckDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UtilisationController_riderUtilisation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UtilisationController_poolUtilisation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     RecordAttemptController_record: {
         parameters: {
             query?: never;
@@ -1582,6 +1770,45 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DashboardController_getLiveCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReportController_getReport: {
+        parameters: {
+            query?: {
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: last 30 days. */
+                from?: string;
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
