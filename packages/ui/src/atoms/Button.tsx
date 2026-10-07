@@ -1,13 +1,14 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { cx } from '../lib/cx.ts';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive';
 type Size = 'sm' | 'md';
 
 const variants: Record<Variant, string> = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50',
   secondary: 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
   ghost: 'text-slate-600 hover:bg-slate-100',
+  destructive: 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50',
 };
 
 const sizes: Record<Size, string> = {
