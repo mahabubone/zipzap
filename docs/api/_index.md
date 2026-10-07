@@ -26,13 +26,14 @@ bug — they are both outputs of the controller decorators.
 
 ## Core endpoints
 
-Status as of 2026-10-05 — ✅ live, 🔲 named but not built:
+Status as of 2026-10-07 — ✅ live, 🔲 named but not built:
 
 ```
 POST   /v1/shipments                        ✅ create (Idempotency-Key required)
 GET    /v1/shipments                        ✅ cursor-paginated list
 GET    /v1/shipments/:id                    ✅ detail, own merchant only
 POST   /v1/shipments/:id/cancel             ✅ validated cancel (CANCELLED is terminal)
+POST   /v1/shipments/:id/exception          ✅ report LOST / DAMAGED through the state machine
 POST   /v1/shipments/bulk/upload            ✅ async upload → preview checkpoint
 POST   /v1/shipments/bulk/accept            ✅ accept → 100-row chunks
 GET    /v1/shipments/bulk/:jobId            ✅ progress
@@ -51,6 +52,12 @@ GET    /v1/cod                              ✅ cursor-paginated list (`cod:read
 GET    /v1/settlements                      ✅ cursor-paginated list
 GET    /v1/webhooks                         ✅ list own endpoints (bounded, unpaginated)
 POST   /v1/webhooks                         ✅ register (secret returned once)
+POST   /v1/hubs/scans                       ✅ hub state machine gestures (inbound→sort→outbound→departed→arrived)
+GET    /v1/coverage?zone=…                  ✅ serviceability check before shipment create
+GET    /v1/me                               ✅ authenticated principal, for client nav
+POST   /v1/auth/login                       ✅ human bearer session (email + password)
+POST   /v1/api-keys                         ✅ mint a scoped machine credential (secret shown once)
+GET    /track/:trackingCode/events          ✅ SSE stream of live timeline events
 ```
 
 Deliberate non-endpoints (not gaps — decisions):

@@ -7,7 +7,10 @@ The paying customer. Phase 1.
 ## Owns
 
 `merchant` schema: `merchants`, `users`, `branches`, `addresses`, `contracts`,
-`pricing_profiles`, `settlement_accounts`, `api_credentials`, `webhooks`.
+`pricing_profiles`, `settlement_accounts`, `api_credentials`, `webhooks`, `sessions`.
+
+`sessions` (bearer tokens for human login) and `merchants.password_hash` shipped 2026-10-07
+(migration 0031). A merchant with a NULL password hash cannot log in.
 
 ## Lifecycle
 

@@ -4,6 +4,7 @@ import { TrackingEventEntity } from './tracking-event.entity.ts';
 import { PublicTimelineEntity } from './public-timeline.entity.ts';
 import { AppendTrackingEventService } from './append-tracking-event.service.ts';
 import { TrackingConsumer } from './tracking.consumer.ts';
+import { TrackingFanout } from './tracking-fanout.ts';
 import { PublicTrackingController } from './public-tracking.controller.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 
@@ -16,7 +17,7 @@ import { ShipmentModule } from '../shipment/shipment.module.ts';
     forwardRef(() => ShipmentModule),
   ],
   controllers: [PublicTrackingController],
-  providers: [AppendTrackingEventService, TrackingConsumer],
-  exports: [AppendTrackingEventService, TrackingConsumer],
+  providers: [AppendTrackingEventService, TrackingConsumer, TrackingFanout],
+  exports: [AppendTrackingEventService, TrackingConsumer, TrackingFanout],
 })
 export class TrackingModule {}

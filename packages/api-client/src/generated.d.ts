@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The authenticated principal */
+        get: operations["MeController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log in with email + password, returns a bearer session token */
+        post: operations["LoginController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks": {
         parameters: {
             query?: never;
@@ -118,6 +152,40 @@ export interface paths {
         put?: never;
         /** Replay a terminal delivery with a fresh delivery id */
         post: operations["WebhookController_replayDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a scoped API key (secret shown once) */
+        post: operations["CreateApiKeyController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/track/{trackingCode}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live timeline events for one tracking code (SSE) */
+        get: operations["PublicTrackingController_events"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -261,6 +329,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/shipments/{id}/exception": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report a LOST or DAMAGED exception for one of your shipments */
+        post: operations["ReportExceptionController_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pricing/quote": {
         parameters: {
             query?: never;
@@ -321,6 +406,23 @@ export interface paths {
         };
         /** List your COD records, newest first */
         get: operations["ListCodRecordsController_listCodRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Serviceability check for one zone */
+        get: operations["CoverageController_coverage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -689,6 +791,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hubs/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a hub scan for a shipment */
+        post: operations["HubScanController_scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/control-tower/live-counts": {
         parameters: {
             query?: never;
@@ -727,10 +846,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        LoginDto: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
         CreateWebhookDto: {
             /** Format: uri */
             url: string;
             events: string[];
+        };
+        CreateApiKeyDto: {
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "keys:manage")[];
         };
         CreateShipmentDto: {
             senderName: string;
@@ -756,6 +883,11 @@ export interface components {
         };
         AcceptBulkDto: {
             jobId: string;
+        };
+        ReportExceptionDto: {
+            /** @enum {string} */
+            reason: "LOST" | "DAMAGED";
+            note?: string | null;
         };
         QuoteDto: {
             weightGrams: number;
@@ -837,6 +969,13 @@ export interface components {
             approverId: string;
             note: string;
         };
+        HubScanDto: {
+            /** Format: uuid */
+            shipmentId: string;
+            /** @enum {string} */
+            scan: "INBOUND" | "SORT" | "OUTBOUND" | "DEPARTED" | "ARRIVED";
+            hubCode?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -873,6 +1012,44 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeController_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    LoginController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -987,6 +1164,46 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CreateApiKeyController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApiKeyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PublicTrackingController_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trackingCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1174,6 +1391,29 @@ export interface operations {
             };
         };
     };
+    ReportExceptionController_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportExceptionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PricingController_quote: {
         parameters: {
             query?: never;
@@ -1244,6 +1484,25 @@ export interface operations {
             query?: {
                 limit?: string;
                 cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoverageController_coverage: {
+        parameters: {
+            query: {
+                zone: string;
             };
             header?: never;
             path?: never;
@@ -1768,6 +2027,27 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    HubScanController_scan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HubScanDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {

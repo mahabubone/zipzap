@@ -3,7 +3,9 @@ import { forModule } from '../../database/module-connection.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 import { TrackingModule } from '../tracking/tracking.module.ts';
 import { HubScanService } from './hub-scan.service.ts';
+import { HubScanController } from './hub-scan.controller.ts';
 import { HubRepository } from './hub.repository.ts';
+import { IdentityModule } from '../identity/identity.module.ts';
 
 /**
  * hub — the `hub` schema owner. Rung 2b shipped the `hubs` table (migration
@@ -15,8 +17,9 @@ import { HubRepository } from './hub.repository.ts';
  * Staff, capacity and schedules arrive with their first consumer.
  */
 @Module({
-  imports: [forModule('hub', []), ShipmentModule, TrackingModule],
+  imports: [forModule('hub', []), ShipmentModule, TrackingModule, IdentityModule],
   providers: [HubScanService, HubRepository],
+  controllers: [HubScanController],
   exports: [HubScanService, HubRepository],
 })
 export class HubModule {}

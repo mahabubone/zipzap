@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AuthenticateApiKeyService, FIND_CREDENTIAL } from './authenticate-api-key.service.ts';
+import { MerchantAuthService } from '../merchant/sessions.service.ts';
 import { hashSecret } from '../../common/secret.ts';
 
 /**
@@ -38,7 +39,14 @@ describe('AuthenticateApiKeyService', () => {
   beforeEach(async () => {
     credentials = { findByKeyId: vi.fn(), touchLastUsed: vi.fn() };
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthenticateApiKeyService, { provide: FIND_CREDENTIAL, useValue: credentials }],
+      providers: [
+        AuthenticateApiKeyService,
+        { provide: FIND_CREDENTIAL, useValue: credentials },
+        {
+          provide: MerchantAuthService,
+          useValue: { authenticateToken: vi.fn().mockResolvedValue(null) },
+        },
+      ],
     }).compile();
     auth = module.get(AuthenticateApiKeyService);
   });

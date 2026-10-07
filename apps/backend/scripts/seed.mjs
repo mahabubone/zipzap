@@ -63,6 +63,7 @@ async function seed() {
     'returns:read',
     'returns:write',
     'cod:read',
+    'keys:manage',
   ];
 
   const runTag = Date.now().toString(36);
@@ -71,12 +72,21 @@ async function seed() {
   const merchantId = randomUUID();
   const keyId = generateKeyId();
   const secret = `sk_${createHash('sha256').update(String(Date.now())).digest('base64url').slice(0, 32)}`;
+  const password = `pp_${createHash('sha256')
+    .update(String(Date.now()) + 'password')
+    .digest('base64url')
+    .slice(0, 24)}`;
 
   await client.query('BEGIN');
   await client.query(
-    `INSERT INTO merchant.merchants (id, name, status, contact_email)
-     VALUES ($1, $2, 'ACTIVE', $3)`,
-    [merchantId, `Ayesha Fashion Ltd (${runTag})`, `ops+${runTag}@ayesha.test`],
+    `INSERT INTO merchant.merchants (id, name, status, contact_email, password_hash)
+     VALUES ($1, $2, 'ACTIVE', $3, $4)`,
+    [
+      merchantId,
+      `Ayesha Fashion Ltd (${runTag})`,
+      `ops+${runTag}@ayesha.test`,
+      hashSecret(password),
+    ],
   );
   await client.query(
     `INSERT INTO merchant.api_credentials (id, merchant_id, key_id, secret_hash, scopes)
@@ -90,8 +100,11 @@ async function seed() {
   console.log(`merchant_id : ${merchantId}`);
   console.log(`key_id      : ${keyId}`);
   console.log(`secret      : ${secret}`);
+  console.log(`email       : ops+${runTag}@ayesha.test`);
+  console.log(`password    : ${password}`);
   console.log();
   console.log('Authorization: ApiKey <key_id>.<secret>');
+  console.log('Login:       POST /v1/auth/login { email, password }');
 }
 
 async function seedProfile(counts, name, runTag, credentialMerchantId) {
@@ -238,7 +251,9 @@ async function seedProfile(counts, name, runTag, credentialMerchantId) {
   );
   console.log();
   console.log(`profile     : ${name}`);
-  console.log(`merchants   : ${counts.merchants} this run (${credentialMerchantId} carries the credential)`);
+  console.log(
+    `merchants   : ${counts.merchants} this run (${credentialMerchantId} carries the credential)`,
+  );
   console.log(`riders      : ${counts.riders}`);
   console.log(`hubs        : ${hubRows[0].n} now (${hubShortfall} added)`);
   console.log(`customers   : ${counts.customers} recipient identities`);

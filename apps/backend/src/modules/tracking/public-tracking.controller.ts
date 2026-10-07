@@ -8,11 +8,14 @@
  * transaction, this projection is built by the consumer a beat later.
  */
 
-import { Controller, Get, NotFoundException, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, NotFoundException, Param, Sse, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
+import { Observable, filter, map } from 'rxjs';
+import type { MessageEvent } from '@nestjs/common';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
+import { TrackingFanout } from './tracking-fanout.ts';
 
 interface TimelineRow {
   sequence: number;
@@ -23,7 +26,26 @@ interface TimelineRow {
 @ApiTags('tracking')
 @Controller('track')
 export class PublicTrackingController {
-  constructor(@InjectDataSource('tracking') private readonly tracking: DataSource) {}
+  constructor(
+    @InjectDataSource('tracking') private readonly tracking: DataSource,
+    @Inject(TrackingFanout) private readonly fanout: TrackingFanout,
+  ) {}
+
+  @Sse(':trackingCode/events')
+  @UseGuards(new RateLimitGuard('public', false))
+  @ApiOperation({ summary: 'Live timeline events for one tracking code (SSE)' })
+  events(@Param('trackingCode') trackingCode: string): Observable<MessageEvent> {
+    return this.fanout.observable().pipe(
+      filter((event) => event.trackingCode === trackingCode),
+      map((event) => ({
+        data: {
+          sequence: event.sequence,
+          event: event.event,
+          occurredAt: event.occurredAt,
+        },
+      })),
+    );
+  }
 
   @Get(':trackingCode')
   @UseGuards(new RateLimitGuard('public', false))

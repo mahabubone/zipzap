@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TrackingConsumer } from './tracking.consumer.ts';
+import { TrackingFanout } from './tracking-fanout.ts';
 import { ShipmentLookup, SHIPMENT_LOOKUP } from '../shipment/shipment.lookup.ts';
 
 /**
@@ -62,6 +63,7 @@ describe('TrackingConsumer dispatch', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrackingConsumer,
+        TrackingFanout,
         { provide: SHIPMENT_LOOKUP, useValue: lookup },
         { provide: 'trackingDataSource', useValue: trackingDs },
       ],
@@ -73,7 +75,7 @@ describe('TrackingConsumer dispatch', () => {
     if (module) {
       consumer = module.get(TrackingConsumer);
     } else {
-      consumer = new TrackingConsumer(trackingDs as never, lookup);
+      consumer = new TrackingConsumer(trackingDs as never, lookup, new TrackingFanout());
     }
   });
 

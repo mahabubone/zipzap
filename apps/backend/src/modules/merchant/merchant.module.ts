@@ -14,6 +14,9 @@ import { WebhookReplayService } from './webhook-replay.service.ts';
 import { WebhookController } from './webhook.controller.ts';
 import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
+import { MerchantAuthService } from './sessions.service.ts';
+import { CreateApiKeyService } from './create-api-key.service.ts';
+import { CreateApiKeyController } from './create-api-key.controller.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
 /** The shared BullMQ root connection, created on first use — never at import
@@ -55,7 +58,7 @@ export class BullConnectionCloser implements OnModuleDestroy {
     }),
     BullModule.registerQueue({ name: WEBHOOK_QUEUE }),
   ],
-  controllers: [WebhookController],
+  controllers: [WebhookController, CreateApiKeyController],
   providers: [
     FindCredentialService,
     WebhookRepository,
@@ -64,7 +67,9 @@ export class BullConnectionCloser implements OnModuleDestroy {
     WebhookConsumer,
     WebhookProcessor,
     BullConnectionCloser,
+    MerchantAuthService,
+    CreateApiKeyService,
   ],
-  exports: [FindCredentialService],
+  exports: [FindCredentialService, MerchantAuthService],
 })
 export class MerchantModule {}

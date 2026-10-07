@@ -24,6 +24,7 @@ import type { DataSource } from 'typeorm';
 import { consumeOnce } from '../system/consume-once.ts';
 import { SHIPMENT_LOOKUP, type ShipmentLookup } from '../shipment/shipment.lookup.ts';
 import type { TrackingEventType } from './rules/tracking-event.ts';
+import { TrackingFanout } from './tracking-fanout.ts';
 
 export const TRACKING_CONSUMER = 'tracking';
 
@@ -67,6 +68,7 @@ export class TrackingConsumer {
   constructor(
     @InjectDataSource('tracking') private readonly tracking: DataSource,
     @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
+    @Inject(TrackingFanout) private readonly fanout: TrackingFanout,
   ) {}
 
   async handle(message: { subject: string; payload: Uint8Array }): Promise<ConsumeOutcomeResult> {
@@ -92,6 +94,11 @@ export class TrackingConsumer {
       this.logger.warn({ type: envelope.type }, 'event carries no shipment identity');
       return 'ignored';
     }
+
+    // Events to broadcast after the projection commits. Filled inside the
+    // transaction callback, published only on success — a failed transaction
+    // must never fan out a timeline row that isn't in the read model.
+    const projected: { trackingCode: string; sequence: number; eventType: string }[] = [];
 
     try {
       const outcome = await consumeOnce(
@@ -132,6 +139,12 @@ export class TrackingConsumer {
                 envelope.occurredAt,
               ],
             );
+
+            projected.push({
+              trackingCode: projection.trackingCode,
+              sequence,
+              eventType: projection.eventType,
+            });
           }
         },
       );
@@ -139,6 +152,15 @@ export class TrackingConsumer {
       if (outcome === 'duplicate') {
         // Not an error: at-least-once means this is expected, and the claim is the proof.
         this.logger.debug({ eventId: envelope.id }, 'duplicate event skipped');
+      } else {
+        for (const row of projected) {
+          this.fanout.publish({
+            trackingCode: row.trackingCode,
+            sequence: row.sequence,
+            event: row.eventType,
+            occurredAt: envelope.occurredAt,
+          });
+        }
       }
       return outcome;
     } catch (error) {

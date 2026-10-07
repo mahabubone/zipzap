@@ -21,6 +21,7 @@ export const API_SCOPES = [
   'settlements:read',
   'settlements:approve',
   'webhooks:manage',
+  'keys:manage',
 ] as const;
 
 export type ApiScope = (typeof API_SCOPES)[number];

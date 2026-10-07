@@ -10,22 +10,42 @@ import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { AuthenticationRequiredError, PermissionDeniedError } from '../../common/domain-error.ts';
 import { verifySecret } from '../../common/secret.ts';
+import { API_SCOPES, type ApiScope } from '../../common/scopes.ts';
 import { canAcceptShipments } from '../merchant/rules/merchant.ts';
 import { FindCredentialService } from '../merchant/find-credential.service.ts';
+import { MerchantAuthService } from '../merchant/sessions.service.ts';
 import type { ApiPrincipal } from './rules/api-principal.ts';
-import type { ApiScope } from '../../common/scopes.ts';
 
 export const FIND_CREDENTIAL = Symbol('FIND_CREDENTIAL');
 
 @Injectable()
 export class AuthenticateApiKeyService {
   constructor(
-    // Injected merchant service, not merchant's repository. The seam is the point.
+    // Injected merchant services, not merchant's repository. The seam is the point.
     @Inject(FIND_CREDENTIAL) private readonly credentials: FindCredentialService,
+    @Inject(MerchantAuthService) private readonly sessions: MerchantAuthService,
   ) {}
 
   async authenticate(header: string | undefined): Promise<ApiPrincipal> {
     const denied = new AuthenticationRequiredError();
+
+    // Human: Bearer <session token>. Machine: ApiKey <key_id>.<secret>.
+    // Never interchangeable — an API key cannot open a console, and
+    // a console token cannot call integrations.
+    if (header?.startsWith('Bearer ')) {
+      const token = header.slice('Bearer '.length).trim();
+      const session = token.length > 0 ? await this.sessions.authenticateToken(token) : null;
+      if (!session) throw denied;
+      return {
+        kind: 'human',
+        subjectId: session.merchantId,
+        merchantId: session.merchantId,
+        scopes: [...API_SCOPES],
+        credentialId: session.id,
+        rateLimitPerMin: session.rateLimitPerMin,
+      };
+    }
+
     if (!header?.startsWith('ApiKey ')) throw denied;
 
     const presented = header.slice('ApiKey '.length).trim();

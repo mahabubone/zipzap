@@ -2,15 +2,26 @@
 
 Two principals, two mechanisms, never interchangeable.
 
-|            | Human                      | Machine               |
-| ---------- | -------------------------- | --------------------- |
-| Credential | session cookie / JWT       | API key + secret      |
-| Used by    | every console, rider app   | merchant integrations |
-| Stored     | hashed password (argon2id) | hashed secret         |
-| Scoped to  | roles → permissions        | a merchant + scopes   |
+|            | Human                                      | Machine               |
+| ---------- | ------------------------------------------ | --------------------- |
+| Credential | bearer session token (`merchant.sessions`) | API key + secret      |
+| Endpoint   | `POST /v1/auth/login` (email + password)   | `POST /v1/api-keys`   |
+| Used by    | every console, rider app                   | merchant integrations |
+| Stored     | hashed password (scrypt), hashed token     | hashed secret         |
+| Scoped to  | the merchant, all scopes                   | a merchant + scopes   |
+| Expiry     | 12h absolute, revocable server-side        | until revoked         |
+
+`argon2id` was the stated plan; scrypt is what the code actually ships everywhere already
+(`common/secret.ts`). One KDF, versioned hash format, parameters raiseable later — that was
+the 2026-10-07 call. `ponytail:` roles granularity comes when a non-merchant human principal
+(support agent) has a table to hang them on.
 
 A merchant API key must never open a browser session, and a support agent's session must never
 work as an integration credential. Separate mechanisms, separate storage, separate revocation.
+
+Human tokens carry no role granularity yet: a successful login returns a principal with every
+scope in the current vocabulary, including `keys:manage`. That only holds while the first
+console is the merchant's own; the first non-merchant human is the trigger to constrain it.
 
 ---
 
