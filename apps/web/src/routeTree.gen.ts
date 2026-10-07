@@ -12,6 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppShipmentsRouteImport } from './routes/app/shipments'
+import { Route as AppTrackRouteImport } from './routes/app/track'
+import { Route as AppShipmentsIdRouteImport } from './routes/app/shipments.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,34 +32,86 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShipmentsRoute = AppShipmentsRouteImport.update({
+  id: '/shipments',
+  path: '/shipments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrackRoute = AppTrackRouteImport.update({
+  id: '/track',
+  path: '/track',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppShipmentsIdRoute = AppShipmentsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppShipmentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/track': typeof AppTrackRoute
+  '/app/': typeof AppIndexRoute
+  '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
   '/login': typeof LoginRoute
+  '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/track': typeof AppTrackRoute
+  '/app': typeof AppIndexRoute
+  '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/app': typeof AppRoute
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/track': typeof AppTrackRoute
+  '/app/': typeof AppIndexRoute
+  '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/login'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/shipments'
+    | '/app/track'
+    | '/app/'
+    | '/app/shipments/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app' | '/login'
-  id: '__root__' | '/' | '/app' | '/login'
+  to:
+    | '/'
+    | '/login'
+    | '/app/shipments'
+    | '/app/track'
+    | '/app'
+    | '/app/shipments/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/shipments'
+    | '/app/track'
+    | '/app/'
+    | '/app/shipments/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AppRoute: typeof AppRoute
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -82,12 +138,66 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/shipments': {
+      id: '/app/shipments'
+      path: '/shipments'
+      fullPath: '/app/shipments'
+      preLoaderRoute: typeof AppShipmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/track': {
+      id: '/app/track'
+      path: '/track'
+      fullPath: '/app/track'
+      preLoaderRoute: typeof AppTrackRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/shipments/$id': {
+      id: '/app/shipments/$id'
+      path: '/$id'
+      fullPath: '/app/shipments/$id'
+      preLoaderRoute: typeof AppShipmentsIdRouteImport
+      parentRoute: typeof AppShipmentsRoute
+    }
   }
 }
 
+interface AppShipmentsRouteChildren {
+  AppShipmentsIdRoute: typeof AppShipmentsIdRoute
+}
+
+const AppShipmentsRouteChildren: AppShipmentsRouteChildren = {
+  AppShipmentsIdRoute: AppShipmentsIdRoute,
+}
+
+const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
+  AppShipmentsRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppShipmentsRoute: typeof AppShipmentsRouteWithChildren
+  AppTrackRoute: typeof AppTrackRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppShipmentsRoute: AppShipmentsRouteWithChildren,
+  AppTrackRoute: AppTrackRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AppRoute: AppRoute,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

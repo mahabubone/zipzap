@@ -25,52 +25,79 @@ export interface AppShellProps {
   readonly sidebarFooter?: ReactNode;
   /** Label for the skip link; keep it short and specific. */
   readonly skipLabel?: string;
+  /** Replace the nav's plain `<a>` with your router's Link — without this every
+   *  nav click is a full document reload. Omit it for a plain-anchor shell. */
+  readonly renderLink?: NavLinkRender;
   readonly children: ReactNode;
 }
+
+export type NavLinkRender = (link: {
+  readonly href: string;
+  readonly className: string;
+  readonly children: ReactNode;
+  readonly 'aria-current'?: 'page';
+  /** Fires on click — the shell uses it to close the mobile drawer. */
+  readonly onNavigate: () => void;
+}) => ReactNode;
 
 function NavLink({
   item,
   collapsed,
   onNavigate,
+  renderLink,
 }: {
   readonly item: NavItem;
   readonly collapsed: boolean;
   readonly onNavigate: () => void;
+  readonly renderLink?: NavLinkRender;
 }) {
+  const className = cx(
+    'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition',
+    item.active
+      ? 'bg-brand-500/10 font-medium text-brand-700'
+      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+  );
+  const activeBar = item.active ? (
+    <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-600" />
+  ) : null;
+  const content = collapsed ? (
+    <>
+      <span aria-hidden className="flex size-5 shrink-0 items-center justify-center text-slate-400">
+        {item.icon ?? item.label.charAt(0)}
+      </span>
+      <span className="sr-only">{item.label}</span>
+    </>
+  ) : (
+    <>
+      {item.icon ?? null}
+      {activeBar}
+      <span className="flex-1 truncate">{item.label}</span>
+      {item.badge ? <span className="shrink-0">{item.badge}</span> : null}
+    </>
+  );
+
+  if (renderLink) {
+    return (
+      <>
+        {renderLink({
+          href: item.href,
+          className,
+          children: content,
+          'aria-current': item.active ? 'page' : undefined,
+          onNavigate,
+        })}
+      </>
+    );
+  }
   return (
     <a
       href={item.href}
       aria-current={item.active ? 'page' : undefined}
       title={collapsed ? item.label : undefined}
       onClick={onNavigate}
-      className={cx(
-        'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition',
-        item.active
-          ? 'bg-brand-500/10 font-medium text-brand-700'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-      )}
+      className={className}
     >
-      {item.active ? (
-        <span aria-hidden className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-600" />
-      ) : null}
-      {collapsed ? (
-        <span
-          aria-hidden
-          className="flex size-5 shrink-0 items-center justify-center text-slate-400"
-        >
-          {item.icon ?? item.label.charAt(0)}
-        </span>
-      ) : (
-        (item.icon ?? null)
-      )}
-      {collapsed ? (
-        <span className="sr-only">{item.label}</span>
-      ) : (
-        <>
-          <span className="flex-1 truncate">{item.label}</span>
-          {item.badge ? <span className="shrink-0">{item.badge}</span> : null}
-        </>
-      )}
+      {content}
     </a>
   );
 }
@@ -89,6 +116,7 @@ export function AppShell({
   topbar,
   sidebarFooter,
   skipLabel = 'Skip to content',
+  renderLink,
   children,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -146,6 +174,7 @@ export function AppShell({
                     item={item}
                     collapsed={collapsed}
                     onNavigate={closeMobile}
+                    renderLink={renderLink}
                   />
                 ))}
               </div>

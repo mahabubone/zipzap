@@ -52,6 +52,7 @@ export {
   type AppShellProps,
   type NavItem,
   type NavGroup,
+  type NavLinkRender,
 } from './organisms/AppShell.tsx';
 export { DataTable, type DataTableProps, type DataTableColumn } from './organisms/DataTable.tsx';
 export { FilterBar, type FilterBarProps } from './organisms/FilterBar.tsx';

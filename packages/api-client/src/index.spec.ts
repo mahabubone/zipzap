@@ -11,6 +11,36 @@
 import { describe, expect, it } from 'vitest';
 import { ZipZapApiError, ZipZapClient, type components } from './index.js';
 
+describe('default fetch binding', () => {
+  it('survives a browser that rejects an unbound fetch', async () => {
+    // A browser `fetch` called with the wrong `this` throws "Illegal
+    // invocation" — which is what a bare `fetch` stored on the instance is.
+    // Simulated here: the stub throws unless the receiver is globalThis.
+    const original = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = function strictFetch(this: unknown) {
+      if (this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      called = true;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ data: [], pagination: { nextCursor: null, hasMore: false } }),
+      });
+    } as unknown as typeof fetch;
+
+    try {
+      const client = new ZipZapClient({ baseUrl: 'http://api.test', apiKey: 'k.s' });
+      await client.listShipments();
+      expect(called).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
 function stubFetch(
   respond: (
     url: string,
@@ -74,7 +104,7 @@ describe('ZipZapClient', () => {
       status: 200,
       body: {
         data: [{ id: 's-1' }],
-        pagination: { next_cursor: 'abc', has_more: true },
+        pagination: { nextCursor: 'abc', hasMore: true },
       },
     }));
     const page = await client.listShipments({ limit: '1' });
@@ -130,7 +160,9 @@ describe('ZipZapClient', () => {
       body: {
         trackingCode: 'ZP-X',
         status: 'SHIPMENT_CREATED',
-        timeline: [{ sequence: 1, event: 'SHIPMENT_CREATED', occurredAt: '2026-10-07T16:39:47.869Z' }],
+        timeline: [
+          { sequence: 1, event: 'SHIPMENT_CREATED', occurredAt: '2026-10-07T16:39:47.869Z' },
+        ],
       },
     }));
     const tracking = await client.track('ZP-X');

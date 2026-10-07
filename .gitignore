@@ -12,6 +12,9 @@ export/
 # Turbo
 .turbo/
 
+# TanStack Start dev cache
+.tanstack/
+
 # Test output
 coverage/
 

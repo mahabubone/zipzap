@@ -1,5 +1,13 @@
 @import 'tailwindcss';
 
+/* Tailwind v4 scans for class names starting at the directory holding this
+ * file. That is packages/ui/src, so without these it never sees the consuming
+ * app's markup and ships a stylesheet of theme variables with no utilities —
+ * which looks like unstyled HTML. Add a source line per app that renders
+ * @zipzap/ui. */
+@source '../src';
+@source '../../../apps/web/src';
+
 @theme {
   --color-brand-500: #2563eb;
   --color-brand-600: #1d4ed8;

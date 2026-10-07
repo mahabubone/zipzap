@@ -1,23 +1,52 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { AppShell, Button } from '@zipzap/ui';
+import { Link, createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
+import { AppShell, Button, type NavGroup, type NavLinkRender } from '@zipzap/ui';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api.ts';
 import { clearSession, readSession } from '../lib/session.ts';
+import type { Principal } from '@zipzap/api-client';
 
 export const Route = createFileRoute('/app')({
-  component: App,
+  component: ConsoleLayout,
 });
 
-function App() {
+/** One place decides which nav item is lit, so a new screen only adds a link. */
+const LINKS = [
+  { label: 'Control tower', href: '/app' },
+  { label: 'Shipments', href: '/app/shipments' },
+  { label: 'Track parcel', href: '/app/track' },
+] as const;
+
+function navFor(pathname: string): NavGroup[] {
+  return [
+    {
+      label: 'Operate',
+      items: LINKS.map((l) => ({
+        ...l,
+        // `/app` must not light up for `/app/shipments`.
+        active: l.href === '/app' ? pathname === '/app' : pathname.startsWith(l.href),
+      })),
+    },
+  ];
+}
+
+function ConsoleLayout() {
   const navigate = useNavigate();
-  const [me, setMe] = useState<string>('');
+  const { pathname } = useLocation();
+  const [principal, setPrincipal] = useState<Principal | null>(null);
 
   useEffect(() => {
-    if (!readSession()) void navigate({ to: '/login' });
+    if (!readSession()) {
+      void navigate({ to: '/login' });
+      return;
+    }
     apiClient()
       .getMe()
-      .then((principal) => setMe(JSON.stringify(principal, null, 2)))
-      .catch((e: unknown) => setMe(e instanceof Error ? e.message : 'Unauthorized'));
+      .then(setPrincipal)
+      .catch(() => {
+        // Expired or revoked token — the session is worthless, so drop it.
+        clearSession();
+        void navigate({ to: '/login' });
+      });
   }, [navigate]);
 
   async function logout() {
@@ -29,22 +58,37 @@ function App() {
     }
   }
 
+  // The shell renders plain anchors; without this every nav click is a full
+  // document reload and the console loses its session-scoped state.
+  const renderLink: NavLinkRender = ({
+    href,
+    className,
+    children,
+    'aria-current': ariaCurrent,
+    onNavigate,
+  }) => (
+    <Link to={href} className={className} aria-current={ariaCurrent} onClick={onNavigate}>
+      {children}
+    </Link>
+  );
+
   return (
     <AppShell
       brand="ZipZap"
-      nav={[{ items: [{ label: 'Console', href: '/app', active: true }] }]}
-      topbar={
-        <div className="flex justify-end">
-          <Button variant="secondary" size="sm" onClick={logout}>
-            Sign out
-          </Button>
-        </div>
+      nav={navFor(pathname)}
+      renderLink={renderLink}
+      sidebarFooter={
+        principal ? (
+          <div className="flex flex-col gap-2">
+            <p className="truncate text-xs text-slate-500">{principal.subjectId}</p>
+            <Button variant="secondary" size="sm" onClick={logout}>
+              Sign out
+            </Button>
+          </div>
+        ) : null
       }
     >
-      <p className="mb-4 text-sm text-slate-500">Your principal, straight from the API.</p>
-      <pre className="overflow-auto rounded-lg border border-slate-200 bg-white p-4 text-xs">
-        {me || 'Loading…'}
-      </pre>
+      <Outlet />
     </AppShell>
   );
 }

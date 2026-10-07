@@ -125,17 +125,69 @@ export interface PublicTracking {
   }>;
 }
 
-/** GET /v1/control-tower/live-counts. Money arrives as a decimal string — the
- *  controller serialises bigint there; see its comment for why. */
+/** GET /v1/control-tower/live-counts — one snapshot of the whole network.
+ *
+ *  `outstandingAmountMinor` arrives as a decimal string: the controller
+ *  serialises a bigint there, because a poisha amount past 2^53 would lose
+ *  precision as a JSON number. Parse it only at the point of display. */
 export interface LiveCounts {
   readonly timestamp: string;
-  readonly shipments: Readonly<Record<string, number | Readonly<Record<string, number>>>>;
-  readonly pickups: Readonly<Record<string, number | Readonly<Record<string, number>>>>;
-  readonly deliveries: Readonly<Record<string, number | Readonly<Record<string, number>>>>;
-  readonly cod: Readonly<
-    Record<string, number | string | Readonly<Record<string, number>>>
-  > & { readonly outstandingAmountMinor: string };
-  readonly riders: Readonly<Record<string, number | Readonly<Record<string, number>>>>;
+  readonly shipments: {
+    readonly total: number;
+    readonly todayNew: number;
+    readonly inTransit: number;
+    readonly atHub: number;
+    readonly sorting: number;
+    readonly outForDelivery: number;
+    readonly delivered: number;
+    readonly failed: number;
+    readonly returned: number;
+    readonly returning: number;
+    readonly cancelled: number;
+    readonly onHold: number;
+    readonly lostOrDamaged: number;
+    readonly exception: number;
+    readonly byStatus: Readonly<Record<string, number>>;
+  };
+  readonly pickups: {
+    readonly total: number;
+    readonly active: number;
+    readonly pending: number;
+    readonly completed: number;
+    readonly failed: number;
+    readonly expired: number;
+    readonly cancelled: number;
+    readonly byStatus: Readonly<Record<string, number>>;
+  };
+  readonly deliveries: {
+    readonly total: number;
+    readonly outForDelivery: number;
+    readonly attempted: number;
+    readonly attemptsRemaining: number;
+    readonly failed: number;
+    readonly delivered: number;
+    readonly byStatus: Readonly<Record<string, number>>;
+  };
+  readonly cod: {
+    readonly total: number;
+    readonly expected: number;
+    readonly outstanding: number;
+    /** Integer minor units, decimal-string encoded. */
+    readonly outstandingAmountMinor: string;
+    readonly byStatus: Readonly<Record<string, number>>;
+  };
+  readonly riders: {
+    readonly total: number;
+    readonly online: number;
+    readonly available: number;
+    readonly offline: number;
+    readonly suspended: number;
+    readonly byStatus: Readonly<Record<string, number>>;
+  };
+  readonly hub: {
+    readonly backlog: number;
+    readonly networkHubs: number;
+  };
 }
 
 function errorEnvelopeOf(body: unknown, status: number): ApiErrorEnvelope {
@@ -156,7 +208,9 @@ export class ZipZapClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: ClientOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bound, because a bare `fetch` invoked as a method of this class loses its
+    // `this` and the browser throws "Illegal invocation".
+    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
   }
 
   private headers(extra?: Record<string, string>): Record<string, string> {
@@ -227,27 +281,28 @@ export class ZipZapClient {
   async listShipments(query?: ListQuery): Promise<Page<ShipmentSummary>> {
     const { data } = await this.request<{
       data: ShipmentSummary[];
-      pagination: { next_cursor: string | null; has_more: boolean };
+      pagination: { nextCursor: string | null; hasMore: boolean };
     }>('/v1/shipments', { method: 'GET', query: query as Record<string, string | undefined> });
     return {
       data: data.data,
-      nextCursor: data.pagination.next_cursor,
-      hasMore: data.pagination.has_more,
+      nextCursor: data.pagination.nextCursor,
+      hasMore: data.pagination.hasMore,
     };
   }
 
   /** GET /v1/shipments/:id — one of your shipments. */
   async getShipment(id: string): Promise<ShipmentDetail> {
-    const { data } = await this.request<ShipmentDetail>(
-      `/v1/shipments/${encodeURIComponent(id)}`,
-      { method: 'GET' },
-    );
+    const { data } = await this.request<ShipmentDetail>(`/v1/shipments/${encodeURIComponent(id)}`, {
+      method: 'GET',
+    });
     return data;
   }
 
   /** GET /v1/control-tower/live-counts — the control tower snapshot. */
   async liveCounts(): Promise<LiveCounts> {
-    const { data } = await this.request<LiveCounts>('/v1/control-tower/live-counts', { method: 'GET' });
+    const { data } = await this.request<LiveCounts>('/v1/control-tower/live-counts', {
+      method: 'GET',
+    });
     return data;
   }
 
