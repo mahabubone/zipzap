@@ -11,7 +11,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsIn } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { CreateApiKeyService } from './create-api-key.service.ts';
+import { CreateApiKeyService } from './create-api-key.service';
 import { API_SCOPES, type ApiScope } from '../../common/scopes.ts';
 
 export class CreateApiKeyDto {
