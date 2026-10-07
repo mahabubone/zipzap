@@ -34,6 +34,8 @@ GET    /v1/shipments                        ✅ cursor-paginated list
 GET    /v1/shipments/:id                    ✅ detail, own merchant only
 POST   /v1/shipments/:id/cancel             ✅ validated cancel (CANCELLED is terminal)
 POST   /v1/shipments/:id/exception          ✅ report LOST / DAMAGED through the state machine
+POST   /v1/shipments/:id/hold               ✅ park an interruptible shipment (ON_HOLD)
+POST   /v1/shipments/:id/release            ✅ resume the state hold interrupted
 POST   /v1/shipments/bulk/upload            ✅ async upload → preview checkpoint
 POST   /v1/shipments/bulk/accept            ✅ accept → 100-row chunks
 GET    /v1/shipments/bulk/:jobId            ✅ progress
@@ -56,8 +58,10 @@ POST   /v1/hubs/scans                       ✅ hub state machine gestures (inbo
 GET    /v1/coverage?zone=…                  ✅ serviceability check before shipment create
 GET    /v1/me                               ✅ authenticated principal, for client nav
 POST   /v1/auth/login                       ✅ human bearer session (email + password)
+POST   /v1/auth/logout                      ✅ revoke the current bearer session (204)
 POST   /v1/api-keys                         ✅ mint a scoped machine credential (secret shown once)
 GET    /track/:trackingCode/events          ✅ SSE stream of live timeline events
+GET    /v1/riders/:riderId/jobs             ✅ a rider's pickup and delivery jobs, newest first
 ```
 
 Deliberate non-endpoints (not gaps — decisions):

@@ -63,6 +63,17 @@ Every row in the matrix involving "duplicate" or "retry" is handled by the same 
 [../api/idempotency.md](../api/idempotency.md). That is why it is mandatory on COD collection
 and settlement approval — those are the retries that move money.
 
+## Inventory
+
+`test/integration/reliability-drills.integration.test.ts` asserts rows 1, 3, 4
+(NATS-outbox, Postgres-503 classification, duplicate-event claim, worker-down
+Redis persistence) against real Postgres and Redis. Redis-down fail
+closed/open is pinned by `rate-limit.guard.spec.ts`; idempotency replay by
+`shipment-create.integration.test.ts`; duplicate settlement by
+`money-path.integration.test.ts`; rider-reconnect duplicates by
+`offline-sync`. 503 mapping itself lives in `common/exception.filter.ts`
+(`isDependencyFailure`).
+
 ## Recovery
 
 **Postgres.** Fail fast on connection acquisition, return 503 with `Retry-After`. Do not queue

@@ -5,6 +5,7 @@ import { FindCredentialService } from '../merchant/find-credential.service.ts';
 import { ApiKeyGuard } from './api-key.guard.ts';
 import { MeController } from './me.controller.ts';
 import { LoginController } from './login.controller.ts';
+import { LogoutController } from './logout.controller.ts';
 
 /**
  * identity registers NO TypeORM connection in this slice, because it owns no tables.
@@ -25,6 +26,6 @@ import { LoginController } from './login.controller.ts';
   // and is instantiated at the decorator site with `new ScopeGuard('shipments:write')`; listing
   // it here makes Nest try to inject a string, which it cannot resolve.
   exports: [AuthenticateApiKeyService, ApiKeyGuard],
-  controllers: [MeController, LoginController],
+  controllers: [MeController, LoginController, LogoutController],
 })
 export class IdentityModule {}

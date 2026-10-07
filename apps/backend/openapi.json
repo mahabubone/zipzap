@@ -71,6 +71,26 @@
         ]
       }
     },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "LogoutController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke the current bearer session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/webhooks": {
       "get": {
         "operationId": "WebhookController_list",
@@ -517,6 +537,64 @@
           }
         },
         "summary": "Report a LOST or DAMAGED exception for one of your shipments",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/{id}/hold": {
+      "post": {
+        "operationId": "HoldReleaseController_hold",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Put one of your shipments on hold (pauses movement)",
+        "tags": [
+          "shipments"
+        ]
+      }
+    },
+    "/v1/shipments/{id}/release": {
+      "post": {
+        "operationId": "HoldReleaseController_release",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Release a held shipment back to its interrupted state",
         "tags": [
           "shipments"
         ]
@@ -1496,6 +1574,38 @@
           "control-tower"
         ]
       }
+    },
+    "/v1/riders/{riderId}/jobs": {
+      "get": {
+        "operationId": "RiderJobsController_jobs",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A rider's pickup and delivery jobs, newest first",
+        "tags": [
+          "riders"
+        ]
+      }
     }
   },
   "info": {
@@ -1708,6 +1818,16 @@
         "required": [
           "reason"
         ]
+      },
+      "HoldDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
       },
       "QuoteDto": {
         "type": "object",

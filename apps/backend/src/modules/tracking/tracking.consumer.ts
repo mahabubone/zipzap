@@ -50,6 +50,8 @@ export const TRACKING_EVENT_MAP = {
   ReturnAdvanced: 'RETURN_INITIATED',
   ReturnCompleted: 'RETURNED',
   ShipmentExceptionRaised: 'EXCEPTION_RAISED',
+  ShipmentHeld: 'SHIPMENT_HELD',
+  ShipmentReleased: 'SHIPMENT_RELEASED',
 } as const satisfies Record<string, TrackingEventType>;
 
 /** Events with no public projection. Emitted for operations, not for recipients. */

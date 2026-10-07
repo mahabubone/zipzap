@@ -60,6 +60,13 @@ export class MerchantAuthService {
     return { token, expiresAt };
   }
 
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.merchant.query(
+      `UPDATE merchant.sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`,
+      [sessionId],
+    );
+  }
+
   async authenticateToken(token: string): Promise<SessionRow | null> {
     const rows = await this.merchant.query(
       `SELECT s.id, s.merchant_id, s.revoked_at, s.expires_at, m.status, m.rate_limit_per_min

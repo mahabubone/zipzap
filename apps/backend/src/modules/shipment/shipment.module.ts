@@ -23,6 +23,8 @@ import { ShipmentDetailController } from './shipment-detail.controller.ts';
 import { CancelShipmentService } from './cancel-shipment.service.ts';
 import { ReportExceptionService } from './report-exception.service.ts';
 import { ReportExceptionController } from './report-exception.controller.ts';
+import { HoldReleaseService } from './hold-release.service.ts';
+import { HoldReleaseController } from './hold-release.controller.ts';
 import { ShipmentAdvanceService } from './advance-shipment.service.ts';
 
 @Module({
@@ -44,12 +46,14 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
     ShipmentDetailController,
     BulkImportController,
     ReportExceptionController,
+    HoldReleaseController,
   ],
   providers: [
     ShipmentRepository,
     CreateShipmentService,
     CancelShipmentService,
     ReportExceptionService,
+    HoldReleaseService,
     ListShipmentsService,
     AppendTrackingEventService,
     ShipmentAdvanceService,

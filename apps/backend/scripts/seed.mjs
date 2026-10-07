@@ -5,6 +5,7 @@
  *   node dist/database/cli.js seed                     # credential only (default)
  *   node dist/database/cli.js seed --profile=demo      # +  20 merchants,  500 shipments
  *   node dist/database/cli.js seed --profile=load      # + 100 merchants, 10000 shipments
+ *   node dist/database/cli.js seed --profile=demo --seed=42   # reproducible fixtures
  *
  * The secret is generated and PRINTED once — it is stored only as a hash, so there is no way to
  * recover it afterwards. That is the intended behaviour, not an inconvenience.
@@ -38,6 +39,40 @@ if (profile !== null && !PROFILES[profile]) {
   process.exit(1);
 }
 
+const seedArg = process.argv.find((a) => a.startsWith('--seed='))?.slice('--seed='.length);
+if (seedArg !== undefined && !/^\d+$/.test(seedArg)) {
+  console.error(`--seed must be a non-negative integer, got "${seedArg}"`);
+  process.exit(1);
+}
+
+// Fixed-seed PRNG (mulberry32): same --seed + same starting DB state → identical
+// fixtures, so demos and load runs are reproducible and diffable. Default stays
+// time-based so a plain run never collides with a previous one.
+function mulberry32(a) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rng = seedArg === undefined ? null : mulberry32(Number(seedArg));
+const newId = () => (rng ? uuidFromRng(rng) : randomUUID());
+function uuidFromRng(r) {
+  const bytes = Array.from({ length: 16 }, () => Math.floor(r() * 256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const h = bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+const newCode = () =>
+  rng
+    ? `ZP-${Array.from({ length: 10 }, () => Math.floor(rng() * 16).toString(16))
+        .join('')
+        .toUpperCase()}`
+    : `ZP-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+
 const client = new pg.Client({ connectionString: url });
 await client.connect();
 
@@ -66,7 +101,7 @@ async function seed() {
     'keys:manage',
   ];
 
-  const runTag = Date.now().toString(36);
+  const runTag = rng ? `s${Number(seedArg).toString(36)}` : Date.now().toString(36);
 
   // --- credential merchant (always) ----------------------------------------
   const merchantId = randomUUID();
@@ -108,6 +143,9 @@ async function seed() {
 }
 
 async function seedProfile(counts, name, runTag, credentialMerchantId) {
+  // Shadow the crypto import: every fixture id/code below flows from the PRNG
+  // when --seed is given, and from crypto.randomUUID otherwise.
+  const randomUUID = newId;
   const merchantIds = [credentialMerchantId];
 
   // Merchants (the credential merchant is profile merchant #1).
@@ -192,7 +230,7 @@ async function seedProfile(counts, name, runTag, credentialMerchantId) {
     for (let j = 0; j < size; j++) {
       const i = start + j;
       const id = randomUUID();
-      const code = `ZP-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+      const code = newCode();
       const recipient = customers[i % customers.length];
       const merchant = merchantIds[i % merchantIds.length];
       const createdAt = new Date(now - (i % 14) * 86_400_000 - (i % 24) * 3_600_000);

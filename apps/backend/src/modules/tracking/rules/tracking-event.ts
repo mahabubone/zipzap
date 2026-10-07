@@ -26,6 +26,10 @@ export const TRACKING_EVENT_TYPES = [
   // a parcel that vanishes from the tracking page is a lie by omission.
   'EXCEPTION_RAISED',
   'EVENT_CORRECTED',
+  // Merchant pause/resume gestures — a held parcel must appear on tracking,
+  // or the customer sees a silent gap.
+  'SHIPMENT_HELD',
+  'SHIPMENT_RELEASED',
 ] as const;
 
 export type TrackingEventType = (typeof TRACKING_EVENT_TYPES)[number];
