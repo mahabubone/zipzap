@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button, Input } from '@zipzap/ui';
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { Logo } from '../lib/brand.tsx';
 import { MERCHANT_WEB_URL } from '../lib/apps.ts';
 
@@ -13,7 +13,7 @@ function TrackLookup() {
   const navigate = useNavigate();
   const [code, setCode] = useState('');
 
-  function submit(e: FormEvent) {
+  function submit(e: SubmitEvent) {
     e.preventDefault();
     const trimmed = code.trim().toUpperCase();
     if (trimmed) void navigate({ to: '/track/$trackingCode', params: { trackingCode: trimmed } });
