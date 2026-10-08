@@ -14,7 +14,8 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppShipmentsRouteImport } from './routes/app/shipments'
-import { Route as AppTrackRouteImport } from './routes/app/track'
+import { Route as TrackIndexRouteImport } from './routes/track.index'
+import { Route as TrackTrackingCodeRouteImport } from './routes/track.$trackingCode'
 import { Route as AppShipmentsIdRouteImport } from './routes/app/shipments.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -42,10 +43,15 @@ const AppShipmentsRoute = AppShipmentsRouteImport.update({
   path: '/shipments',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTrackRoute = AppTrackRouteImport.update({
-  id: '/track',
-  path: '/track',
-  getParentRoute: () => AppRoute,
+const TrackIndexRoute = TrackIndexRouteImport.update({
+  id: '/track/',
+  path: '/track/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackTrackingCodeRoute = TrackTrackingCodeRouteImport.update({
+  id: '/track/$trackingCode',
+  path: '/track/$trackingCode',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppShipmentsIdRoute = AppShipmentsIdRouteImport.update({
   id: '/$id',
@@ -58,16 +64,18 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/app/shipments': typeof AppShipmentsRouteWithChildren
-  '/app/track': typeof AppTrackRoute
+  '/track/$trackingCode': typeof TrackTrackingCodeRoute
   '/app/': typeof AppIndexRoute
+  '/track/': typeof TrackIndexRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/app/shipments': typeof AppShipmentsRouteWithChildren
-  '/app/track': typeof AppTrackRoute
+  '/track/$trackingCode': typeof TrackTrackingCodeRoute
   '/app': typeof AppIndexRoute
+  '/track': typeof TrackIndexRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRoutesById {
@@ -76,8 +84,9 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/app/shipments': typeof AppShipmentsRouteWithChildren
-  '/app/track': typeof AppTrackRoute
+  '/track/$trackingCode': typeof TrackTrackingCodeRoute
   '/app/': typeof AppIndexRoute
+  '/track/': typeof TrackIndexRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
 }
 export interface FileRouteTypes {
@@ -87,16 +96,18 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/app/shipments'
-    | '/app/track'
+    | '/track/$trackingCode'
     | '/app/'
+    | '/track/'
     | '/app/shipments/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/app/shipments'
-    | '/app/track'
+    | '/track/$trackingCode'
     | '/app'
+    | '/track'
     | '/app/shipments/$id'
   id:
     | '__root__'
@@ -104,8 +115,9 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/app/shipments'
-    | '/app/track'
+    | '/track/$trackingCode'
     | '/app/'
+    | '/track/'
     | '/app/shipments/$id'
   fileRoutesById: FileRoutesById
 }
@@ -113,6 +125,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  TrackTrackingCodeRoute: typeof TrackTrackingCodeRoute
+  TrackIndexRoute: typeof TrackIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,12 +166,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppShipmentsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/track': {
-      id: '/app/track'
+    '/track/': {
+      id: '/track/'
       path: '/track'
-      fullPath: '/app/track'
-      preLoaderRoute: typeof AppTrackRouteImport
-      parentRoute: typeof AppRoute
+      fullPath: '/track/'
+      preLoaderRoute: typeof TrackIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/$trackingCode': {
+      id: '/track/$trackingCode'
+      path: '/track/$trackingCode'
+      fullPath: '/track/$trackingCode'
+      preLoaderRoute: typeof TrackTrackingCodeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/shipments/$id': {
       id: '/app/shipments/$id'
@@ -183,13 +204,11 @@ const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppShipmentsRoute: typeof AppShipmentsRouteWithChildren
-  AppTrackRoute: typeof AppTrackRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppShipmentsRoute: AppShipmentsRouteWithChildren,
-  AppTrackRoute: AppTrackRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -199,6 +218,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  TrackTrackingCodeRoute: TrackTrackingCodeRoute,
+  TrackIndexRoute: TrackIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -14,7 +14,6 @@ export const Route = createFileRoute('/app')({
 const LINKS = [
   { label: 'Control tower', href: '/app' },
   { label: 'Shipments', href: '/app/shipments' },
-  { label: 'Track parcel', href: '/app/track' },
 ] as const;
 
 function navFor(pathname: string): NavGroup[] {

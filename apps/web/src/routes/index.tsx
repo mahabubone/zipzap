@@ -27,11 +27,18 @@ function Home() {
       <header className="border-b border-slate-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
-          <Link to="/login">
-            <Button variant="secondary" size="sm">
-              Sign in
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/track">
+              <Button variant="ghost" size="sm">
+                Track a parcel
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button variant="secondary" size="sm">
+                Sign in
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -47,12 +54,12 @@ function Home() {
             operating system, for merchants, riders and delivery teams.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/login">
-              <Button>Open your console</Button>
+            <Link to="/track">
+              <Button>Track a parcel</Button>
             </Link>
-            <a href="#how">
-              <Button variant="secondary">See how it works</Button>
-            </a>
+            <Link to="/login">
+              <Button variant="secondary">Open your console</Button>
+            </Link>
           </div>
         </section>
 
@@ -106,11 +113,17 @@ function Home() {
             Ready to see your own network?
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-slate-600">
-            Sign in to the console for live counts, your shipments and parcel tracking.
+            Sign in to the console for live counts, your shipments and cash-on-delivery. No account?
+            Every parcel has a public tracking page.
           </p>
-          <Link to="/login" className="mt-8 inline-block">
-            <Button>Open your console</Button>
-          </Link>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link to="/login" className="inline-block">
+              <Button>Open your console</Button>
+            </Link>
+            <Link to="/track" className="inline-block">
+              <Button variant="secondary">Track a parcel</Button>
+            </Link>
+          </div>
         </section>
       </main>
 

@@ -75,7 +75,7 @@ exists as a package. This is the single biggest gap in the repo. Note that none 
 | Operations Control Tower | `apps/frontends/control-tower`     | 🔴 folded into `apps/web`                    |
 | Hub Console              | `apps/frontends/hub-console`       | 🔴                                           |
 | Rider Mobile             | `apps/mobile-rider`                | 🔴                                           |
-| Customer Tracking        | `apps/frontends/customer-tracking` | 🟡 public `/track/:code` API exists, no page |
+| Customer Tracking        | `apps/frontends/customer-tracking` | 🟢 public `/track` page, in `apps/web`       |
 | Support Console          | `apps/frontends/support-console`   | 🔴                                           |
 | Admin Console            | `apps/frontends/admin-console`     | 🔴                                           |
 | Developer Portal         | `apps/frontends/developer-portal`  | 🔴                                           |
@@ -141,7 +141,8 @@ Seeded credentials (`ops+muyc0amh@ayesha.test`) live in env only, never committe
 
 ### Where the web layer actually stands
 
-Built: landing · login · control tower · shipments list · shipment detail · parcel tracking.
+Built: landing · login · control tower · shipments list · shipment detail · **public parcel
+tracking** (`/track`, no session — the console-only version was deleted as unreachable).
 
 **Known thin, deliberately:**
 
@@ -157,14 +158,11 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ### Next, in the order the roadmap implies
 
-1. **Customer tracking page** (`apps/frontends/customer-tracking`). The public API is already
-   there and unauthenticated — this is the cheapest missing surface and it completes a fifth
-   projection of the same events. Highest value per line written.
-2. **Rider mobile app** (`apps/mobile-rider`). The _server_ contract is done and proven —
+1. **Rider mobile app** (`apps/mobile-rider`). The _server_ contract is done and proven —
    ordered replay, explicit rejection of commands invalidated while offline, idempotent acks.
    The device half is unstarted. Phase 5's exit gate cannot pass without it.
-3. **Hub console** — scan-first, designed for a loading dock. Fills the operations gap.
-4. **Reliability drills.** Every scenario in [docs/operations/reliability.md](docs/operations/reliability.md)
+2. **Hub console** — scan-first, designed for a loading dock. Fills the operations gap.
+3. **Reliability drills.** Every scenario in [docs/operations/reliability.md](docs/operations/reliability.md)
    induced and asserted: Postgres down, Redis down, NATS down, publisher killed, worker killed,
    duplicate event, duplicate request, rider reconnect, duplicate settlement. Phase 6 rungs 7–8.
 

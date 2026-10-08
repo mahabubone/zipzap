@@ -3,7 +3,8 @@
  * Logs in through the real form, then visits each route — so a shot that looks
  * right means the route, the auth guard and the API all worked.
  *
- * Run: SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... node apps/web/scripts/shots.mjs
+ * Run: SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... TRACKING_CODE=ZP-... \
+ *      node apps/web/scripts/shots.mjs
  */
 // playwright-core from a global install, not a project dependency — a shot
 // script must not add a runtime dep to the web app.
@@ -16,6 +17,7 @@ const WEB = process.env.WEB_URL ?? 'http://localhost:5173';
 const EMAIL = process.env.SEED_CONSOLE_EMAIL;
 const PASSWORD = process.env.SEED_CONSOLE_PASSWORD;
 const OUT = new URL('../../../shots/', import.meta.url).pathname;
+const CODE = process.env.TRACKING_CODE;
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -34,7 +36,7 @@ async function settle(page) {
 }
 
 async function shoot(page, name, fullPage = true) {
-  const file = `${OUT}2026-10-07_web_${name}.png`;
+  const file = `${OUT}2026-10-08_web_${name}.png`;
   await page.screenshot({ path: file, fullPage });
   console.log(`shot  ${file}`);
 }
@@ -54,9 +56,34 @@ await anon.setViewportSize({ width: 900, height: 1000 });
 await anon.goto(`${WEB}/login`);
 await settle(anon);
 await shoot(anon, 'login_brand_hidden', false);
+
+// Tracking is public: a recipient has a code and no account.
+await anon.setViewportSize({ width: 1440, height: 1000 });
+await anon.goto(`${WEB}/track`);
+await settle(anon);
+await shoot(anon, 'track_lookup', false);
+
+if (CODE) {
+  await anon.goto(`${WEB}/track/${CODE}`);
+  await settle(anon);
+  await shoot(anon, 'track_parcel');
+
+  await anon.goto(`${WEB}/track/ZP-NOSUCHCODE`);
+  await anon.waitForTimeout(1200);
+  await shoot(anon, 'track_not_found', false);
+}
 await anon.close();
 
 // --- console, behind the guard ------------------------------------------------
+// Skipped without credentials. A bare `seed` mints an empty merchant, and shots of
+// empty tables are worse than the ones already in shots/ — so the fixture merchant
+// is the one to shoot with.
+if (!EMAIL || !PASSWORD) {
+  console.log('skip  console shots (no SEED_CONSOLE_EMAIL / SEED_CONSOLE_PASSWORD)');
+  await browser.close();
+  process.exit(0);
+}
+
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.goto(`${WEB}/login`);
 await settle(page);
@@ -68,7 +95,6 @@ await page.waitForURL('**/app', { timeout: 15000 });
 for (const [name, path] of [
   ['app_control_tower', '/app'],
   ['app_shipments', '/app/shipments'],
-  ['app_track', '/app/track'],
 ]) {
   await page.goto(`${WEB}${path}`);
   await settle(page);
