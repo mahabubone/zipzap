@@ -13,6 +13,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './common/exception.filter';
+import { requestIdMiddleware } from './common/request-id.middleware';
 import { config } from './config';
 import {
   registry,
@@ -33,10 +34,14 @@ async function bootstrap(): Promise<void> {
   // event loop). This is a hard dependency, not an opt-in: /metrics must work.
   registerProcessMetrics();
 
+  // Every request gets a correlation id BEFORE the instrumentation, so a slow or failed request is
+  // findable by the same id the client was given. Registered first deliberately.
+  app.use(requestIdMiddleware);
+
   // Global HTTP instrumentation: route template (never a concrete path with an
   // id), method and status. The /metrics scrape endpoint is excluded so it does
   // not pollute its own counters.
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  app.use((req: Request & { requestId?: string }, res: Response, next: NextFunction) => {
     if (req.url === '/metrics') return next();
     const start = Date.now();
     res.on('finish', () => {

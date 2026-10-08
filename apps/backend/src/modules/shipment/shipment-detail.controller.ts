@@ -5,80 +5,42 @@
  * the shipment exists — an enumeration oracle). Cancel follows the
  * AdvanceDeliveryService shape: lock, assert, save, emit — and the machine rejects
  * cancelling a DELIVERED parcel, because that is a return, not a cancel.
+ *
+ * The GET response carries four contact fields, so the read is audited. The audit happens inside
+ * GetShipmentService rather than here: a controller that logs what it read is a controller that
+ * can forget to.
  */
 
 import { Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { InjectDataSource } from '@nestjs/typeorm';
-import type { DataSource } from 'typeorm';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ResourceNotFoundError } from '../../common/domain-error.ts';
 import { CancelShipmentService, type CancelledShipment } from './cancel-shipment.service.ts';
-
-interface ShipmentDetail {
-  readonly id: string;
-  readonly trackingCode: string;
-  readonly status: string;
-  readonly merchantReference: string | null;
-  readonly senderName: string;
-  readonly senderPhone: string;
-  readonly recipientName: string;
-  readonly recipientPhone: string;
-  readonly parcelWeightGrams: number;
-  readonly parcelDescription: string;
-  readonly codAmountMinor: number;
-  readonly codCurrency: string;
-  readonly pricingVersion: number;
-  readonly createdAt: string;
-}
+import { GetShipmentService, type ShipmentDetail } from './get-shipment.service.ts';
 
 @ApiTags('shipments')
 @Controller('v1/shipments')
 @UseGuards(ApiKeyGuard)
 export class ShipmentDetailController {
   constructor(
-    @InjectDataSource('shipment') private readonly shipments: DataSource,
+    @Inject(GetShipmentService) private readonly get: GetShipmentService,
     @Inject(CancelShipmentService) private readonly cancel: CancelShipmentService,
   ) {}
-
-  private merchantId(request: AuthenticatedRequest): string {
-    return request.principal!.merchantId!;
-  }
 
   @Get(':id')
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'Get one of your shipments' })
   async detail(
     @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
+    @Req() req: AuthenticatedRequest & { requestId?: string },
   ): Promise<ShipmentDetail> {
-    const merchantId = this.merchantId(request);
-    const rows = await this.shipments.query(
-      `SELECT id, tracking_code, status, merchant_reference, sender_name, sender_phone,
-              recipient_name, recipient_phone, parcel_weight_grams, parcel_description,
-              cod_amount_minor, cod_currency, pricing_version, created_at
-         FROM shipment.shipments WHERE id = $1 AND merchant_id = $2`,
-      [id, merchantId],
-    );
-    const row = rows[0] as Record<string, unknown> | undefined;
-    if (!row) throw new ResourceNotFoundError('Shipment not found.');
-    return {
-      id: String(row.id),
-      trackingCode: String(row.tracking_code),
-      status: String(row.status),
-      merchantReference: (row.merchant_reference as string | null) ?? null,
-      senderName: String(row.sender_name),
-      senderPhone: String(row.sender_phone),
-      recipientName: String(row.recipient_name),
-      recipientPhone: String(row.recipient_phone),
-      parcelWeightGrams: Number(row.parcel_weight_grams),
-      parcelDescription: String(row.parcel_description),
-      codAmountMinor: Number(row.cod_amount_minor),
-      codCurrency: String(row.cod_currency),
-      pricingVersion: Number(row.pricing_version),
-      createdAt: new Date(row.created_at as string).toISOString(),
-    };
+    const principal = req.principal!;
+    return this.get.execute(principal.merchantId!, id, {
+      actorType: principal.kind,
+      actorId: principal.credentialId,
+      ip: req.ip ?? null,
+      requestId: req.requestId ?? null,
+    });
   }
 
   @Post(':id/cancel')
@@ -88,6 +50,6 @@ export class ShipmentDetailController {
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<CancelledShipment> {
-    return this.cancel.execute(this.merchantId(request), id);
+    return this.cancel.execute(request.principal!.merchantId!, id);
   }
 }

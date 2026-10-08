@@ -10,7 +10,8 @@ import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { AuthenticationRequiredError, PermissionDeniedError } from '../../common/domain-error.ts';
 import { verifySecret } from '../../common/secret.ts';
-import { API_SCOPES, type ApiScope } from '../../common/scopes.ts';
+import { type ApiScope } from '../../common/scopes.ts';
+import { isRoleName, scopesForRole } from './rules/roles.ts';
 import { canAcceptShipments } from '../merchant/rules/merchant.ts';
 import { FindCredentialService } from '../merchant/find-credential.service.ts';
 import { MerchantAuthService } from '../merchant/sessions.service.ts';
@@ -36,11 +37,18 @@ export class AuthenticateApiKeyService {
       const token = header.slice('Bearer '.length).trim();
       const session = token.length > 0 ? await this.sessions.authenticateToken(token) : null;
       if (!session) throw denied;
+      // An unrecognised role fails the session closed rather than falling back to full access.
+      // The column has a CHECK, so this is unreachable — which is the point: widening the role
+      // vocabulary must never silently widen an already-issued token.
+      if (!isRoleName(session.role)) throw denied;
       return {
         kind: 'human',
         subjectId: session.merchantId,
         merchantId: session.merchantId,
-        scopes: [...API_SCOPES],
+        // The role's bundle, NOT [...API_SCOPES]. Granting every scope here made every browser
+        // session omnipotent — including `settlements:approve` and `keys:manage`, so one stolen
+        // console token could move money and mint itself a fresh credential.
+        scopes: scopesForRole(session.role),
         credentialId: session.id,
         rateLimitPerMin: session.rateLimitPerMin,
       };

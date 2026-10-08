@@ -10,8 +10,8 @@ One schema per module. The schema _is_ the boundary.
 
 | Schema         | Module       | Owns                                                                               |
 | -------------- | ------------ | ---------------------------------------------------------------------------------- |
-| `identity`     | identity     | users, sessions, credentials, roles, permissions                                   |
-| `merchant`     | merchant     | merchants, branches, addresses, contracts, credentials, webhooks                   |
+| `identity`     | identity     | none — roles are code, sessions and API credentials are merchant's                 |
+| `merchant`     | merchant     | merchants, branches, addresses, contracts, api_credentials, sessions, webhooks     |
 | `customer`     | customer     | customers, phones, addresses                                                       |
 | `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                                    |
 | `pickup`       | pickup       | pickup requests, batches, assignments, attempts                                    |
@@ -29,7 +29,7 @@ One schema per module. The schema _is_ the boundary.
 | `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                             |
 | `analytics`    | analytics    | projections only                                                                   |
 | `dashboard`    | dashboard    | none — read-only control-tower surface, no tables                                  |
-| `system`       | system       | outbox, idempotency keys                                                           |
+| `system`       | system       | outbox, idempotency keys, consumed events, audit events (append-only)              |
 
 No foreign keys across schemas. A `rider_id` in `delivery` is a bare identifier — an
 application-level reference, not a constraint. See

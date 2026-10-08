@@ -20,6 +20,7 @@ import { CreateShipmentController } from './create-shipment.controller.ts';
 import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentDetailController } from './shipment-detail.controller.ts';
+import { GetShipmentService } from './get-shipment.service.ts';
 import { CancelShipmentService } from './cancel-shipment.service.ts';
 import { ReportExceptionService } from './report-exception.service.ts';
 import { ReportExceptionController } from './report-exception.controller.ts';
@@ -55,6 +56,7 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
     ReportExceptionService,
     HoldReleaseService,
     ListShipmentsService,
+    GetShipmentService,
     AppendTrackingEventService,
     ShipmentAdvanceService,
     { provide: SHIPMENT_LOOKUP, useClass: ShipmentLookup },

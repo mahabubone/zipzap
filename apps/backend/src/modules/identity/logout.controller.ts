@@ -14,9 +14,15 @@ export class LogoutController {
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke the current bearer session' })
-  async logout(@Req() req: AuthenticatedRequest): Promise<void> {
+  async logout(@Req() req: AuthenticatedRequest & { requestId?: string }): Promise<void> {
     const p = req.principal;
     if (p?.kind !== 'human' || !p.credentialId) return;
-    await this.sessions.revokeSession(p.credentialId);
+    // The revocation is audited inside the service, with the session itself — a logout that
+    // succeeded but left no trail is indistinguishable from one that never happened.
+    await this.sessions.revokeSession(p.credentialId, {
+      merchantId: p.merchantId,
+      ip: req.ip ?? null,
+      requestId: req.requestId ?? null,
+    });
   }
 }

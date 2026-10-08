@@ -62,27 +62,43 @@ ticked — `ROADMAP.md`'s own rule, and the reason its Phase 1 boxes are current
 **Nothing else starts here.** Multi-business and staff roles sit directly on `identity`, and
 retrofitting tenancy under three live surfaces costs more than building it first.
 
-| Work                                                                                                                   | Source                       |
-| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Schema `identity`: users, identities, sessions, credentials, devices, roles, permissions, role_permissions             | ROADMAP Phase 1, 10 unticked |
-| Argon2id; constant-time compare on every secret and signature                                                          | ROADMAP security, unticked   |
-| Two principal kinds — a machine API key must never open a browser session                                              | ROADMAP Phase 1              |
-| Session rotation on privilege change; audit events for login, failed login, logout, rotation, revocation               | ROADMAP Phase 1              |
-| Guards enforce **permissions**, never role names                                                                       | ROADMAP Phase 1              |
-| Tenant scoping derived from the principal                                                                              | ROADMAP Phase 1              |
-| Seven role bundles: platform admin, ops manager, hub operator, support agent, merchant owner, merchant operator, rider | ROADMAP Phase 1              |
-| Multi-business: orders, stores, invoices and analytics nest under a business id                                        | CarryBee parity              |
-| Rate limiting fails **closed on writes**, open on reads                                                                | ROADMAP security             |
-| `REQUEST_ID` propagated edge → log → span                                                                              | ROADMAP security             |
-| Customer-data reads audited, not merely restricted                                                                     | ROADMAP security             |
+| Work                                                                            | Source                                                                                            |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Role bundles as code** — seven roles, guards check scopes never role names    | ✅ **done**, [identity/rules/roles.ts](../../../apps/backend/src/modules/identity/rules/roles.ts) |
+| **A human session gets its role's scopes, not every scope**                     | ✅ **done** — this was a live bug                                                                 |
+| Two principal kinds — a machine API key must never open a browser session       | ✅ already true                                                                                   |
+| Tenant scoping derived from the principal                                       | ✅ already true — `assertTenant` returns 404, not 403                                             |
+| Rate limiting fails **closed on writes**, open on reads                         | ✅ already true                                                                                   |
+| `REQUEST_ID` propagated edge → log → span                                       | ✅ **done** — middleware, validated header, response echo                                         |
+| Audit events: login, failed login, logout, credential minted                    | ✅ **done** — `system.audit_events`, append-only by trigger                                       |
+| Customer-data reads audited, not merely restricted                              | ✅ **done** — `GET /v1/shipments/:id`, the only read that returns PII                             |
+| `identity.users` — one login per person, many per merchant                      | 🔲 **open**, deliberately after the above                                                         |
+| Multi-business: orders, stores, invoices and analytics nest under a business id | 🔲 **open**                                                                                       |
 
-**Exit check**
+**Audit corrections.** Reading the code before building changed three rows of this stage:
+
+| This plan originally said              | Reality                                                                                                                                                                                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Argon2id is the only password hash"   | `common/secret.ts` uses **scrypt** with a documented rationale: memory-hard, zero dependencies, and the ~70 ms cost is _deliberately_ spent as the login rate limiter. Argon2's edge is GPU resistance, which an online guessing surface does not need. **The doc was corrected, not the code.** |
+| "identity schema migration"            | [identity.module.ts](../../../apps/backend/src/modules/identity/identity.module.ts) deliberately registers **no TypeORM connection**. Sessions and API credentials are merchant's tables, with a written rationale. Moving them would be a boundary change with no security benefit.             |
+| "Rate limiting fails closed on writes" | Already implemented in [rate-limit.guard.ts](../../../apps/backend/src/modules/identity/rate-limit.guard.ts), with the reasoning inline. `ROADMAP.md`'s unticked box is stale.                                                                                                                   |
+
+**The bug this stage found.** Every human session was issued `[...API_SCOPES]` — all fifteen,
+including `settlements:approve` and `keys:manage`. One shared merchant password meant one
+omnipotent console login per merchant, and a stolen token could approve a settlement and mint
+itself a fresh API key. The role is now stored on the session and mapped to a bundle at
+authentication; `MERCHANT_OPERATOR` cannot reach either scope.
+
+### Exit check
 
 - [ ] An API key cannot obtain a browser session, and a session cannot call an API-only scope
 - [ ] Two operators on one merchant hold different permissions; the denied one gets 403 **without**
       leaking the resource's existence
 - [ ] One login can act inside two businesses and cannot read the third — proven by test, per module
 - [ ] Argon2id is the only password hash in the database; a timing test on signature compare is in CI
+      → **reworded**: scrypt only, per `docs/domains/identity.md` rule 2; `timingSafeEqual` is
+      already the only comparison path and `verifySecret` is unit-tested against a malformed
+      stored value
 - [ ] A write under rate limit returns 429, and the limit cannot be bypassed by retrying
 
 ---

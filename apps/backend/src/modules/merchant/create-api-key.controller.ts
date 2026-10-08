@@ -31,12 +31,17 @@ export class CreateApiKeyController {
   @ApiOperation({ summary: 'Create a scoped API key (secret shown once)' })
   async create(
     @Body() body: CreateApiKeyDto,
-    @Req() request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest & { requestId?: string },
   ): Promise<{ keyId: string; secret: string; scopes: ApiScope[] }> {
-    const merchantId = request.principal!.merchantId!;
-    const held = new Set(request.principal!.scopes);
+    const principal = request.principal!;
+    const held = new Set(principal.scopes);
     const requested = body.scopes.filter((scope) => held.has(scope));
 
-    return this.keys.create(merchantId, requested);
+    return this.keys.create(principal.merchantId!, requested, {
+      actorType: principal.kind,
+      actorId: principal.credentialId,
+      requestId: request.requestId ?? null,
+      ip: request.ip ?? null,
+    });
   }
 }

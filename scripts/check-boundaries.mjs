@@ -125,12 +125,13 @@ function inspect(file) {
     // 5. A provider's wire format escaping the adapter layer. Rule 11.
     // Token list narrowed once — see docs/ADR/0002-postgresql-schema-boundaries.md; a rule that
     // fires on valid code gets disabled, which is worse than not having it.
+    //
+    // `senderName` used to be listed and then exempted on the very next line, so it could never
+    // fire — a token that only reads like it is policed. Removed instead of left in: our own
+    // CreateShipmentDto has a `senderName` field. Net enforcement change: none.
     if (!rel.includes(`${sep}provider${sep}`)) {
       if (
-        /\b(status_code|trx_status|expair_Date|transactionType|mobileNumber|senderName)\b\s*[:'"]/.test(
-          line,
-        ) &&
-        !/\bsenderName\b\s*:/.test(line)
+        /\b(status_code|trx_status|expair_Date|transactionType|mobileNumber)\b\s*[:'"]/.test(line)
       ) {
         add(file, 'provider wire format outside an adapter (rule 11)', index, text);
       }
