@@ -23,6 +23,9 @@ history — none of them owns state.
 Shared React components live in `packages/ui`. The API client in `packages/api-client` is
 generated from the backend's OpenAPI output — never hand-written.
 
+Ten surfaces are planned; **two exist as packages**. What each one must eventually beat in the
+market is recorded in [competition/](competition/_index.md).
+
 ---
 
 ## Merchant Web
