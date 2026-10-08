@@ -2,6 +2,7 @@
 
 One page. Research date **2026-10-08**. Deep dives: [carrybee.md](carrybee.md) ·
 [redx.md](redx.md) · [steadfast.md](steadfast.md).
+**What we are doing about it: [plan.md](plan.md).**
 
 ## Method and honesty note
 
@@ -139,5 +140,6 @@ This document is a snapshot of 2026-10-08 and a market that moves fast. Re-verif
 single number in a deck. Update the ZipZap column the moment a row stops being accurate — a
 scorecard that flatters us is worse than no scorecard.
 
-Related: [carrybee.md](carrybee.md) · [redx.md](redx.md) · [steadfast.md](steadfast.md) ·
-[../surfaces.md](../surfaces.md) · [../roadmap.md](../roadmap.md) · [../../../state.md](../../../state.md)
+Related: [plan.md](plan.md) · [carrybee.md](carrybee.md) · [redx.md](redx.md) ·
+[steadfast.md](steadfast.md) · [../surfaces.md](../surfaces.md) · [../roadmap.md](../roadmap.md) ·
+[../../../state.md](../../../state.md)

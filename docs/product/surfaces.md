@@ -24,7 +24,8 @@ Shared React components live in `packages/ui`. The API client in `packages/api-c
 generated from the backend's OpenAPI output — never hand-written.
 
 Ten surfaces are planned; **two exist as packages**. What each one must eventually beat in the
-market is recorded in [competition/](competition/_index.md).
+market is recorded in [competition/](competition/_index.md), and the order we build them in is
+[competition/plan.md](competition/plan.md).
 
 ---
 
