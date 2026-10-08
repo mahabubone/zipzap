@@ -3,13 +3,15 @@
  * no account — the fifth projection of the same events.
  *
  * Run: TRACKING_CODE=ZP-... PLAYWRIGHT_CORE=<path>/playwright-core/index.js \
- *      node apps/web/scripts/verify-tracking.mjs
+ *      node apps/frontends/customer-tracking/scripts/verify-tracking.mjs
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core').then(
   (m) => m.default ?? m,
 );
 
-const WEB = process.env.WEB_URL ?? 'http://localhost:5173';
+// This app's own dev server. The merchant console is a different origin entirely.
+const WEB = process.env.WEB_URL ?? 'http://localhost:5174';
+const MERCHANT_WEB = process.env.MERCHANT_WEB_URL ?? 'http://localhost:5173';
 const CODE = process.env.TRACKING_CODE;
 if (!CODE) {
   console.error('set TRACKING_CODE');
@@ -79,10 +81,14 @@ check(
   true,
 );
 
-// --- the surface is reachable from the landing page -------------------------
-await page.goto(`${WEB}/`);
+// --- the merchant landing page links out to this app -------------------------
+await page.goto(`${MERCHANT_WEB}/`);
 await page.waitForLoadState('networkidle');
-check('landing links to /track', await page.locator('a[href="/track"]').count() >= 1, true);
+check(
+  'landing links out to this app',
+  await page.locator(`a[href="${WEB}/track"]`).count() >= 1,
+  true,
+);
 
 await browser.close();
 console.log(failures === 0 ? '\nall checks passed' : `\n${failures} check(s) failed`);

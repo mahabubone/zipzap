@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Badge, Button } from '@zipzap/ui';
 import { Logo } from '../lib/brand.tsx';
+import { TRACKING_URL } from '../lib/apps.ts';
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -28,11 +29,11 @@ function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-2">
-            <Link to="/track">
+            <a href={`${TRACKING_URL}/track`}>
               <Button variant="ghost" size="sm">
                 Track a parcel
               </Button>
-            </Link>
+            </a>
             <Link to="/login">
               <Button variant="secondary" size="sm">
                 Sign in
@@ -54,9 +55,9 @@ function Home() {
             operating system, for merchants, riders and delivery teams.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/track">
+            <a href={`${TRACKING_URL}/track`}>
               <Button>Track a parcel</Button>
-            </Link>
+            </a>
             <Link to="/login">
               <Button variant="secondary">Open your console</Button>
             </Link>
@@ -120,9 +121,9 @@ function Home() {
             <Link to="/login" className="inline-block">
               <Button>Open your console</Button>
             </Link>
-            <Link to="/track" className="inline-block">
+            <a href={`${TRACKING_URL}/track`} className="inline-block">
               <Button variant="secondary">Track a parcel</Button>
-            </Link>
+            </a>
           </div>
         </section>
       </main>

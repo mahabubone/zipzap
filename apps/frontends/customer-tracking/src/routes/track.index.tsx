@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button, Input } from '@zipzap/ui';
 import { useState, type FormEvent } from 'react';
 import { Logo } from '../lib/brand.tsx';
+import { MERCHANT_WEB_URL } from '../lib/apps.ts';
 
 export const Route = createFileRoute('/track/')({
   component: TrackLookup,
@@ -23,7 +24,10 @@ function TrackLookup() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Logo />
-          <a href="/login" className="text-sm text-slate-600 hover:text-slate-900">
+          <a
+            href={`${MERCHANT_WEB_URL}/login`}
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
             Merchant sign in
           </a>
         </div>

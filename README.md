@@ -54,7 +54,7 @@ API docs at `http://localhost:3000/docs` · Grafana at `http://localhost:3001`.
 
 ```
 apps/backend          NestJS — one dir per domain module, 3 entrypoints (api/worker/publisher)
-apps/frontends/*      merchant-web · control-tower · hub-console · admin-console · tracking
+apps/frontends/*      merchant-web · customer-tracking · control-tower · hub-console · admin-console
 apps/mobile-rider     Expo rider app (offline-capable)
 apps/desktop          Electron wrapper for the ops console
 apps/site             Astro — landing page + developer docs

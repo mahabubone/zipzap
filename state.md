@@ -64,23 +64,21 @@ command proves it.
 | 5 — Advanced logistics (routing, SLA, offline)    | 🔄 rungs 1–3 done; offline server contract done, device app not |
 | 6 — Operations (control tower, analytics, load)   | 🔄 rungs 1–6 shipped; reliability drills + desktop open         |
 
-**Planned surfaces** — ten rows in [surfaces.md](docs/product/surfaces.md), and **one** of them
-exists as a package. This is the single biggest gap in the repo. Note that none of the
-`apps/frontends/*` paths in that table exist on disk: the merchant console was built in
-`apps/web` instead, so the doc and the repo disagree:
+**Planned surfaces** — ten rows in [surfaces.md](docs/product/surfaces.md). **Two** exist as
+packages. The rest do not, and that is the single biggest gap in the repo:
 
-| Surface                  | Package                            | Built                                        |
-| ------------------------ | ---------------------------------- | -------------------------------------------- |
-| Merchant Web             | `apps/web`                         | 🟡 partial                                   |
-| Operations Control Tower | `apps/frontends/control-tower`     | 🔴 folded into `apps/web`                    |
-| Hub Console              | `apps/frontends/hub-console`       | 🔴                                           |
-| Rider Mobile             | `apps/mobile-rider`                | 🔴                                           |
-| Customer Tracking        | `apps/frontends/customer-tracking` | 🟢 public `/track` page, in `apps/web`       |
-| Support Console          | `apps/frontends/support-console`   | 🔴                                           |
-| Admin Console            | `apps/frontends/admin-console`     | 🔴                                           |
-| Developer Portal         | `apps/frontends/developer-portal`  | 🔴                                           |
-| Desktop                  | `apps/desktop`                     | 🔴                                           |
-| Landing + docs site      | `apps/site`                        | 🟡 landing page in `apps/web`, no Astro site |
+| Surface                  | Package                            | Built                                            |
+| ------------------------ | ---------------------------------- | ------------------------------------------------ |
+| Merchant Web             | `apps/frontends/merchant-web`      | 🟡 partial                                       |
+| Operations Control Tower | `apps/frontends/control-tower`     | 🔴 folded into `merchant-web`                    |
+| Hub Console              | `apps/frontends/hub-console`       | 🔴                                               |
+| Rider Mobile             | `apps/mobile-rider`                | 🔴                                               |
+| Customer Tracking        | `apps/frontends/customer-tracking` | 🟢 public, no session                            |
+| Support Console          | `apps/frontends/support-console`   | 🔴                                               |
+| Admin Console            | `apps/frontends/admin-console`     | 🔴                                               |
+| Developer Portal         | `apps/frontends/developer-portal`  | 🔴                                               |
+| Desktop                  | `apps/desktop`                     | 🔴                                               |
+| Landing + docs site      | `apps/site`                        | 🟡 landing page in `merchant-web`, no Astro site |
 
 ---
 
@@ -110,9 +108,10 @@ them passed `tsc`, passed SSR, and was invisible from the terminal:
 2. **`next_cursor` vs `nextCursor`.** The API sends camelCase; the client read snake_case, so
    every page of shipments silently paginated wrong. **My own contract test had encoded the bug
    as the expected shape** — a test written from the implementation instead of from the spec.
-3. **Tailwind never scanned `apps/web`.** v4 auto-detects sources from the _stylesheet's_
+3. **Tailwind never scanned the web app.** v4 auto-detects sources from the _stylesheet's_
    directory — `packages/ui/src` — so it shipped theme variables with zero utilities and the
-   console rendered as unstyled HTML. Fixed with an explicit `@source`.
+   console rendered as unstyled HTML. Fixed with an explicit `@source` per app. A third app
+   needs a third line there or it renders unstyled too.
 4. **`.ts` importing a `.tsx`.** `tsc` resolves it via `rewriteRelativeImportExtensions`;
    **Vite does not.** SSR fell back to client rendering with an empty body.
 
@@ -130,7 +129,8 @@ app.** Curl the HTML and you get a 200 and the right copy while the screen is bl
 | Backend API            | 3000 | `dist/main.js`                                                |
 | Worker (BullMQ + NATS) | 9090 | Consumes the event stream — **needed** for tracking timelines |
 | Publisher (outbox)     | 9091 | The only process that publishes to NATS                       |
-| Web dev server         | 5173 | TanStack Start, Vite                                          |
+| Web dev server         | 5173 | `merchant-web` — landing, login, console                      |
+| Tracking dev server    | 5174 | `customer-tracking` — public `/track`, no session             |
 
 The API alone is not enough. `tracking.public_timeline` is a **projection built by the worker**,
 so without `worker.js` running, `/track/:code` 404s for a freshly created shipment. This cost
@@ -141,8 +141,8 @@ Seeded credentials (`ops+muyc0amh@ayesha.test`) live in env only, never committe
 
 ### Where the web layer actually stands
 
-Built: landing · login · control tower · shipments list · shipment detail · **public parcel
-tracking** (`/track`, no session — the console-only version was deleted as unreachable).
+Built: landing · login · control tower · shipments list · shipment detail in
+`merchant-web`; **public parcel tracking** in `customer-tracking` (`/track`, no session).
 
 **Known thin, deliberately:**
 
@@ -192,9 +192,9 @@ tracking** (`/track`, no session — the console-only version was deleted as unr
 
 - **No git remote.** `git remote -v` is empty. 20+ commits exist on this machine only. First
   push publishes them; `main` is public by default on a new GitHub repo.
-- **`docs/product/surfaces.md` disagrees with the repo.** It lists `apps/frontends/*` paths that
-  do not exist; the console was built in `apps/web`. Either move the app or fix the doc — and
-  `ROADMAP.md` line "apps/ holds `backend` only" is now stale too.
+- **`ROADMAP.md` line "apps/ holds `backend` only" is stale**, and `docs/product/surfaces.md`'s
+  surface list is now honest but mostly unbuilt: `control-tower`, `hub-console`,
+  `support-console`, `admin-console` and `developer-portal` have no package.
 - **Phase 2's section boxes are marked stale in ROADMAP itself** and still need an audit.
 - **113 unticked roadmap boxes**, concentrated in surfaces (7 of 10 unbuilt), security (6, none
   started), observability dashboards/alerts, and load-test phases.
@@ -214,15 +214,22 @@ Two scripts assert what the terminal cannot:
 
 ```bash
 # Drives the real client against a running backend and asserts decoded values.
-SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... node apps/web/scripts/verify-client.mjs
+SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... \
+  node apps/frontends/merchant-web/scripts/verify-client.mjs
 
 # Measures rendered geometry — a page that silently loses its CSS still
 # returns 200 with all its copy intact.
-PLAYWRIGHT_CORE=<path>/playwright-core/index.js node apps/web/scripts/verify-marketing.mjs
-
-# Recaptures shots/ after any visible change.
 PLAYWRIGHT_CORE=<path>/playwright-core/index.js \
-  SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... node apps/web/scripts/shots.mjs
+  node apps/frontends/merchant-web/scripts/verify-marketing.mjs
+
+# Public tracking, in its own app. Needs TRACKING_CODE.
+TRACKING_CODE=ZP-... PLAYWRIGHT_CORE=<path>/playwright-core/index.js \
+  node apps/frontends/customer-tracking/scripts/verify-tracking.mjs
+
+# Recaptures shots/ after any visible change. Covers both web apps.
+PLAYWRIGHT_CORE=<path>/playwright-core/index.js \
+  SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... TRACKING_CODE=ZP-... \
+  node apps/frontends/merchant-web/scripts/shots.mjs
 ```
 
 `shots/` is the visual memory — after any visible change, capture fresh ones. It is the

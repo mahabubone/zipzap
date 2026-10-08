@@ -6,7 +6,8 @@
  * which looks like unstyled HTML. Add a source line per app that renders
  * @zipzap/ui. */
 @source '../src';
-@source '../../../apps/web/src';
+@source '../../../apps/frontends/merchant-web/src';
+@source '../../../apps/frontends/customer-tracking/src';
 
 @theme {
   --color-brand-500: #2563eb;

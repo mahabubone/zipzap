@@ -1,10 +1,13 @@
 /**
- * Captures the console screens into shots/ per the repo's visual-memory rule.
- * Logs in through the real form, then visits each route — so a shot that looks
- * right means the route, the auth guard and the API all worked.
+ * Captures the screens into shots/ per the repo's visual-memory rule. Logs in
+ * through the real form, then visits each route — so a shot that looks right
+ * means the route, the auth guard and the API all worked.
+ *
+ * Public tracking is a separate app on a separate origin, so this script shoots
+ * both. Run each app's dev server first.
  *
  * Run: SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... TRACKING_CODE=ZP-... \
- *      node apps/web/scripts/shots.mjs
+ *      node apps/frontends/merchant-web/scripts/shots.mjs
  */
 // playwright-core from a global install, not a project dependency — a shot
 // script must not add a runtime dep to the web app.
@@ -14,9 +17,10 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-cor
 import fs from 'node:fs';
 
 const WEB = process.env.WEB_URL ?? 'http://localhost:5173';
+const TRACKING = process.env.TRACKING_URL ?? 'http://localhost:5174';
 const EMAIL = process.env.SEED_CONSOLE_EMAIL;
 const PASSWORD = process.env.SEED_CONSOLE_PASSWORD;
-const OUT = new URL('../../../shots/', import.meta.url).pathname;
+const OUT = new URL('../../../../shots/', import.meta.url).pathname;
 const CODE = process.env.TRACKING_CODE;
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -57,18 +61,18 @@ await anon.goto(`${WEB}/login`);
 await settle(anon);
 await shoot(anon, 'login_brand_hidden', false);
 
-// Tracking is public: a recipient has a code and no account.
+// Tracking is public and lives in its own app: a recipient has a code, no account.
 await anon.setViewportSize({ width: 1440, height: 1000 });
-await anon.goto(`${WEB}/track`);
+await anon.goto(`${TRACKING}/track`);
 await settle(anon);
 await shoot(anon, 'track_lookup', false);
 
 if (CODE) {
-  await anon.goto(`${WEB}/track/${CODE}`);
+  await anon.goto(`${TRACKING}/track/${CODE}`);
   await settle(anon);
   await shoot(anon, 'track_parcel');
 
-  await anon.goto(`${WEB}/track/ZP-NOSUCHCODE`);
+  await anon.goto(`${TRACKING}/track/ZP-NOSUCHCODE`);
   await anon.waitForTimeout(1200);
   await shoot(anon, 'track_not_found', false);
 }

@@ -1,7 +1,7 @@
 /**
  * Local console seeding — creates a handful of shipments through the public API
- * so `apps/web` has something to render. Not a test fixture and not deployed;
- * this is the "make the dev environment usable" script.
+ * so the merchant console has something to render. Not a test fixture and not
+ * deployed; this is the "make the dev environment usable" script.
  *
  * Usage: node --env-file-if-exists=../../.env scripts/seed-console.mjs
  * Reads SEED_CONSOLE_EMAIL / SEED_CONSOLE_PASSWORD from the environment when
