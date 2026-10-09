@@ -32,6 +32,11 @@ export const SUBSCRIPTIONS: readonly NatsSubscription[] = [
   { consumer: 'tracking', subject: 'zipzap.shipment.released' },
   { consumer: 'finance', subject: 'zipzap.cod.collected' },
   { consumer: 'finance', subject: 'zipzap.cod.partial_collection' },
+  // The disputed collection posts a ledger row too — cash a rider physically took is a fact about
+  // the world, and hiding it because the figure is wrong is how ৳50 of theft becomes invisible.
+  { consumer: 'finance', subject: 'zipzap.cod.collection_failed' },
+  // ...and the review posts the compensating adjustment, so both rows are kept (rule 8).
+  { consumer: 'finance', subject: 'zipzap.cod.reconciled' },
   { consumer: 'finance', subject: 'zipzap.return.completed' },
   { consumer: 'webhook', subject: 'zipzap.shipment.created' },
   { consumer: 'webhook', subject: 'zipzap.delivery.out_for_delivery' },

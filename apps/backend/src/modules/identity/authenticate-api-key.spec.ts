@@ -2,8 +2,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AuthenticateApiKeyService, FIND_CREDENTIAL } from './authenticate-api-key.service.ts';
 import { MerchantAuthService } from '../merchant/sessions.service.ts';
+import { UserService } from './user.service.ts';
 import { hashSecret } from '../../common/secret.ts';
-import { API_SCOPES } from '../../common/scopes.ts';
+import { MERCHANT_SCOPES } from './rules/roles.ts';
 import { AuthenticationRequiredError } from '../../common/domain-error.ts';
 
 /**
@@ -38,9 +39,22 @@ function session(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 's1',
     merchantId: 'm-active',
+    userId: 'u-1',
     merchantStatus: 'ACTIVE',
     rateLimitPerMin: null,
     role: 'MERCHANT_OWNER',
+    ...overrides,
+  };
+}
+
+/** The person behind a session: memberships plus the credential identity reads. */
+function user(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    userId: 'u-1',
+    email: 'person@example.test',
+    passwordHash: STORED,
+    disabledAt: null,
+    memberships: [{ merchantId: 'm-active', role: 'MERCHANT_OWNER' }],
     ...overrides,
   };
 }
@@ -52,15 +66,18 @@ describe('AuthenticateApiKeyService', () => {
     findByKeyId: ReturnType<typeof vi.fn>;
     touchLastUsed: ReturnType<typeof vi.fn>;
   };
+  let users: { findById: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     credentials = { findByKeyId: vi.fn(), touchLastUsed: vi.fn() };
     sessions = { authenticateToken: vi.fn().mockResolvedValue(null) };
+    users = { findById: vi.fn().mockResolvedValue(user()) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthenticateApiKeyService,
         { provide: FIND_CREDENTIAL, useValue: credentials },
         { provide: MerchantAuthService, useValue: sessions },
+        { provide: UserService, useValue: users },
       ],
     }).compile();
     auth = module.get(AuthenticateApiKeyService);
@@ -104,7 +121,12 @@ describe('AuthenticateApiKeyService', () => {
   });
 
   it('resolves a human principal with its role bundle, never the full vocabulary', async () => {
+    // Scopes come from the MEMBERSHIP, not from the session's stored role — so the two must agree
+    // in the fixture, or this test would be asserting about a state the system cannot represent.
     sessions.authenticateToken.mockResolvedValue(session({ role: 'MERCHANT_OPERATOR' }));
+    users.findById.mockResolvedValue(
+      user({ memberships: [{ merchantId: 'm-active', role: 'MERCHANT_OPERATOR' }] }),
+    );
 
     const principal = await auth.authenticate('Bearer tok');
 
@@ -116,16 +138,69 @@ describe('AuthenticateApiKeyService', () => {
     expect(principal.scopes).not.toContain('keys:manage');
   });
 
-  it('gives the owner the full bundle, because the owner is the merchant', async () => {
+  it('carries every membership, so one login can act inside two businesses', async () => {
+    sessions.authenticateToken.mockResolvedValue(session({ role: 'MERCHANT_OPERATOR' }));
+    users.findById.mockResolvedValue(
+      user({
+        memberships: [
+          { merchantId: 'm-active', role: 'MERCHANT_OPERATOR' },
+          { merchantId: 'm-second', role: 'MERCHANT_OWNER' },
+        ],
+      }),
+    );
+
+    const principal = await auth.authenticate('Bearer tok');
+
+    expect(principal.merchantIds).toEqual(['m-active', 'm-second']);
+    // Scoped to the ACTIVE business, not to every business the person can reach.
+    expect(principal.merchantId).toBe('m-active');
+    expect(principal.scopes).not.toContain('keys:manage');
+  });
+
+  it('refuses a session whose user has been disabled or removed', async () => {
+    sessions.authenticateToken.mockResolvedValue(session());
+    users.findById.mockResolvedValue(user({ disabledAt: new Date() }));
+    await expect(auth.authenticate('Bearer tok')).rejects.toThrow(AuthenticationRequiredError);
+
+    sessions.authenticateToken.mockResolvedValue(session());
+    users.findById.mockResolvedValue(null);
+    await expect(auth.authenticate('Bearer tok')).rejects.toThrow(AuthenticationRequiredError);
+  });
+
+  it('gives the owner the full merchant bundle, because the owner is the merchant', async () => {
+    // Not "every scope": the hub scopes are platform powers and a merchant key must not carry them.
+    // See roles.spec.ts — this is the same claim at the point the token is actually built.
     sessions.authenticateToken.mockResolvedValue(session({ role: 'MERCHANT_OWNER' }));
 
     const principal = await auth.authenticate('Bearer tok');
 
-    expect([...principal.scopes].sort()).toEqual([...API_SCOPES].sort());
+    expect([...principal.scopes].sort()).toEqual([...MERCHANT_SCOPES].sort());
+    expect(principal.scopes).not.toContain('hub:scan');
   });
 
-  it('refuses a session whose role the vocabulary does not recognise, rather than defaulting', async () => {
-    sessions.authenticateToken.mockResolvedValue(session({ role: 'SUPERUSER' }));
+  it('gives a hub operator the scan scope, so the hub console is not a dead end', async () => {
+    // This is the failure the scope was added to fix: HUB_OPERATOR had no write scope at all, so
+    // every scan returned 403 and the console could not exist.
+    sessions.authenticateToken.mockResolvedValue(session());
+    users.findById.mockResolvedValue(
+      user({ memberships: [{ merchantId: 'm-active', role: 'HUB_OPERATOR' }] }),
+    );
+
+    const principal = await auth.authenticate('Bearer tok');
+
+    expect(principal.scopes).toContain('hub:scan');
+    // And the merchant power stays away, or the scope is not worth having.
+    expect(principal.scopes).not.toContain('shipments:write');
+  });
+
+  it('refuses a membership whose role the vocabulary does not recognise, rather than defaulting', async () => {
+    // The role lives on the membership as of migration 0036, so this is where an unrecognised one
+    // can now arrive. It must fail closed: widening the role vocabulary must never silently widen an
+    // already-issued token.
+    sessions.authenticateToken.mockResolvedValue(session());
+    users.findById.mockResolvedValue(
+      user({ memberships: [{ merchantId: 'm-active', role: 'SUPERUSER' }] }),
+    );
 
     await expect(auth.authenticate('Bearer tok')).rejects.toThrow(AuthenticationRequiredError);
   });

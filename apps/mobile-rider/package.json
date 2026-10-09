@@ -1,0 +1,14 @@
+{
+  "name": "@zipzap/rider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:queue": "node scripts/verify-queue.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "The offline queue and its proof only. No Expo, no React Native, no app shell yet — see the note in src/offline/command-queue.ts about why the logic is framework-free and separately provable.",
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

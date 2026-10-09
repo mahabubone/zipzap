@@ -80,6 +80,45 @@ export interface AckResult {
   readonly createdAt: Date;
 }
 
+/**
+ * One command as a device recorded it, offline.
+ *
+ * `createdAt` is the *device's* clock, not the server's — that is the whole reason replay orders by
+ * it (ADR-0012). A device whose clock is wrong still gets a total order among its own commands,
+ * because `deviceSequence` breaks ties.
+ */
+export interface DeviceCommand {
+  readonly deviceSequence: number;
+  readonly createdAt: Date;
+  readonly commandType: string;
+  readonly payload: object;
+  readonly expectedState?: object | null;
+}
+
+/**
+ * Why one replayed command ended the way it did.
+ *
+ * `duplicate` is not an error and not a no-op: it means this `(rider_id, device_sequence)` was
+ * already submitted, and `reason` carries what happened then, so the device can reconcile its local
+ * queue against the server instead of guessing. Without it a rider who reconnected on a flaky link
+ * would have no way to know which of their 40 scans had landed.
+ */
+export type ReplayOutcomeKind = 'applied' | 'rejected' | 'duplicate';
+
+export interface ReplayOutcome {
+  readonly deviceSequence: number;
+  readonly commandId: string;
+  readonly kind: ReplayOutcomeKind;
+  /** Human-readable, and the rider reads it. Null only when there is nothing to say. */
+  readonly reason: string | null;
+}
+
+export interface ReplayResult {
+  readonly results: readonly ReplayOutcome[];
+  readonly queueSize: number;
+  readonly capWarning: boolean;
+}
+
 /** Registry of per-command-type validators injected by the module that owns the
  * aggregate semantics. A command type with no validator is unconditional (always valid). */
 export const OFFLINE_SYNC_VALIDATORS = Symbol('offlineSyncValidators');
@@ -149,7 +188,7 @@ export class OfflineSyncService {
         throw new CommandQueueFullError(queueSize, CAP);
       }
 
-      await this.queue.enqueue(manager, {
+      const inserted = await this.queue.enqueue(manager, {
         id: randomUUID(),
         riderId,
         deviceSequence,
@@ -158,6 +197,12 @@ export class OfflineSyncService {
         expectedState: expectedState ?? null,
         createdAt: new Date(),
       });
+      if (!inserted) {
+        // The row is already there. The single-command path has no per-command outcome to report, so
+        // it reports the queue as it stands — which is the honest answer, and better than the raw
+        // unique violation this used to raise.
+        return { queueSize, capWarning: queueSize >= CAP_WARNING_THRESHOLD };
+      }
 
       const { count: newCountStr } = await this.queue.countPending(manager, riderId);
       return { queueSize: Number(newCountStr), capWarning: queueSize + 1 >= CAP_WARNING_THRESHOLD };
@@ -230,8 +275,7 @@ export class OfflineSyncService {
       }
 
       // Pending -> validate, then mark once (append-only markers).
-      const validator = this.validators[row.commandType];
-      const cmd: PendingCommandRow = {
+      const applied = await this.apply(manager, {
         id: row.id,
         rider_id: row.riderId,
         device_sequence: row.deviceSequence,
@@ -239,46 +283,178 @@ export class OfflineSyncService {
         payload: row.payload as object,
         expected_state: row.expectedState,
         created_at: row.createdAt,
-      };
-      const result = validator ? await validator(manager, cmd) : { valid: true };
+      });
 
-      if (result.valid) {
-        await this.queue.markDelivered(manager, commandId);
-        await appendOutbox(manager, {
-          type: 'RiderCommandDelivered',
-          aggregateType: 'rider',
-          aggregateId: row.riderId,
-          payload: {
-            commandId: row.id,
-            deviceSequence: row.deviceSequence,
-            commandType: row.commandType,
-          },
-        });
-        await claimed.complete(200, {
+      if (applied.kind === 'applied') {
+        const delivered: AckResult = {
           outcome: { kind: 'delivered', replayed: false },
           createdAt: row.createdAt,
-        });
-        return { outcome: { kind: 'delivered', replayed: false }, createdAt: row.createdAt };
+        };
+        await claimed.complete(200, delivered);
+        return delivered;
       }
 
-      await this.queue.markRejected(manager, commandId, result.reason ?? 'state mismatch');
-      await appendOutbox(manager, {
-        type: 'RiderCommandRejected',
-        aggregateType: 'rider',
-        aggregateId: row.riderId,
-        payload: {
-          commandId: row.id,
-          deviceSequence: row.deviceSequence,
-          commandType: row.commandType,
-          reason: result.reason ?? 'state mismatch',
-        },
-      });
-      const acked: AckResult = {
+      const rejected: AckResult = {
         outcome: { kind: 'rejected', replayed: false },
         createdAt: row.createdAt,
       };
-      await claimed.complete(200, acked);
-      return acked;
+      await claimed.complete(200, rejected);
+      return rejected;
     });
   }
+
+  /**
+   * Validate a pending command, mark it once, and write the outbox row — the whole of "apply".
+   *
+   * Extracted because `acknowledge` and `replay` must not be able to disagree about what applying a
+   * command means. A copy here would let the batch path accept a state the single path rejects, and
+   * the divergence would only show up as a device that behaves differently depending on how it
+   * reconnected.
+   */
+  private async apply(
+    manager: import('typeorm').EntityManager,
+    row: PendingCommandRow,
+  ): Promise<{ kind: 'applied' } | { kind: 'rejected'; reason: string }> {
+    const validator = this.validators[row.command_type];
+    const result = validator
+      ? await validator(manager, row)
+      : { valid: true, reason: undefined as string | undefined };
+
+    if (result.valid) {
+      await this.queue.markDelivered(manager, row.id);
+      await appendOutbox(manager, {
+        type: 'RiderCommandDelivered',
+        aggregateType: 'rider',
+        aggregateId: row.rider_id,
+        payload: {
+          commandId: row.id,
+          deviceSequence: row.device_sequence,
+          commandType: row.command_type,
+        },
+      });
+      return { kind: 'applied' };
+    }
+
+    const reason = result.reason ?? 'state mismatch';
+    await this.queue.markRejected(manager, row.id, reason);
+    await appendOutbox(manager, {
+      type: 'RiderCommandRejected',
+      aggregateType: 'rider',
+      aggregateId: row.rider_id,
+      payload: {
+        commandId: row.id,
+        deviceSequence: row.device_sequence,
+        commandType: row.command_type,
+        reason,
+      },
+    });
+    return { kind: 'rejected', reason };
+  }
+
+  /**
+   * A device reconnecting with a day of work it could not send.
+   *
+   * This is the endpoint ADR-0012's wire describes and `enqueue` alone never was: the whole point
+   * of an offline queue is that the device pushes *its* commands, and there was no route to do it.
+   * A rider finishing a day on a bad connection had nowhere to put 40 scans.
+   *
+   * Three properties, and each one is load-bearing:
+   *
+   * 1. **Ordered by the device's `createdAt`, tie-broken by `deviceSequence`.** The device's clock,
+   *    not the server's — the server cannot know when the rider pressed the button.
+   * 2. **Exactly once, on `(rider_id, device_sequence)`.** The unique index decides; a re-sent batch
+   *    comes back `duplicate` per command with the original outcome, never applied twice.
+   * 3. **One transaction for the whole batch, with the cap checked up front.** A batch that would
+   *    overflow is refused *entirely*, so the device keeps every command and retries later. Filling
+   *    the queue with the first 90 and 409ing on the 91st would lose the rest — the exact silent
+   *    data loss ADR-0012 exists to prevent.
+   */
+  async replay(riderId: string, commands: readonly DeviceCommand[]): Promise<ReplayResult> {
+    return this.rider.transaction(async (manager) => {
+      const rider = await this.riders.findById(manager, riderId);
+      if (!rider) {
+        throw new ResourceNotFoundError(`Rider ${riderId} not found.`);
+      }
+
+      const { count: countStr } = await this.queue.countPending(manager, riderId);
+      const queueSize = Number(countStr);
+      if (queueSize + commands.length > CAP) {
+        throw new CommandQueueFullError(queueSize + commands.length, CAP);
+      }
+
+      const ordered = [...commands].sort(
+        (a, b) =>
+          a.createdAt.getTime() - b.createdAt.getTime() || a.deviceSequence - b.deviceSequence,
+      );
+
+      const results: ReplayOutcome[] = [];
+      for (const command of ordered) {
+        // The id is ours and known before the insert, so a successful insert needs no read-back.
+        const commandId = randomUUID();
+        const inserted = await this.queue.enqueue(manager, {
+          id: commandId,
+          riderId,
+          deviceSequence: command.deviceSequence,
+          commandType: command.commandType,
+          payload: command.payload,
+          expectedState: command.expectedState ?? null,
+          createdAt: command.createdAt,
+        });
+
+        if (!inserted) {
+          // Already submitted. Report what happened then rather than re-deciding, so a device that
+          // reconnects twice converges on one truth.
+          const existing = await this.queue.findByDeviceSequence(
+            manager,
+            riderId,
+            command.deviceSequence,
+          );
+          results.push({
+            deviceSequence: command.deviceSequence,
+            commandId: existing?.id ?? '',
+            kind: 'duplicate',
+            reason: recordedOutcome(existing),
+          });
+          continue;
+        }
+
+        const applied = await this.apply(manager, {
+          id: commandId,
+          rider_id: riderId,
+          device_sequence: command.deviceSequence,
+          command_type: command.commandType,
+          payload: command.payload,
+          expected_state: command.expectedState ?? null,
+          created_at: command.createdAt,
+        });
+
+        results.push({
+          deviceSequence: command.deviceSequence,
+          commandId,
+          kind: applied.kind,
+          reason: applied.kind === 'rejected' ? applied.reason : null,
+        });
+      }
+
+      // A replayed command is applied inside this same transaction, so nothing is left pending and
+      // the queue behind the batch is always empty. `capWarning` therefore reports the BATCH's
+      // nearness to the limit — which is the signal a device can act on ("your queue is nearly
+      // full, expect a refusal"). Deriving it from `queueSize` would make it dead code on this path.
+      return { results, queueSize: 0, capWarning: ordered.length >= CAP_WARNING_THRESHOLD };
+    });
+  }
+}
+
+/** One sentence about a command row's recorded fate, for a duplicate the device has to reconcile. */
+function recordedOutcome(
+  row: {
+    acknowledgedAt?: Date | null;
+    rejectedAt?: Date | null;
+    rejectionReason?: string | null;
+  } | null,
+): string {
+  if (!row) return 'already submitted';
+  if (row.acknowledgedAt) return 'already applied';
+  if (row.rejectedAt) return row.rejectionReason ?? 'already rejected';
+  return 'already submitted';
 }

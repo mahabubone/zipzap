@@ -15,7 +15,7 @@ import { PricingService } from '../pricing/pricing.service.ts';
 
 const COMMAND = {
   merchantId: 'a71cdemo',
-  merchantPlan: 'standard',
+
   zone: 'dhaka-metro',
   remoteArea: false,
   fragile: false,

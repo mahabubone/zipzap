@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { PricingService } from './pricing.service.ts';
 import { PricingRepository } from './pricing.repository.ts';
 import { PricingVersionNotFoundError } from '../../common/domain-error.ts';
+import { MERCHANT_PLAN_LOOKUP } from '../merchant/merchant-plan.lookup.ts';
 
 /**
  * The service seams: version selection, mapping, and the not-found contract.
@@ -23,6 +24,14 @@ const ROW = {
   currency: 'BDT',
 };
 
+/**
+ * No `merchantPlan` here any more, and that is the point.
+ *
+ * It used to be a request field, so a caller could name the plan with the best discount and be
+ * quoted it — the server had no idea which plan the merchant was actually on. The plan is now
+ * resolved from `merchant.merchants` through `MERCHANT_PLAN_LOOKUP`, and `INPUT` carries a
+ * `merchantId` because that is the only thing that identifies whose rates apply.
+ */
 const INPUT = {
   weightGrams: 1200,
   codAmountMinor: 125_050,
@@ -30,14 +39,18 @@ const INPUT = {
   remoteArea: false,
   fragile: false,
   packagingKind: null,
-  merchantPlan: 'standard',
+  merchantId: '11111111-1111-4111-8111-111111111111',
 };
 
 describe('PricingService', () => {
   let versions: { findActive: ReturnType<typeof vi.fn>; findByVersion: ReturnType<typeof vi.fn> };
+  let plans: { planFor: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     versions = { findActive: vi.fn(), findByVersion: vi.fn() };
+    plans = { planFor: vi.fn() };
+    // Default to the discount-free plan. Tests that care override it explicitly.
+    plans.planFor.mockResolvedValue('standard');
   });
 
   async function service(): Promise<PricingService> {
@@ -45,12 +58,16 @@ describe('PricingService', () => {
     // "transaction" is just a call boundary. Real atomicity needs no proof here — quoting is
     // read-only, and the engine itself is asserted pure in rules/pricing.spec.ts.
     const fakeDs = { transaction: (fn: (m: unknown) => Promise<unknown>) => fn({}) };
-    return new PricingService(fakeDs as never, versions as never);
+    return new PricingService(fakeDs as never, versions as never, plans as never);
   }
 
   it('resolves through the real Nest container', async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PricingService, { provide: PricingRepository, useValue: versions }],
+      providers: [
+        PricingService,
+        { provide: PricingRepository, useValue: versions },
+        { provide: MERCHANT_PLAN_LOOKUP, useValue: plans },
+      ],
     })
       .useMocker(() => ({}))
       .compile();

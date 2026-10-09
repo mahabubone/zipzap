@@ -253,7 +253,7 @@ function shipmentPayload() {
     zone: 'dhaka-metro',
     remoteArea: false,
     fragile: false,
-    merchantPlan: 'standard',
+
     codAmountMinor: (10 + (Date.now() % 40)) * 1_000,
     codCurrency: 'BDT',
   };
@@ -437,21 +437,16 @@ async function settlementPhase(shipmentIds) {
   const { LedgerEntryEntity } = await import('../dist/modules/finance/ledger-entry.entity.js');
   const { SettlementEntity } = await import('../dist/modules/finance/settlement.entity.js');
   const { FinanceRepository } = await import('../dist/modules/finance/finance.repository.js');
-  const { CreateSettlementService } = await import(
-    '../dist/modules/finance/create-settlement.service.js'
-  );
-  const { ApproveSettlementService } = await import(
-    '../dist/modules/finance/approve-settlement.service.js'
-  );
-  const { InitiateSettlementPaymentService } = await import(
-    '../dist/modules/finance/initiate-settlement-payment.service.js'
-  );
-  const { ConfirmSettlementPaymentService } = await import(
-    '../dist/modules/finance/confirm-settlement-payment.service.js'
-  );
-  const { MockPaymentProvider } = await import(
-    '../dist/modules/finance/provider/mock-payment.provider.js'
-  );
+  const { CreateSettlementService } =
+    await import('../dist/modules/finance/create-settlement.service.js');
+  const { ApproveSettlementService } =
+    await import('../dist/modules/finance/approve-settlement.service.js');
+  const { InitiateSettlementPaymentService } =
+    await import('../dist/modules/finance/initiate-settlement-payment.service.js');
+  const { ConfirmSettlementPaymentService } =
+    await import('../dist/modules/finance/confirm-settlement-payment.service.js');
+  const { MockPaymentProvider } =
+    await import('../dist/modules/finance/provider/mock-payment.provider.js');
 
   console.log(`settle: money chain for ${merchants.length} merchant(s)…`);
   const financeDb = await connectModuleDataSource('finance', [LedgerEntryEntity, SettlementEntity]);

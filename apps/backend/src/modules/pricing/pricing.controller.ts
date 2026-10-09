@@ -1,11 +1,11 @@
 /**
- * POST /v1/pricing/quote — thin by design: validate, call one use case, return.
+ * Pricing's HTTP surface: a quote, and a card you can read.
  *
- * Read-only and side-effect free, so no Idempotency-Key: a quote changes nothing, and quoting
- * twice with the same inputs returns the same quote by determinism, not by dedupe.
+ * Both are side-effect free, so neither takes an Idempotency-Key. A quote changes nothing and
+ * quoting twice with the same inputs returns the same quote by determinism, not by dedupe.
  */
 
-import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -17,8 +17,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ApiKeyGuard } from '../identity/api-key.guard.ts';
-import { PricingService } from './pricing.service.ts';
+import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import { PricingService, type RateCard } from './pricing.service.ts';
 import type { Currency } from '../../common/money.ts';
 import type { Quote } from './rules/pricing.ts';
 
@@ -46,10 +46,6 @@ export class QuoteDto {
   @MaxLength(40)
   packagingKind?: string;
 
-  @IsString()
-  @MaxLength(40)
-  merchantPlan!: string;
-
   @IsOptional()
   @Matches(/^[A-Z]{3}$/)
   currency?: Currency;
@@ -68,7 +64,7 @@ export class PricingController {
 
   @Post('quote')
   @ApiOperation({ summary: 'Quote a shipment price' })
-  async quote(@Body() body: QuoteDto): Promise<Quote> {
+  async quote(@Body() body: QuoteDto, @Req() request: AuthenticatedRequest): Promise<Quote> {
     return this.pricing.quote({
       weightGrams: body.weightGrams,
       codAmountMinor: body.codAmountMinor,
@@ -76,9 +72,17 @@ export class PricingController {
       remoteArea: body.remoteArea,
       fragile: body.fragile,
       packagingKind: body.packagingKind ?? null,
-      merchantPlan: body.merchantPlan,
       currency: body.currency,
       version: body.version,
+      // The plan comes from the credential's merchant, never from the body. It used to be a body
+      // field, which meant a caller could name the plan with the best discount and be quoted it.
+      merchantId: request.principal!.merchantId!,
     });
+  }
+
+  @Get('rate-card')
+  @ApiOperation({ summary: 'Your rate card, with worked examples' })
+  async rateCard(@Req() request: AuthenticatedRequest): Promise<RateCard> {
+    return this.pricing.rateCard(request.principal!.merchantId!);
   }
 }

@@ -61,6 +61,26 @@ export class ShipmentLookup {
    * reading the shipment table or its status vocabulary. An unknown id is
    * "not arrived" — cargo nobody can find is missing, by definition.
    */
+  /**
+   * The raw status string, for a caller that has to *compare* rather than branch on a predicate.
+   *
+   * `hasArrived` answers the manifest question and is deliberately a boolean. An offline rider's
+   * replay needs the opposite: it recorded the status it believed at scan time, and the server has
+   * to say whether the world still agrees. That is a comparison against device-supplied text, so it
+   * needs the vocabulary itself — and the rider module cannot read `shipment.shipments` to get it
+   * (rule 2). Null for an unknown id, which the callers read as "cannot confirm" and reject on.
+   */
+  async currentStatus(shipmentId: string): Promise<string | null> {
+    return this.shipmentDataSource.transaction(async (manager) => {
+      const row = await manager
+        .createQueryBuilder(ShipmentEntity, 's')
+        .select('s.status', 'status')
+        .where('s.id = :id', { id: shipmentId })
+        .getRawOne<{ status: string }>();
+      return row?.status ?? null;
+    });
+  }
+
   async hasArrived(shipmentId: string): Promise<boolean> {
     const status = await this.shipmentDataSource.transaction(async (manager) => {
       const row = await manager

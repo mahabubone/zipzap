@@ -414,6 +414,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/rate-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your rate card, with worked examples */
+        get: operations["PricingController_rateCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cod/collect": {
         parameters: {
             query?: never;
@@ -465,6 +482,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cod/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Unreviewed COD reconciliation exceptions, newest first */
+        get: operations["ListCodExceptionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/coverage": {
         parameters: {
             query?: never;
@@ -474,6 +508,23 @@ export interface paths {
         };
         /** Serviceability check for one zone */
         get: operations["CoverageController_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every zone you can ship to */
+        get: operations["CoverageController_zones"];
         put?: never;
         post?: never;
         delete?: never;
@@ -722,23 +773,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/merchants/{id}/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Derived merchant balance in minor units */
-        get: operations["BalanceController_balance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/settlements/{id}/initiate-payment": {
         parameters: {
             query?: never;
@@ -767,6 +801,57 @@ export interface paths {
         put?: never;
         /** Confirm the provider payout and settle */
         post: operations["SettlementPaymentController_confirmPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your derived balance, itemised, with anything blocking a payout */
+        get: operations["MerchantBalanceController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settlements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One settlement, itemised */
+        get: operations["GetSettlementController_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settlements/{id}/statement.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the itemised statement */
+        get: operations["GetSettlementController_csv"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -915,6 +1000,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         LoginDto: {
+            /**
+             * Format: uuid
+             * @description Business to open the session against
+             */
+            merchantId?: string;
             /** Format: email */
             email: string;
             password: string;
@@ -943,7 +1033,6 @@ export interface components {
             remoteArea: boolean;
             fragile: boolean;
             packagingKind?: string;
-            merchantPlan: string;
         };
         UploadBulkDto: {
             csv: string;
@@ -967,7 +1056,6 @@ export interface components {
             remoteArea: boolean;
             fragile: boolean;
             packagingKind?: string;
-            merchantPlan: string;
             /** @enum {string} */
             currency?: "BDT";
             version?: number;
@@ -1323,6 +1411,16 @@ export interface operations {
             query?: {
                 limit?: string;
                 cursor?: string;
+                /** @description A shipment status, or several — `?status=CREATED,IN_TRANSIT`. */
+                status?: string;
+                /** @description The zone a parcel was priced against, e.g. `dhaka-metro`. */
+                zone?: string;
+                /** @description Tracking code or phone, partial. */
+                q?: string;
+                /** @description `yyyy-mm-dd`, Asia/Dhaka, inclusive. */
+                from?: string;
+                /** @description `yyyy-mm-dd`, Asia/Dhaka, inclusive of the whole day. */
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -1565,6 +1663,23 @@ export interface operations {
             };
         };
     };
+    PricingController_rateCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CollectCodController_collect: {
         parameters: {
             query?: never;
@@ -1629,11 +1744,48 @@ export interface operations {
             };
         };
     };
+    ListCodExceptionsController_list: {
+        parameters: {
+            query?: {
+                limit?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CoverageController_coverage: {
         parameters: {
             query: {
                 zone: string;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoverageController_zones: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -1997,25 +2149,6 @@ export interface operations {
             };
         };
     };
-    BalanceController_balance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     SettlementPaymentController_initiatePayment: {
         parameters: {
             query?: never;
@@ -2051,6 +2184,61 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MerchantBalanceController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSettlementController_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSettlementController_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

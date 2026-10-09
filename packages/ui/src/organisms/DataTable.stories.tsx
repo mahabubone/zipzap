@@ -259,6 +259,29 @@ export const WithFilters: RowStory = {
   },
 };
 
+/** Cursor-fed list: no page numbers, no client search, no client sort — the
+ *  rows are exactly the page the server returned. */
+export const ServerPaged: RowStory = {
+  render: () => {
+    const [depth, setDepth] = useState(0);
+    const slice = ROWS.slice(depth * 5, depth * 5 + 5);
+    return (
+      <DataTable<Shipment>
+        caption="Shipments"
+        rowKey={(r) => r.code}
+        columns={COLUMNS}
+        rows={slice}
+        serverPage={{
+          hasMore: depth * 5 + 5 < ROWS.length,
+          canGoBack: depth > 0,
+          onNext: () => setDepth((d) => d + 1),
+          onBack: () => setDepth((d) => Math.max(0, d - 1)),
+        }}
+      />
+    );
+  },
+};
+
 export const Loading: RowStory = {
   render: () => (
     <DataTable<Shipment>

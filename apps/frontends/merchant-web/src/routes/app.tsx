@@ -14,6 +14,12 @@ export const Route = createFileRoute('/app')({
 const LINKS = [
   { label: 'Control tower', href: '/app' },
   { label: 'Shipments', href: '/app/shipments' },
+  { label: 'New shipment', href: '/app/shipments/new' },
+  { label: 'Bulk import', href: '/app/shipments/bulk' },
+  { label: 'Money', href: '/app/money' },
+  { label: 'Reconciliation', href: '/app/cod' },
+  { label: 'Settlements', href: '/app/settlements' },
+  { label: 'Rate card', href: '/app/pricing' },
 ] as const;
 
 function navFor(pathname: string): NavGroup[] {
@@ -22,8 +28,13 @@ function navFor(pathname: string): NavGroup[] {
       label: 'Operate',
       items: LINKS.map((l) => ({
         ...l,
-        // `/app` must not light up for `/app/shipments`.
-        active: l.href === '/app' ? pathname === '/app' : pathname.startsWith(l.href),
+        // `/app` must not light up for `/app/shipments`, and `/app/shipments/new`
+        // would light BOTH — so the longer path is matched exactly and only the
+        // list uses a prefix test.
+        active:
+          l.href === '/app'
+            ? pathname === '/app'
+            : pathname === l.href || pathname.startsWith(`${l.href}/`),
       })),
     },
   ];

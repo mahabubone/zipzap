@@ -53,7 +53,6 @@ export class CreateShipmentDto {
   @IsBoolean() remoteArea!: boolean;
   @IsBoolean() fragile!: boolean;
   @IsOptional() @IsString() @MaxLength(40) packagingKind?: string;
-  @IsString() @MaxLength(40) merchantPlan!: string;
 }
 
 @ApiTags('shipments')
@@ -82,7 +81,6 @@ export class CreateShipmentController {
     const { result, replayed } = await this.createShipment.execute({
       // merchantId comes from the credential, never from the body.
       merchantId: principal.merchantId!,
-      merchantPlan: body.merchantPlan,
       zone: body.zone,
       remoteArea: body.remoteArea,
       fragile: body.fragile,

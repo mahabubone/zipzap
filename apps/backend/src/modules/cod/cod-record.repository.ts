@@ -72,6 +72,47 @@ export class CodRecordRepository {
 
   /** Status counting. Each query owns only the `cod` schema; the dashboard
    * aggregates many such single-schema reads — it never joins across schemas. */
+  async countsByMerchant(manager: EntityManager, merchantId: string): Promise<Map<string, number>> {
+    const rows = await manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .select('c.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('c.merchantId = :merchantId', { merchantId })
+      .groupBy('c.status')
+      .getRawMany();
+    return new Map(rows.map((r) => [r.status, Number(r.count)]));
+  }
+
+  /**
+   * The open-exception queue, newest first.
+   *
+   * Pinned to `RECONCILIATION_EXCEPTION` in the WHERE rather than filtering in application code,
+   * so the partial index from migration 1759000000038 is usable. Ordering is (created_at, id) both
+   * DESC for the same reason as every other page here: `created_at` alone is not unique, and a
+   * cursor over a non-total order repeats or skips a row.
+   */
+  exceptionsFor(
+    manager: EntityManager,
+    merchantId: string,
+    after: { createdAt: string; id: string } | null,
+    take: number,
+  ): Promise<CodRecordEntity[]> {
+    const query = manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .where('c.merchantId = :merchantId', { merchantId })
+      .andWhere('c.status = :status', { status: 'RECONCILIATION_EXCEPTION' })
+      .orderBy('c.createdAt', 'DESC')
+      .addOrderBy('c.id', 'DESC')
+      .take(take);
+    if (after) {
+      query.andWhere('(c.createdAt, c.id) < (:createdAt, :id)', {
+        createdAt: after.createdAt,
+        id: after.id,
+      });
+    }
+    return query.getMany();
+  }
+
   countByStatus(manager: EntityManager, status: CodStatus): Promise<number> {
     return manager.getRepository(CodRecordEntity).countBy({ status });
   }
@@ -98,6 +139,28 @@ export class CodRecordRepository {
       'SETTLEMENT_CREATED',
       'SETTLEMENT_HOLD',
     ]);
+  }
+
+  /**
+   * Reviewed records whose figures disagreed — each one still owes a correcting ADJUSTMENT row.
+   *
+   * A review that found no difference needs no correction, so `collected <> expected` is part of
+   * the predicate rather than a filter applied afterwards. Only `COD_RECONCILED` counts: an
+   * unreviewed exception is already blocking, and a match was never wrong.
+   *
+   * This exists because a review clears the COD block in the same transaction that emits the
+   * event, while the correcting ledger row is written later by the finance consumer. Callers use
+   * it to refuse acting on a window that is open for as long as that hop takes.
+   */
+  reviewedMismatches(manager: EntityManager, merchantId: string): Promise<string[]> {
+    return manager
+      .createQueryBuilder(CodRecordEntity, 'c')
+      .select('c.id', 'id')
+      .where('c.merchantId = :merchantId', { merchantId })
+      .andWhere('c.status = :status', { status: 'COD_RECONCILED' })
+      .andWhere('c.collectedMinor <> c.expectedMinor')
+      .getRawMany<{ id: string }>()
+      .then((rows) => rows.map((row) => row.id));
   }
 
   /** Money in collection: collected but not yet paid out to the merchant. Integer

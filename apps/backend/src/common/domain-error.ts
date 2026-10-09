@@ -102,6 +102,21 @@ export class CodRecordNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+/**
+ * A settlement that does not exist, or belongs to another merchant.
+ *
+ * One error for both, on purpose: `assertTenant` runs after the lookup and throws this rather than
+ * `PermissionDeniedError`, because a 403 confirms the row exists and a settlement id is sequential
+ * enough to be enumerated. Same reasoning as `assertTenant` itself.
+ */
+export class SettlementNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'SETTLEMENT_NOT_FOUND',
+    status: 404,
+    title: 'Settlement not found',
+  } satisfies DomainErrorSpec;
+}
+
 export class PricingVersionNotFoundError extends DomainError {
   readonly spec = {
     code: 'PRICING_VERSION_NOT_FOUND',
@@ -255,6 +270,11 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [ServiceabilityFailedError, new ServiceabilityFailedError('reason').spec],
   [ReconciliationExceptionError, new ReconciliationExceptionError().spec],
   [ManifestIncompleteError, new ManifestIncompleteError([]).spec],
+  // Was missing, so a full offline queue surfaced as a 500 — an infrastructure fault for what is
+  // ordinary backpressure. Unreachable only because no HTTP route could fill the queue; the moment
+  // the device replay route landed it would have shipped. Caught by reading the spec against the
+  // classes, which is what this map exists for.
+  [CommandQueueFullError, new CommandQueueFullError(0, 0).spec],
   [RateLimitedError, new RateLimitedError(60).spec],
   [DependencyUnavailableError, new DependencyUnavailableError().spec],
 ]);

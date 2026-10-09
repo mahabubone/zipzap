@@ -8,6 +8,13 @@ import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
 import { ShipmentEntity } from './shipment.entity.ts';
 import { type ShipmentStatus } from './rules/state-machine.ts';
+import {
+  NO_FILTERS,
+  dhakaDayEndExclusive,
+  dhakaDayStart,
+  escapeLike,
+  type ShipmentFilters,
+} from './rules/filters.ts';
 
 /**
  * Takes an EntityManager on every method rather than holding a connection. That is what makes
@@ -116,12 +123,23 @@ export class ShipmentRepository {
    * both DESC — created_at alone is not unique, and the cursor then repeats
    * or skips a row. The composite WHERE keeps the page stable under writes:
    * rows created after paging started sort before the cursor, never inside it.
+   *
+   * Filters are ANDed into the SAME WHERE as the cursor, not applied after the
+   * page is fetched. Paging first and filtering after would silently shrink a
+   * page — the merchant asks for 25 delivered parcels and gets however many
+   * survived the slice, then a "next page" that skips the rest.
+   *
+   * Date bounds arrive as `yyyy-mm-dd` Asia/Dhaka days. `from` is inclusive;
+   * `to` is converted to an EXCLUSIVE instant one day later, so the whole of
+   * the selected final day is included. Passing `to` straight through as
+   * `created_at <= '2026-10-01'` would mean midnight at the START of that day.
    */
   async pageByMerchant(
     manager: EntityManager,
     merchantId: string,
     after: { createdAt: string; id: string } | null,
     take: number,
+    filters: ShipmentFilters = NO_FILTERS,
   ): Promise<ShipmentEntity[]> {
     const query = manager
       .createQueryBuilder(ShipmentEntity, 's')
@@ -129,6 +147,30 @@ export class ShipmentRepository {
       .orderBy('s.createdAt', 'DESC')
       .addOrderBy('s.id', 'DESC')
       .take(take);
+
+    if (filters.statuses !== null) {
+      query.andWhere('s.status IN (:...statuses)', { statuses: [...filters.statuses] });
+    }
+    if (filters.zone !== null) {
+      query.andWhere('s.zone = :zone', { zone: filters.zone });
+    }
+    if (filters.search !== null) {
+      // The term is a bound parameter, never interpolated. `ILIKE` so a merchant
+      // typing a tracking code in lower case still finds it.
+      query.andWhere(
+        '(s.trackingCode ILIKE :search OR s.recipientPhone ILIKE :search OR s.senderPhone ILIKE :search)',
+        { search: `%${escapeLike(filters.search)}%` },
+      );
+    }
+    if (filters.from !== null) {
+      query.andWhere('s.createdAt >= :from', { from: dhakaDayStart(filters.from) });
+    }
+    if (filters.to !== null) {
+      query.andWhere('s.createdAt < :toExclusive', {
+        toExclusive: dhakaDayEndExclusive(filters.to),
+      });
+    }
+
     if (after) {
       query.andWhere('(s.createdAt, s.id) < (:createdAt, :id)', {
         createdAt: after.createdAt,

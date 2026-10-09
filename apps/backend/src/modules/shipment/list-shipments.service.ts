@@ -13,6 +13,7 @@ import type { DataSource } from 'typeorm';
 import { ValidationFailedError } from '../../common/domain-error.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
 import { clampLimit, decodeCursor, encodeCursor } from './rules/pagination.ts';
+import { parseShipmentFilters, type ShipmentFilters } from './rules/filters.ts';
 
 export interface ShipmentSummary {
   readonly id: string;
@@ -21,6 +22,10 @@ export interface ShipmentSummary {
   readonly merchantReference: string | null;
   readonly codAmountMinor: number;
   readonly codCurrency: string;
+  /** The zone this parcel was priced against. Null on rows created before the
+   *  column existed — the migration deliberately did not backfill, because a
+   *  guessed zone is a wrong charge that nobody can later correct. */
+  readonly zone: string | null;
   readonly createdAt: string;
 }
 
@@ -36,7 +41,12 @@ export class ListShipmentsService {
     @Inject(ShipmentRepository) private readonly repository: ShipmentRepository,
   ) {}
 
-  async execute(merchantId: string, limitRaw: unknown, cursorRaw: unknown): Promise<ShipmentPage> {
+  async execute(
+    merchantId: string,
+    limitRaw: unknown,
+    cursorRaw: unknown,
+    filterRaw: { status?: unknown; zone?: unknown; q?: unknown; from?: unknown; to?: unknown } = {},
+  ): Promise<ShipmentPage> {
     const limit = clampLimit(limitRaw);
     const after =
       typeof cursorRaw === 'string' && cursorRaw.length > 0
@@ -46,11 +56,20 @@ export class ListShipmentsService {
       throw new ValidationFailedError([{ path: 'cursor', message: after.reason }]);
     }
 
+    const parsed = parseShipmentFilters(filterRaw);
+    if (!parsed.ok) {
+      // Every bad field at once: a merchant fixing a filter should not have to
+      // discover the second problem on the second round trip.
+      throw new ValidationFailedError([...parsed.issues]);
+    }
+    const filters: ShipmentFilters = parsed.filters;
+
     const rows = await this.repository.pageByMerchant(
       this.shipments.manager,
       merchantId,
       after.cursor ? { createdAt: after.cursor.createdAt, id: after.cursor.id } : null,
       limit + 1,
+      filters,
     );
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
@@ -63,6 +82,7 @@ export class ListShipmentsService {
         merchantReference: row.merchantReference,
         codAmountMinor: row.codAmountMinor,
         codCurrency: row.codCurrency,
+        zone: row.zone,
         createdAt: row.createdAt.toISOString(),
       })),
       pagination: {

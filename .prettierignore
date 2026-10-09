@@ -11,3 +11,5 @@ apps/backend/openapi.json
 packages/api-client/src/generated.d.ts
 apps/frontends/merchant-web/src/routeTree.gen.ts
 apps/frontends/customer-tracking/src/routeTree.gen.ts
+apps/frontends/hub-console/src/routeTree.gen.ts
+apps/frontends/control-tower/src/routeTree.gen.ts

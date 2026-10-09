@@ -46,7 +46,7 @@ let service: CreateShipmentService;
 
 const command = (key: string) => ({
   merchantId: randomUUID(),
-  merchantPlan: 'standard',
+
   zone: 'dhaka-metro',
   remoteArea: false,
   fragile: false,

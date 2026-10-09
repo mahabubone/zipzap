@@ -43,6 +43,14 @@ export interface ManifestView {
   readonly status: ManifestStatus;
 }
 
+/** A manifest with its cargo list resolved — what the console renders on the manifest screen. */
+export interface ManifestDetail extends ManifestView {
+  readonly itemCount: number;
+  readonly items: ReadonlyArray<{ readonly shipmentId: string; readonly arrived: boolean }>;
+  /** Zero before RECEIVED: nobody has looked yet, which is not the same as nothing missing. */
+  readonly missingCount: number;
+}
+
 function toView(row: ManifestRow): ManifestView {
   return { id: row.id, code: row.code, tripId: row.trip_id, status: row.status as ManifestStatus };
 }
@@ -114,6 +122,73 @@ export class ManifestService {
         payload: { code, tripId, shipmentCount: shipmentIds.length },
       });
       return { id: manifestId, code, tripId, status: 'DRAFT' as const };
+    });
+  }
+
+  /**
+   * Manifests, newest first, optionally filtered by status.
+   *
+   * Exists because the hub console needs a work list and the transitions need a target. Ordered by
+   * `(created_at, id)` both DESC — `created_at` alone is not unique, and a console that skips a
+   * manifest when two share a timestamp is a console that loses cargo.
+   *
+   * A null status means no filter. An unrecognised one matches nothing rather than everything:
+   * `status=SHIPED` from a typo should show an empty list the operator notices, not every manifest
+   * in the network.
+   */
+  async list(status: string | null = null): Promise<ManifestView[]> {
+    return this.network.transaction(async (manager) => {
+      const rows = (await manager.query(
+        status === null
+          ? `SELECT id, code, trip_id, status FROM network.manifests
+              ORDER BY created_at DESC, id DESC`
+          : `SELECT id, code, trip_id, status FROM network.manifests
+              WHERE status = $1
+              ORDER BY created_at DESC, id DESC`,
+        status === null ? [] : [status],
+      )) as ManifestRow[];
+      return rows.map(toView);
+    });
+  }
+
+  /**
+   * One manifest with its cargo list and each parcel's arrival resolved.
+   *
+   * The console renders `missingCount` as the exception badge, so it is resolved here rather than
+   * left to the client — a client that counted the list itself would have to ask the same question
+   * twice and could disagree with `reconcile`, which is the authority.
+   *
+   * `missingCount` is 0 before RECEIVED even when nothing has arrived, because nobody has looked
+   * yet. "Not checked" and "nothing missing" must not render as the same number.
+   */
+  async detail(manifestId: string): Promise<ManifestDetail> {
+    return this.network.transaction(async (manager) => {
+      const rows = (await manager.query(
+        `SELECT id, code, trip_id, status FROM network.manifests WHERE id = $1`,
+        [manifestId],
+      )) as ManifestRow[];
+      const manifest = rows[0];
+      if (!manifest) throw new ResourceNotFoundError('Manifest not found.');
+
+      const items = (await manager.query(
+        `SELECT shipment_id FROM network.manifest_items WHERE manifest_id = $1 ORDER BY created_at`,
+        [manifestId],
+      )) as { shipment_id: string }[];
+
+      const checked = manifest.status === 'RECEIVED' || manifest.status === 'RECONCILED';
+      const arrived = checked
+        ? await Promise.all(items.map((item) => this.shipments.hasArrived(item.shipment_id)))
+        : items.map(() => false);
+
+      return {
+        ...toView(manifest),
+        itemCount: items.length,
+        items: items.map((item, index) => ({
+          shipmentId: item.shipment_id,
+          arrived: arrived[index] === true,
+        })),
+        missingCount: checked ? arrived.filter((a) => !a).length : 0,
+      };
     });
   }
 

@@ -45,6 +45,47 @@ export class RiderRepository {
     return manager.getRepository(RiderEntity).findBy({ status: 'AVAILABLE' });
   }
 
+  /**
+   * Every rider that has a position, for the ops map.
+   *
+   * `last_known_* IS NOT NULL` is the filter, and it is doing real work rather than being tidy: a
+   * rider who has never reported has NULL there, and plotting those at (0, 0) would put them in the
+   * Gulf of Guinea. The caller counts the ones it cannot draw with `countWithoutPosition`, so the
+   * map can say "4 riders, 1 has never reported" instead of quietly drawing three.
+   */
+  listWithPosition(manager: EntityManager): Promise<
+    Array<{
+      id: string;
+      display_name: string;
+      status: string;
+      lng: string;
+      lat: string;
+      last_known_at: Date | null;
+      current_job_id: string | null;
+    }>
+  > {
+    return manager.query(
+      `SELECT id,
+              display_name,
+              status,
+              last_known_longitude::text AS lng,
+              last_known_latitude::text  AS lat,
+              last_known_at,
+              current_job_id
+         FROM rider.riders
+        WHERE last_known_latitude IS NOT NULL
+          AND last_known_longitude IS NOT NULL
+        ORDER BY display_name`,
+    );
+  }
+
+  countWithoutPosition(manager: EntityManager): Promise<number> {
+    return manager
+      .createQueryBuilder(RiderEntity, 'r')
+      .where('r.lastKnownLatitude IS NULL')
+      .getCount();
+  }
+
   /** Status counting. Each query owns only the `rider` schema; the dashboard
    * aggregates many such single-schema reads — it never joins across schemas. */
   countByStatus(manager: EntityManager, status: RiderStatus): Promise<number> {

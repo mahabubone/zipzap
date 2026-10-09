@@ -10,10 +10,15 @@ Who is acting, and are they allowed to. Phase 1.
 to a bundle of scopes. A guard checks scopes and never a role name, so the bundles are the only
 place a role name means anything.
 
-`sessions` are `merchant`'s table, not identity's — see [merchant](merchant.md). identity registers
-no TypeORM connection and owns no tables; it calls merchant's service to authenticate and to
-resolve a session. The `identity` schema (`users`, `identities`, `devices`, `permissions`,
-`role_permissions`) is **not built**; see the deferred table in [the plan](../../product/competition/plan.md).
+**`users` and `user_merchants`** — a person, and their role inside one merchant each. Both added in
+migration 0036. identity registers a TypeORM connection because of them; before that it owned no
+tables and read a person's credential out of `merchant.merchants`, which is precisely why one login
+could not hold two businesses.
+
+`sessions` remain `merchant`'s table — see [merchant](merchant.md). A session authenticates a
+person, so it carries `user_id`, but its lifecycle is merchant's business. The seam runs both ways
+and that is the point: identity exposes `UserService`, merchant calls it to resolve the credential,
+and identity calls `FindCredentialService` to verify an API key. Neither reads the other's tables.
 
 ## Two kinds of principal
 
@@ -43,11 +48,46 @@ The two scopes withheld from `MERCHANT_OPERATOR` are the two that are irreversib
 `settlements:approve` moves money off the platform, and `keys:manage` mints a credential that acts
 with full merchant scope. An operator who can do either can empty the account.
 
-**The role is stored on the session, not on a user.** A privilege change therefore _revokes_
-sessions rather than widening them, so a live token can never carry permissions its bearer did not
-have at login. The cost is that a role change forces a re-login — the correct failure mode for an
-authorization change. Add `identity.users` when one merchant has more than one human and that
-re-login stops being acceptable.
+**The role lives on the membership, not on the user and not on the session.** It moved off
+`sessions.role` in migration 0036 for two reasons: a role per user cannot express "operator at one
+store, owner at another", which is the ordinary case for anyone running two shops; and a second copy
+of the role on a session could disagree with the membership and nothing would notice.
+
+A membership is therefore the unit of permission, and **permissions are resolved per request** —
+`AuthenticateApiKeyService` re-reads the memberships on every call rather than trusting a copy on the
+token. That is stricter than the old "revoke on privilege change" behaviour and it is deliberate: a
+membership revoked mid-session stops working on the very next request, with no re-login, so a
+legitimately-revoked employee cannot keep using a live token.
+
+## Multi-business
+
+A login is a **person**; a **membership** is that person's role in one merchant. One person may hold
+several, and `ApiPrincipal` carries both:
+
+| Field         | Meaning                                                                |
+| ------------- | ---------------------------------------------------------------------- |
+| `merchantId`  | the ACTIVE business — the one this request acts inside                 |
+| `merchantIds` | every business this principal may act inside, one entry per membership |
+| `scopes`      | the ACTIVE membership's role bundle — never a union across businesses  |
+
+`assertTenant` checks **membership**, not equality: a principal holding `[m-1, m-2]` may act in
+either and a third gets the same 404 as one that does not exist. A business outside the set is
+never a 403, because a 403 confirms it exists.
+
+The active business is chosen at login (`POST /v1/auth/login` takes an optional `merchantId`) and
+resolved **deterministically** — the first membership by `merchantId`, so two people with identical
+memberships never get different defaults. A `merchantId` the user does not hold **fails the login**
+rather than falling back to the default: falling back would serve the wrong store's data with a
+200, which is a cross-tenant read wearing a success code.
+
+An API key principal has exactly one entry in `merchantIds`. A key is issued to one merchant, and a
+machine carrying a membership set would be a credential that could reach a second tenant.
+
+`ponytail:` there is no role-assignment UI, no invitation flow and no password reset. Every
+membership in the database was written by the seed or by migration 0036's backfill. Add the write
+path when a human other than the seed has to create one — an admin surface is the trigger, not a
+date. There is also no "switch business" endpoint yet: a second login with `merchantId` reaches the
+other business today, which is enough to prove the model and not enough to be a good console.
 
 ## Rules
 
@@ -68,8 +108,11 @@ re-login stops being acceptable.
 3. **API secrets are hashed.** Compared, never stored raw. See [merchant](merchant.md).
 4. **Every permission check happens at the application boundary**, in a guard — not in a
    controller, and never only in the UI.
-5. **Sessions rotate on privilege change.** A role change invalidates existing sessions.
-6. **Tenant scoping is derived, never accepted.** The merchant is a property of the credential.
+5. **A privilege change takes effect on the next request.** Permissions are resolved from the
+   membership per request, so revoking a membership or changing a role needs no session rotation.
+6. **Tenant scoping is derived, never accepted.** The merchant is a property of the credential —
+   and for a human, a property of their memberships. A client-supplied `merchantId` is a _request_
+   for a scope, checked against the membership set, never an assertion of one.
 7. **Authentication is audited.** Login, failed login, logout, credential rotation, credential
    revocation — written to `system.audit_events`, see [Audit trail](#audit-trail).
 
@@ -186,6 +229,11 @@ commands are keyed on, and it can be revoked to cut off a stolen phone. See
 
 Every other schema. Identity is referenced by `userId` everywhere and owns nothing outside
 `identity`.
+
+`identity.user_merchants.merchant_id` is a bare uuid with a CHECK on `role`, **not** a foreign key:
+merchant is another module's table, and a cross-schema FK is the coupling
+[ADR-0002](../../ADR/0002-postgresql-schema-boundaries.md) exists to prevent. `sessions.user_id` is
+the same deal in the other direction.
 
 ---
 

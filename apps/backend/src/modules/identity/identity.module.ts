@@ -1,31 +1,43 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { forModule } from '../../database/module-connection.ts';
 import { MerchantModule } from '../merchant/merchant.module.ts';
 import { FIND_CREDENTIAL, AuthenticateApiKeyService } from './authenticate-api-key.service.ts';
 import { FindCredentialService } from '../merchant/find-credential.service.ts';
+import { UserService } from './user.service.ts';
+import { UserEntity } from './user.entity.ts';
+import { UserMerchantEntity } from './user-merchant.entity.ts';
 import { ApiKeyGuard } from './api-key.guard.ts';
 import { MeController } from './me.controller.ts';
 import { LoginController } from './login.controller.ts';
 import { LogoutController } from './logout.controller.ts';
 
 /**
- * identity registers NO TypeORM connection in this slice, because it owns no tables.
+ * identity owns two tables as of migration 0036: `users` (a person) and `user_merchants` (the
+ * membership, and where a role lives).
  *
- * API credentials are merchant data — docs/domains/merchant.md lists api_credentials under the
- * merchant schema — so identity verifies a key by calling merchant's service rather than reading
- * a table. That is the boundary rule working in our favour: it removed a connection, a JOIN, and
- * an ownership question we would otherwise have answered wrongly.
+ * It registered NO TypeORM connection until then, because a person's password hash sat on
+ * `merchant.merchants` — which is exactly why one login could not hold two businesses: the
+ * credential that proved who you were was the same row that scoped what you could see. Owning the
+ * user is what separates the two.
+ *
+ * The other direction is unchanged and still a service call: API credentials are merchant's tables,
+ * so identity verifies a key through `FindCredentialService` rather than reading them.
  */
 @Module({
-  imports: [forwardRef(() => MerchantModule)],
+  imports: [
+    forModule('identity', [UserEntity, UserMerchantEntity]),
+    forwardRef(() => MerchantModule),
+  ],
   providers: [
     AuthenticateApiKeyService,
     ApiKeyGuard,
+    UserService,
     { provide: FIND_CREDENTIAL, useExisting: FindCredentialService },
   ],
   // ScopeGuard is deliberately NOT a provider. It takes a scope string as a constructor argument
   // and is instantiated at the decorator site with `new ScopeGuard('shipments:write')`; listing
   // it here makes Nest try to inject a string, which it cannot resolve.
-  exports: [AuthenticateApiKeyService, ApiKeyGuard],
+  exports: [AuthenticateApiKeyService, ApiKeyGuard, UserService],
   controllers: [MeController, LoginController, LogoutController],
 })
 export class IdentityModule {}

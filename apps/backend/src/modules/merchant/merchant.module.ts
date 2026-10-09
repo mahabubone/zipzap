@@ -16,6 +16,7 @@ import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
 import { MerchantAuthService } from './sessions.service.ts';
 import { CreateApiKeyService } from './create-api-key.service.ts';
+import { MerchantPlanLookup, MERCHANT_PLAN_LOOKUP } from './merchant-plan.lookup.ts';
 import { CreateApiKeyController } from './create-api-key.controller.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
@@ -69,7 +70,10 @@ export class BullConnectionCloser implements OnModuleDestroy {
     BullConnectionCloser,
     MerchantAuthService,
     CreateApiKeyService,
+    // Pricing resolves a merchant's plan through this rather than reading `merchant.merchants`.
+    MerchantPlanLookup,
+    { provide: MERCHANT_PLAN_LOOKUP, useExisting: MerchantPlanLookup },
   ],
-  exports: [FindCredentialService, MerchantAuthService],
+  exports: [FindCredentialService, MerchantAuthService, MERCHANT_PLAN_LOOKUP],
 })
 export class MerchantModule {}

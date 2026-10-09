@@ -19,6 +19,20 @@
  *
  * An operator who can do either is an operator who can empty the account. Every other merchant
  * scope is granted, because an operator who cannot see shipments cannot do their job.
+ *
+ * ## The vocabulary is no longer all merchant-facing
+ *
+ * `hub:read` and `hub:scan` arrived with the hub console, and they are not merchant powers: a
+ * merchant does not stand at a conveyor belt. Granting them to a merchant would hand every
+ * merchant API key the ability to drive the network state machine for a parcel they do not own —
+ * `hub:scan` advances a shipment through custody, and that is platform state, not tenant state.
+ *
+ * So the split is now DERIVED rather than asserted: `MERCHANT_SCOPES` is every scope that is not
+ * platform-facing, and a platform scope is withheld from merchants by default. That direction
+ * matters. The previous shape listed the merchant's scopes explicitly, which meant the next scope
+ * anyone added was a merchant scope until somebody remembered to subtract it — fail-open on a
+ * permission list. A platform scope added tomorrow is withheld from every merchant role the moment
+ * it lands here, with no second edit to forget.
  */
 
 import { API_SCOPES, type ApiScope } from '../../../common/scopes.ts';
@@ -39,24 +53,25 @@ export function isRoleName(value: string): value is RoleName {
   return (ROLE_NAMES as readonly string[]).includes(value);
 }
 
-/** Everything a merchant-facing role may hold. Platform scopes are separate by construction. */
-const MERCHANT_SCOPES: readonly ApiScope[] = [
-  'shipments:read',
-  'shipments:write',
-  'tracking:read',
-  'pickup:create',
-  'pickup:read',
-  'delivery:create',
-  'delivery:read',
-  'delivery:complete',
-  'returns:read',
-  'returns:write',
-  'cod:read',
-  'settlements:read',
-  'settlements:approve',
-  'webhooks:manage',
-  'keys:manage',
-];
+/**
+ * Scopes that act on the network rather than on one merchant's account.
+ *
+ * Exported because the exclusion is a security claim that belongs in a test, and a test that has to
+ * re-derive the list is a test that stops asserting anything the moment the list moves.
+ */
+/**
+ * Scopes that belong to the delivery network rather than to any client of it.
+ *
+ * A hub is a network partner and a merchant is a client; neither is a tenant of the other, so
+ * neither holds these. `hub:read`/`hub:scan` drive custody; `rider:sync` reads a rider's day. All
+ * three would let a client drive or observe the network itself.
+ */
+export const PLATFORM_SCOPES: readonly ApiScope[] = ['hub:read', 'hub:scan', 'rider:sync'];
+
+/** Everything a merchant-facing role may hold: the vocabulary minus the platform's own. */
+export const MERCHANT_SCOPES: readonly ApiScope[] = API_SCOPES.filter(
+  (scope) => !PLATFORM_SCOPES.includes(scope),
+);
 
 /** The two an operator may not hold. Named so the reason survives a future edit. */
 export const OWNER_ONLY_SCOPES: readonly ApiScope[] = ['settlements:approve', 'keys:manage'];
@@ -82,10 +97,26 @@ export const ROLE_SCOPES: Readonly<Record<RoleName, readonly ApiScope[]>> = {
     'returns:read',
     'returns:write',
     'cod:read',
+    'hub:read',
+    'hub:scan',
+    'rider:sync',
   ],
 
-  /** Works a hub: scans and reconciles manifests. Read-only elsewhere, and sees no money at all. */
-  HUB_OPERATOR: ['shipments:read', 'tracking:read', 'pickup:read', 'delivery:read'],
+  /**
+   * Works a hub: scans parcels and reconciles manifests. Read-only elsewhere, and sees no money.
+   *
+   * `hub:scan` is deliberately NOT `shipments:write`. A hub operator moves parcels between hubs;
+   * creating and cancelling shipments is the merchant's power, and a hub console that could do it
+   * would turn every hub terminal into a way to write into someone else's account.
+   */
+  HUB_OPERATOR: [
+    'shipments:read',
+    'tracking:read',
+    'pickup:read',
+    'delivery:read',
+    'hub:read',
+    'hub:scan',
+  ],
 
   /**
    * Answers "where is my parcel". Read-only everywhere. Deliberately cannot read `cod:read`: a
@@ -104,7 +135,13 @@ export const ROLE_SCOPES: Readonly<Record<RoleName, readonly ApiScope[]>> = {
    * A rider's own feed. Not a merchant role at all — a rider is scoped to assigned jobs, which the
    * rider module enforces separately. These scopes are the floor the app needs to render work.
    */
-  RIDER: ['tracking:read', 'pickup:read', 'delivery:read', 'delivery:complete'],
+  /**
+   * A rider's own day. `rider:sync` is the offline protocol: pull what ops queued, push back what
+   * the rider did while the network was down, and acknowledge. It is the only way to move a
+   * shipment forward for this role, which is the point — a rider app with no `rider:sync` could
+   * read its jobs and never report anything.
+   */
+  RIDER: ['tracking:read', 'pickup:read', 'delivery:read', 'delivery:complete', 'rider:sync'],
 };
 
 export function scopesForRole(role: RoleName): readonly ApiScope[] {

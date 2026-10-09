@@ -349,6 +349,51 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "A shipment status, or several — `?status=CREATED,IN_TRANSIT`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zone",
+            "required": false,
+            "in": "query",
+            "description": "The zone a parcel was priced against, e.g. `dhaka-metro`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tracking code or phone, partial.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "`yyyy-mm-dd`, Asia/Dhaka, inclusive.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "`yyyy-mm-dd`, Asia/Dhaka, inclusive of the whole day.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -625,6 +670,21 @@
         ]
       }
     },
+    "/v1/pricing/rate-card": {
+      "get": {
+        "operationId": "PricingController_rateCard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your rate card, with worked examples",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
     "/v1/cod/collect": {
       "post": {
         "operationId": "CollectCodController_collect",
@@ -716,6 +776,38 @@
         ]
       }
     },
+    "/v1/cod/exceptions": {
+      "get": {
+        "operationId": "ListCodExceptionsController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Unreviewed COD reconciliation exceptions, newest first",
+        "tags": [
+          "cod"
+        ]
+      }
+    },
     "/v1/coverage": {
       "get": {
         "operationId": "CoverageController_coverage",
@@ -735,6 +827,21 @@
           }
         },
         "summary": "Serviceability check for one zone",
+        "tags": [
+          "coverage"
+        ]
+      }
+    },
+    "/v1/zones": {
+      "get": {
+        "operationId": "CoverageController_zones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every zone you can ship to",
         "tags": [
           "coverage"
         ]
@@ -1255,30 +1362,6 @@
         ]
       }
     },
-    "/v1/merchants/{id}/balance": {
-      "get": {
-        "operationId": "BalanceController_balance",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Derived merchant balance in minor units",
-        "tags": [
-          "settlements"
-        ]
-      }
-    },
     "/v1/settlements/{id}/initiate-payment": {
       "post": {
         "operationId": "SettlementPaymentController_initiatePayment",
@@ -1338,6 +1421,69 @@
           }
         },
         "summary": "Confirm the provider payout and settle",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/finance/balance": {
+      "get": {
+        "operationId": "MerchantBalanceController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Your derived balance, itemised, with anything blocking a payout",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/settlements/{id}": {
+      "get": {
+        "operationId": "GetSettlementController_one",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One settlement, itemised",
+        "tags": [
+          "settlements"
+        ]
+      }
+    },
+    "/v1/settlements/{id}/statement.csv": {
+      "get": {
+        "operationId": "GetSettlementController_csv",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download the itemised statement",
         "tags": [
           "settlements"
         ]
@@ -1628,6 +1774,11 @@
       "LoginDto": {
         "type": "object",
         "properties": {
+          "merchantId": {
+            "type": "string",
+            "description": "Business to open the session against",
+            "format": "uuid"
+          },
           "email": {
             "type": "string",
             "format": "email"
@@ -1750,10 +1901,6 @@
           "packagingKind": {
             "type": "string",
             "maxLength": 40
-          },
-          "merchantPlan": {
-            "type": "string",
-            "maxLength": 40
           }
         },
         "required": [
@@ -1767,8 +1914,7 @@
           "parcelDescription",
           "zone",
           "remoteArea",
-          "fragile",
-          "merchantPlan"
+          "fragile"
         ]
       },
       "UploadBulkDto": {
@@ -1854,10 +2000,6 @@
             "type": "string",
             "maxLength": 40
           },
-          "merchantPlan": {
-            "type": "string",
-            "maxLength": 40
-          },
           "currency": {
             "type": "string",
             "enum": [
@@ -1875,8 +2017,7 @@
           "codAmountMinor",
           "zone",
           "remoteArea",
-          "fragile",
-          "merchantPlan"
+          "fragile"
         ]
       },
       "CollectCodDto": {

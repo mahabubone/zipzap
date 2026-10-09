@@ -28,6 +28,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { ResourceNotFoundError } from '../../common/domain-error.ts';
 import { AuditService } from '../system/audit.service.ts';
+import { TimelineReadService, type TimelineEntry } from '../tracking/timeline-read.service.ts';
 
 export interface ShipmentDetail {
   readonly id: string;
@@ -36,14 +37,20 @@ export interface ShipmentDetail {
   readonly merchantReference: string | null;
   readonly senderName: string;
   readonly senderPhone: string;
+  readonly senderAddress: string;
   readonly recipientName: string;
   readonly recipientPhone: string;
+  readonly recipientAddress: string;
   readonly parcelWeightGrams: number;
   readonly parcelDescription: string;
   readonly codAmountMinor: number;
   readonly codCurrency: string;
+  /** The zone this parcel was priced against; null pre-column. */
+  readonly zone: string | null;
   readonly pricingVersion: number;
   readonly createdAt: string;
+  /** Oldest first. Empty only if the log has not been written yet. */
+  readonly timeline: ReadonlyArray<TimelineEntry>;
 }
 
 export interface ReadContext {
@@ -61,13 +68,15 @@ export class GetShipmentService {
   constructor(
     @InjectDataSource('shipment') private readonly shipments: DataSource,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TimelineReadService) private readonly timeline: TimelineReadService,
   ) {}
 
   async execute(merchantId: string, id: string, context?: ReadContext): Promise<ShipmentDetail> {
     const rows = await this.shipments.query(
       `SELECT id, tracking_code, status, merchant_reference, sender_name, sender_phone,
-              recipient_name, recipient_phone, parcel_weight_grams, parcel_description,
-              cod_amount_minor, cod_currency, pricing_version, created_at
+              sender_address, recipient_name, recipient_phone, recipient_address,
+              parcel_weight_grams, parcel_description,
+              cod_amount_minor, cod_currency, zone, pricing_version, created_at
          FROM shipment.shipments WHERE id = $1 AND merchant_id = $2`,
       [id, merchantId],
     );
@@ -98,14 +107,22 @@ export class GetShipmentService {
       merchantReference: (row.merchant_reference as string | null) ?? null,
       senderName: String(row.sender_name),
       senderPhone: String(row.sender_phone),
+      senderAddress: String(row.sender_address ?? ''),
       recipientName: String(row.recipient_name),
       recipientPhone: String(row.recipient_phone),
+      recipientAddress: String(row.recipient_address ?? ''),
       parcelWeightGrams: Number(row.parcel_weight_grams),
       parcelDescription: String(row.parcel_description),
       codAmountMinor: Number(row.cod_amount_minor),
       codCurrency: String(row.cod_currency),
+      zone: (row.zone as string | null) ?? null,
       pricingVersion: Number(row.pricing_version),
       createdAt: new Date(row.created_at as string).toISOString(),
+      // Asked for, never selected: `tracking.events` is another module's table
+      // (rule 2). The authorisation that matters happened above — the WHERE
+      // clause already proved this parcel is this merchant's — so this call
+      // cannot widen anything.
+      timeline: await this.timeline.forShipment(String(row.id)),
     };
   }
 }

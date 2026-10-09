@@ -41,6 +41,26 @@ export class CodRecordEntity {
   @Column('text', { nullable: true })
   failureNote!: string | null;
 
+  /**
+   * What the reviewer concluded, and who concluded it.
+   *
+   * Separate from `failureNote` because they are different facts: the failure describes the
+   * problem, the review describes the decision about it. One nullable text column cannot hold both
+   * without the second write overwriting the first.
+   *
+   * Nullable and left NULL by collection. A record that was never reviewed has no review note, and
+   * inventing one would put a reviewer's name on a decision nobody made.
+   */
+  @Column('text', { nullable: true })
+  reviewNote!: string | null;
+
+  /** An actor id, not a foreign key to identity.users. See ADR-0002. */
+  @Column('uuid', { nullable: true })
+  reviewedBy!: string | null;
+
+  @Column('timestamptz', { nullable: true })
+  reviewedAt!: Date | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

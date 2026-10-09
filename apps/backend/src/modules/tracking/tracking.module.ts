@@ -5,6 +5,7 @@ import { PublicTimelineEntity } from './public-timeline.entity.ts';
 import { AppendTrackingEventService } from './append-tracking-event.service.ts';
 import { TrackingConsumer } from './tracking.consumer.ts';
 import { TrackingFanout } from './tracking-fanout.ts';
+import { TimelineReadService } from './timeline-read.service.ts';
 import { PublicTrackingController } from './public-tracking.controller.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 
@@ -17,7 +18,9 @@ import { ShipmentModule } from '../shipment/shipment.module.ts';
     forwardRef(() => ShipmentModule),
   ],
   controllers: [PublicTrackingController],
-  providers: [AppendTrackingEventService, TrackingConsumer, TrackingFanout],
-  exports: [AppendTrackingEventService, TrackingConsumer, TrackingFanout],
+  providers: [AppendTrackingEventService, TrackingConsumer, TrackingFanout, TimelineReadService],
+  // TimelineReadService is exported for the shipment detail screen, which owns
+  // authorisation for it (it resolves the shipment inside its own schema first).
+  exports: [AppendTrackingEventService, TrackingConsumer, TrackingFanout, TimelineReadService],
 })
 export class TrackingModule {}

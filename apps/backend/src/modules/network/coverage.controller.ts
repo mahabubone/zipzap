@@ -27,4 +27,10 @@ export class CoverageController {
   async coverage(@Query() query: CoverageQuery): Promise<CoverageCheck> {
     return this.network.checkZone(query.zone);
   }
+
+  @Get('zones')
+  @ApiOperation({ summary: 'Every zone you can ship to' })
+  async zones(): Promise<{ zones: string[] }> {
+    return { zones: await this.network.listServiceableZones() };
+  }
 }

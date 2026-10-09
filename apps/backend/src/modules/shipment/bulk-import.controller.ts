@@ -7,8 +7,8 @@
  * then 202-accept moves it to chunked processing.
  */
 
-import { Body, Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Header, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { IsString, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { BulkImportService, type BulkJobView, type BulkPreview } from './bulk-import.service.ts';
@@ -70,6 +70,12 @@ export class BulkImportController {
 
   @Get(':jobId/result')
   @UseGuards(new ScopeGuard('shipments:write'))
+  // Nest returns a bare `string` as text/html, so a browser saves the result as
+  // an .html file that opens as a broken page. Both headers are load-bearing:
+  // the type is what makes it a download, the disposition is what names it.
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="zipzap-bulk-result.csv"')
+  @ApiProduces('text/csv')
   @ApiOperation({ summary: 'Download the row-level result CSV' })
   async result(
     @Param('jobId') jobId: string,

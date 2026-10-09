@@ -10,17 +10,22 @@
  * Guarded by settlements:read: seeing what is owed is read access. Approving is separate.
  */
 
-import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { CreateSettlementService, type CreatedSettlement } from './create-settlement.service.ts';
 
-export class CreateSettlementDto {
-  @IsUUID('4')
-  merchantId!: string;
-}
-
+/**
+ * **No body at all.**
+ *
+ * The endpoint used to take `merchantId` in the request body and never checked it — so any valid
+ * key could freeze *another* merchant's collections into a settlement. A permission without tenant
+ * scope is a data breach waiting for a missing WHERE, and this was the write case of it. The id now
+ * comes from the credential, where it cannot be tampered with, and there is nothing left to validate.
+ *
+ * The second argument to `execute` is the actor. It was hardcoded `null`, which meant every
+ * settlement was frozen by nobody in particular; the principal's subject id is who it actually was.
+ */
 @ApiTags('settlements')
 @Controller('v1/settlements')
 @UseGuards(ApiKeyGuard)
@@ -31,12 +36,11 @@ export class CreateSettlementController {
 
   @Post()
   @UseGuards(new ScopeGuard('settlements:read'))
-  @ApiOperation({ summary: 'Freeze unsettled entries into a settlement' })
-  async create(
-    @Body() body: CreateSettlementDto,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<CreatedSettlement> {
-    void request;
-    return this.createSettlement.execute({ merchantId: body.merchantId, actorId: null });
+  @ApiOperation({ summary: 'Freeze your unsettled entries into a settlement' })
+  async create(@Req() request: AuthenticatedRequest): Promise<CreatedSettlement> {
+    return this.createSettlement.execute({
+      merchantId: request.principal!.merchantId!,
+      actorId: request.principal!.subjectId,
+    });
   }
 }

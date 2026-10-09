@@ -6,9 +6,11 @@
  * order is the machine's 409; unknown scan kind is a 400 from the service. No
  * Idempotency-Key: the machine's state ordering is the dedupe.
  *
- * Scope reuse (ponytail): 'shipments:write' gates scans today because hub has no scope of
- * its own. Upgrade path: add a first-class 'hub:scan' scope when a dedicated warehouse
- * credential type exists — don't invent it until that principal does.
+ * Guarded on `hub:scan`, which this controller predicted and the hub console then justified.
+ * It was on `shipments:write` before, with a note saying not to invent a scope until a dedicated
+ * warehouse principal existed. That principal is a HUB_OPERATOR, so the scope exists — and the
+ * scan now needs nothing a merchant does. `shipments:write` would have let a hub employee create
+ * and cancel shipments, which is a merchant's power.
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
@@ -38,7 +40,7 @@ export class HubScanController {
   constructor(@Inject(HubScanService) private readonly hubScan: HubScanService) {}
 
   @Post('scans')
-  @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
+  @UseGuards(new ScopeGuard('hub:scan'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Record a hub scan for a shipment' })
   async scan(
     @Body() body: HubScanDto,

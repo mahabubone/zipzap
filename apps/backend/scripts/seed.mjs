@@ -99,6 +99,8 @@ async function seed() {
     'returns:write',
     'cod:read',
     'keys:manage',
+    'hub:read',
+    'hub:scan',
   ];
 
   const runTag = rng ? `s${Number(seedArg).toString(36)}` : Date.now().toString(36);
@@ -112,16 +114,28 @@ async function seed() {
     .digest('base64url')
     .slice(0, 24)}`;
 
+  const email = `ops+${runTag}@ayesha.test`;
+  const userId = randomUUID();
+
+  // One transaction across two schemas: the person, their membership in this merchant, the merchant
+  // and the credential are one fact. Splitting them would let a rerun leave a user with no merchant.
   await client.query('BEGIN');
   await client.query(
-    `INSERT INTO merchant.merchants (id, name, status, contact_email, password_hash)
-     VALUES ($1, $2, 'ACTIVE', $3, $4)`,
-    [
-      merchantId,
-      `Ayesha Fashion Ltd (${runTag})`,
-      `ops+${runTag}@ayesha.test`,
-      hashSecret(password),
-    ],
+    `INSERT INTO merchant.merchants (id, name, status, contact_email)
+     VALUES ($1, $2, 'ACTIVE', $3)`,
+    [merchantId, `Ayesha Fashion Ltd (${runTag})`, email],
+  );
+  // The credential belongs to the PERSON (migration 0036), not to the merchant — which is what lets
+  // one login hold several businesses. MERCHANT_OWNER: this is the merchant's own operator.
+  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
+    userId,
+    email,
+    hashSecret(password),
+  ]);
+  await client.query(
+    `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
+     VALUES ($1, $2, 'MERCHANT_OWNER')`,
+    [userId, merchantId],
   );
   await client.query(
     `INSERT INTO merchant.api_credentials (id, merchant_id, key_id, secret_hash, scopes)
@@ -132,11 +146,37 @@ async function seed() {
 
   if (profile) await seedProfile(PROFILES[profile], profile, runTag, merchantId);
 
+  // The hub console's operator. Same merchant — because that is how a membership is expressed —
+  // but a role whose ONLY write scope is `hub:scan`, so this login can move parcels between hubs
+  // and cannot create, cancel or settle anything.
+  const hubEmail = `hub+${runTag}@ayesha.test`;
+  const hubUserId = randomUUID();
+  const hubPassword = `hh_${createHash('sha256')
+    .update(String(Date.now()) + 'hubpassword')
+    .digest('base64url')
+    .slice(0, 24)}`;
+  await client.query('BEGIN');
+  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
+    hubUserId,
+    hubEmail,
+    hashSecret(hubPassword),
+  ]);
+  await client.query(
+    `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
+     VALUES ($1, $2, 'HUB_OPERATOR')`,
+    [hubUserId, merchantId],
+  );
+  await client.query('COMMIT');
+
   console.log(`merchant_id : ${merchantId}`);
   console.log(`key_id      : ${keyId}`);
   console.log(`secret      : ${secret}`);
-  console.log(`email       : ops+${runTag}@ayesha.test`);
+  console.log(`email       : ${email}`);
   console.log(`password    : ${password}`);
+  console.log();
+  console.log('Hub console login (scans parcels, reconciles manifests, no merchant power):');
+  console.log(`hub_email   : ${hubEmail}`);
+  console.log(`hub_password: ${hubPassword}`);
   console.log();
   console.log('Authorization: ApiKey <key_id>.<secret>');
   console.log('Login:       POST /v1/auth/login { email, password }');

@@ -70,6 +70,13 @@ export class ShipmentEntity {
   @Column('integer')
   pricingVersion!: number;
 
+  /** The zone this parcel was priced and serviceability-checked against. Not a
+   *  foreign key to network.service_areas: the zone list is another module's data
+   *  and grows, and a parcel must keep naming the zone it was charged for even
+   *  if that zone is later retired. NULL on rows created before it was stored. */
+  @Column('text', { nullable: true })
+  zone!: string | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

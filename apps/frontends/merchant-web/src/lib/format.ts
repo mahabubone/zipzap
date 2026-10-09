@@ -41,8 +41,34 @@ export function statusTone(status: string): Tone {
   return 'info';
 }
 
+/** `chattogram-metro` → `Chattogram metro`. The slug is the wire format; nobody
+ *  types it and nobody should read it. */
+export function zoneLabel(zone: string): string {
+  const words = zone.replace(/-/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** Integer minor units from the API's decimal string. Safe because the value is
  *  an integer — `Number` is exact below 2^53 and nothing here exceeds it. */
 export function minorOf(decimalString: string): number {
   return Number(decimalString);
+}
+
+const UNITS: Record<string, number> = { BDT: 100, USD: 100, EUR: 100 };
+const SYMBOLS: Record<string, string> = { BDT: '৳', USD: '$', EUR: '€' };
+
+/** `125050` + `BDT` → `৳1,250.50`, and `-50` → `-৳0.50`. A string, for places that need money
+ *  inside prose — the timeline's detail lines. Renders as a string because arithmetic on a float is
+ *  exactly what rule 4 forbids; the only division here is by a constant 100.
+ *
+ *  The sign goes OUTSIDE the symbol. `Intl` puts it on the number, so prefixing the symbol naively
+ *  yields `৳-0.50` — which reads as a corrupted taka sign followed by a stray dash, and it is the
+ *  format of every correction row on every statement. Found on the reconciliation screen. */
+export function formatMinor(amountMinor: number, currency: string): string {
+  const formatted = new Intl.NumberFormat('en-BD', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(amountMinor) / (UNITS[currency] ?? 100));
+  const symbol = SYMBOLS[currency] ?? '';
+  return `${amountMinor < 0 ? '-' : ''}${symbol}${formatted}`.trim();
 }

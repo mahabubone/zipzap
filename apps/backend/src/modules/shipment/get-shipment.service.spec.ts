@@ -19,6 +19,8 @@ const ROW = {
   sender_phone: '+8801700000000',
   recipient_name: 'Rahim Uddin',
   recipient_phone: '+8801800000000',
+  sender_address: 'Agrabad C/A, Chattogram',
+  recipient_address: 'Zindabazar, Sylhet',
   parcel_weight_grams: 1200,
   parcel_description: 'Two shirts',
   cod_amount_minor: 125050,
@@ -27,11 +29,30 @@ const ROW = {
   created_at: new Date('2026-10-08T00:00:00Z'),
 };
 
-function harness(rows: unknown[] = [ROW]) {
+const TIMELINE = [
+  {
+    eventType: 'ShipmentCreated',
+    occurredAt: '2026-10-08T00:00:00.000Z',
+    actorType: 'human',
+    metadata: { zone: 'dhaka-metro' },
+    correctsEventId: null,
+  },
+];
+
+function harness(rows: unknown[] = [ROW], timeline: unknown[] = TIMELINE) {
   const query = vi.fn().mockResolvedValue(rows);
   const record = vi.fn().mockResolvedValue(undefined);
-  const service = new GetShipmentService({ query } as never, { record } as never);
-  return { service, query, record };
+  // The timeline lives in the tracking module (rule 2), so the detail service
+  // receives it rather than selecting it — which is why it is a stub here.
+  const forShipment = vi.fn().mockResolvedValue(timeline);
+  const service = new GetShipmentService(
+    { query } as never,
+    { record } as never,
+    {
+      forShipment,
+    } as never,
+  );
+  return { service, query, record, forShipment };
 }
 
 const CONTEXT = {
@@ -50,6 +71,70 @@ describe('GetShipmentService', () => {
     expect(detail.trackingCode).toBe('ZP-8F32A1');
     expect(detail.recipientName).toBe('Rahim Uddin');
     expect(detail.codAmountMinor).toBe(125050);
+  });
+
+  it('returns the addresses, which were stored all along and never selected', async () => {
+    const { service } = harness();
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    expect(detail.senderAddress).toBe('Agrabad C/A, Chattogram');
+    expect(detail.recipientAddress).toBe('Zindabazar, Sylhet');
+  });
+
+  it('asks the tracking module for the timeline rather than selecting it', async () => {
+    const { service, query, forShipment } = harness();
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    // Rule 2: `tracking.events` is another module's table. The one SQL statement
+    // this service runs must not mention it.
+    const [sql] = query.mock.calls[0] as [string];
+    expect(sql).not.toMatch(/tracking\./);
+    expect(forShipment).toHaveBeenCalledWith('ship-1');
+    expect(detail.timeline).toEqual(TIMELINE);
+  });
+
+  it('returns an empty timeline rather than failing when the log has no rows', async () => {
+    const { service } = harness([ROW], []);
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    // A parcel whose log has not been written yet is still a parcel. Throwing
+    // here would make the detail screen 500 on a real, freshly created shipment.
+    expect(detail.timeline).toEqual([]);
+  });
+
+  it('returns the addresses, which were stored all along and never selected', async () => {
+    const { service } = harness();
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    expect(detail.senderAddress).toBe('Agrabad C/A, Chattogram');
+    expect(detail.recipientAddress).toBe('Zindabazar, Sylhet');
+  });
+
+  it('asks the tracking module for the timeline rather than selecting it', async () => {
+    const { service, query, forShipment } = harness();
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    // Rule 2: `tracking.events` is another module's table. The one SQL statement
+    // this service runs must not mention it.
+    const [sql] = query.mock.calls[0] as [string];
+    expect(sql).not.toMatch(/tracking\./);
+    expect(forShipment).toHaveBeenCalledWith('ship-1');
+    expect(detail.timeline).toEqual(TIMELINE);
+  });
+
+  it('returns an empty timeline rather than failing when the log has no rows', async () => {
+    const { service } = harness([ROW], []);
+
+    const detail = await service.execute('m-1', 'ship-1');
+
+    // A parcel whose log has not been written yet is still a parcel. Throwing
+    // here would make the detail screen 500 on a real, freshly created shipment.
+    expect(detail.timeline).toEqual([]);
   });
 
   it('scopes the read to the merchant in the WHERE clause', async () => {

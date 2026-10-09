@@ -177,7 +177,6 @@ describeIfServer('openapi contract — observed behaviour', () => {
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,
-      merchantPlan: 'standard',
     };
     const once = await fetch(`${apiBaseUrl}/v1/shipments`, {
       method: 'POST',
@@ -225,7 +224,6 @@ describeIfServer('openapi contract — observed behaviour', () => {
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,
-      merchantPlan: 'standard',
     };
     const headers = {
       Authorization: header,
@@ -272,7 +270,6 @@ describeIfServer('openapi contract — observed behaviour', () => {
         zone: 'dhaka-metro',
         remoteArea: false,
         fragile: false,
-        merchantPlan: 'standard',
       }),
     });
     assert.equal(created.status, 201);
@@ -315,7 +312,6 @@ describeIfServer('openapi contract — observed behaviour', () => {
         zone: 'atlantis-01',
         remoteArea: false,
         fragile: false,
-        merchantPlan: 'standard',
       }),
     });
     assert.equal(response.status, 422);
@@ -347,7 +343,6 @@ describeIfServer('openapi contract — observed behaviour', () => {
         zone: 'dhaka-metro',
         remoteArea: false,
         fragile: false,
-        merchantPlan: 'standard',
       }),
     });
     const { id } = (await created.json()) as { id: string };

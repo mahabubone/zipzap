@@ -1,26 +1,27 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
+  type DomainErrorSpec,
   AuthenticationRequiredError,
-  DependencyUnavailableError,
+  CodRecordNotFoundError,
+  CommandQueueFullError,
   DOMAIN_ERROR_SPECS,
+  DependencyUnavailableError,
   DomainError,
   DuplicateRequestError,
-  InvalidIdempotencyKeyError,
   InvalidBatchError,
+  InvalidIdempotencyKeyError,
   InvalidTransitionError,
+  ManifestIncompleteError,
   PermissionDeniedError,
   PickupNotFoundError,
   PricingVersionNotFoundError,
-  CodRecordNotFoundError,
   RateLimitedError,
   ReconciliationExceptionError,
-  ManifestIncompleteError,
   ResourceNotFoundError,
   ServiceabilityFailedError,
   ShipmentNotFoundError,
   ValidationFailedError,
-  type DomainErrorSpec,
 } from './domain-error.ts';
 import { toEnvelope } from './error-envelope.ts';
 
@@ -48,6 +49,7 @@ const ALL_ERROR_CLASSES = [
   ServiceabilityFailedError,
   ReconciliationExceptionError,
   ManifestIncompleteError,
+  CommandQueueFullError,
   RateLimitedError,
   DependencyUnavailableError,
 ] as const;

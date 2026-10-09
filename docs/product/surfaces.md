@@ -23,7 +23,7 @@ history — none of them owns state.
 Shared React components live in `packages/ui`. The API client in `packages/api-client` is
 generated from the backend's OpenAPI output — never hand-written.
 
-Ten surfaces are planned; **two exist as packages**. What each one must eventually beat in the
+Ten surfaces are planned; **three exist as packages**. What each one must eventually beat in the
 market is recorded in [competition/](competition/_index.md), and the order we build them in is
 [competition/plan.md](competition/plan.md).
 
@@ -96,7 +96,29 @@ create operational ticket.
 
 ## Hub Console
 
+`apps/frontends/hub-console` · React 19 · TanStack Router · Tailwind · shared component library.
+A separate app from merchant-web because it is a separate **principal**: `hub:read` and `hub:scan`
+are platform scopes, derived by subtraction in
+[roles.ts](../../apps/backend/src/modules/identity/rules/roles.ts) and withheld from every merchant
+role by default. A `MERCHANT_OWNER` on the same merchant is refused at the scan with
+`PERMISSION_DENIED` — proven live, not asserted.
+
 Inbound and outbound, scan-first. Manifest sealing, missing-shipment exceptions, reconciliation.
+
+### The one screen that matters, and why it is shaped this way
+
+The work list shows every parcel waiting at a hub and, for each, the **one** gesture it needs next —
+as a button, not a picker of the five kinds. Two reasons, and the second is the load-bearing one:
+
+- The operator already knows the gesture; they just performed it. A picker is slower.
+- A picker _invites_ the mistake. Choosing `OUTBOUND` on a parcel nobody sorted produces a 409 the
+  operator has to read. Offering only the server's own answer means an out-of-order scan **cannot be
+  expressed through this screen at all** — so the refusal is rendered where it actually comes from,
+  a stale tablet whose button has fallen behind the parcel.
+
+Every scan target is ≥ 48×88 CSS px at a 5" viewport, and the scan is the largest thing on the page.
+See [competition/plan.md](competition/plan.md#stage-3--hub-console) for what the four exit checks
+found — including why the fifth gesture, `ARRIVED`, is recorded on the manifest screen instead.
 
 ## Admin Console
 

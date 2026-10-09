@@ -6,13 +6,18 @@
  * per guess (docs/operations/performance.md's scrypt finding was the same
  * price, and here we spend it on purpose).
  *
+ * `merchantId` is OPTIONAL and names which business to open the session against, for a person who
+ * belongs to more than one. It is a request for a scope, never an assertion of one: a business the
+ * user does not hold is refused (login fails), never quietly ignored. Ignoring it would sign them
+ * into the default business and return a 200, which is a cross-tenant read wearing a success code.
+ *
  * Provenance (ip, user-agent, request_id) is passed to the auth service rather than read here, so
  * the audit row is written where the credential decision is made and not in a controller.
  */
 
 import { Body, Controller, Inject, Post, Req } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEmail, IsString } from 'class-validator';
+import { ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
 import type { Request } from 'express';
 import { AuthenticationRequiredError } from '../../common/domain-error.ts';
 import { MerchantAuthService, type IssuedSession } from '../merchant/sessions.service.ts';
@@ -23,6 +28,12 @@ export class LoginDto {
 
   @IsString()
   password!: string;
+
+  /** Which business to act inside. Omitted = the first membership, chosen deterministically. */
+  @ApiPropertyOptional({ format: 'uuid', description: 'Business to open the session against' })
+  @IsOptional()
+  @IsUUID('4')
+  merchantId?: string;
 }
 
 @ApiTags('auth')
@@ -39,6 +50,7 @@ export class LoginController {
     const session = await this.auth.loginWithPassword({
       email: body.email,
       password: body.password,
+      merchantId: body.merchantId ?? null,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
       requestId: req.requestId ?? null,

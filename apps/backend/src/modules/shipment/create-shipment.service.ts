@@ -43,7 +43,6 @@ import { AppendTrackingEventService } from '../tracking/append-tracking-event.se
 
 export interface CreateShipmentCommand {
   readonly merchantId: string;
-  readonly merchantPlan: string;
   readonly zone: string;
   readonly remoteArea: boolean;
   readonly fragile: boolean;
@@ -91,7 +90,6 @@ export class CreateShipmentService {
       parcel: command.parcel,
       cod: command.cod?.amountMinor ?? 0,
       currency: command.cod?.currency ?? 'BDT',
-      merchantPlan: command.merchantPlan,
       zone: command.zone,
       remoteArea: command.remoteArea,
       fragile: command.fragile,
@@ -142,7 +140,7 @@ export class CreateShipmentService {
         remoteArea: command.remoteArea,
         fragile: command.fragile,
         packagingKind: command.packagingKind,
-        merchantPlan: command.merchantPlan,
+        merchantId: command.merchantId,
         currency: command.cod?.currency,
       });
 
@@ -176,6 +174,9 @@ export class CreateShipmentService {
         status: shipment.status,
         heldFromStatus: shipment.heldFromStatus,
         pricingVersion: shipment.pricingVersion,
+        // Priced and serviceability-checked from the command; stored so the charge
+        // can be explained later and so the console can filter by it.
+        zone: command.zone,
         createdAt: shipment.createdAt,
         updatedAt: shipment.createdAt,
       } as never);

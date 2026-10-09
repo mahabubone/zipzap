@@ -21,7 +21,9 @@ const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
 const { AppModule } = await import('../dist/app.module.js');
 
 const app = await NestFactory.create(AppModule, { logger: false });
-app.useGlobalFilters(new (await import('../dist/common/exception.filter.js')).DomainExceptionFilter());
+app.useGlobalFilters(
+  new (await import('../dist/common/exception.filter.js')).DomainExceptionFilter(),
+);
 
 const document = SwaggerModule.createDocument(
   app,
