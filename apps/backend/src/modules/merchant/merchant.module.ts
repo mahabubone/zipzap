@@ -11,6 +11,7 @@ import { WebhookDeliveryEntity } from './webhook-delivery.entity.ts';
 import { WebhookRepository } from './webhook.repository.ts';
 import { WebhookEndpointService } from './webhook-endpoint.service.ts';
 import { WebhookReplayService } from './webhook-replay.service.ts';
+import { ListWebhookDeliveriesService } from './list-webhook-deliveries.service.ts';
 import { WebhookController } from './webhook.controller.ts';
 import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
@@ -61,6 +62,7 @@ export class BullConnectionCloser implements OnModuleDestroy {
   ],
   controllers: [WebhookController, CreateApiKeyController],
   providers: [
+    ListWebhookDeliveriesService,
     FindCredentialService,
     WebhookRepository,
     WebhookEndpointService,

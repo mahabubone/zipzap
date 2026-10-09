@@ -158,6 +158,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/webhooks/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every webhook delivery attempt for your endpoints, newest first */
+        get: operations["WebhookController_deliveryLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks/deliveries/{deliveryId}/replay": {
         parameters: {
             query?: never;
@@ -209,6 +226,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/track/token/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public tracking by unguessable token (26 chars, 130 bits) — not enumerable */
+        get: operations["PublicTrackingController_trackByToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/track/{trackingCode}": {
         parameters: {
             query?: never;
@@ -216,7 +250,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Public shipment tracking */
+        /** Public shipment tracking by tracking code */
         get: operations["PublicTrackingController_track"];
         put?: never;
         post?: never;
@@ -533,6 +567,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/manifests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Manifests, newest first, optionally by status */
+        get: operations["ManifestController_list"];
+        put?: never;
+        /** Schedule a trip, or create a DRAFT manifest on an existing one */
+        post: operations["ManifestController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One manifest and the parcels on it */
+        get: operations["ManifestController_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Schedule one run of a seeded route */
+        post: operations["ManifestController_scheduleTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/seal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → SEALED. A sealed manifest is evidence of what left. */
+        post: operations["ManifestController_seal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SEALED → DISPATCHED */
+        post: operations["ManifestController_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DISPATCHED → RECEIVED */
+        post: operations["ManifestController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RECEIVED → RECONCILED, refused while any parcel has not arrived */
+        post: operations["ManifestController_reconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pickups": {
         parameters: {
             query?: never;
@@ -602,6 +756,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/riders/{riderId}/sync/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A device pushing its own offline commands back, in device order, exactly once each */
+        post: operations["RiderSyncController_replay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/riders/{riderId}/sync/ack": {
         parameters: {
             query?: never;
@@ -613,6 +784,23 @@ export interface paths {
         put?: never;
         /** Acknowledge one queued command */
         post: operations["RiderSyncController_ack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/riders/{riderId}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a rider position. Never visible on public tracking. */
+        post: operations["RiderPositionController_record"];
         delete?: never;
         options?: never;
         head?: never;
@@ -748,7 +936,7 @@ export interface paths {
         /** List your settlements, newest first */
         get: operations["ListSettlementsController_listSettlements"];
         put?: never;
-        /** Freeze unsettled entries into a settlement */
+        /** Freeze your unsettled entries into a settlement */
         post: operations["CreateSettlementController_create"];
         delete?: never;
         options?: never;
@@ -944,6 +1132,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hubs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every hub and how many parcels are waiting at it */
+        get: operations["HubConsoleController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hubs/{hubCode}/parcels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parcels waiting at one hub, and the scan each needs next */
+        get: operations["HubConsoleController_parcels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/control-tower/live-counts": {
         parameters: {
             query?: never;
@@ -970,6 +1192,23 @@ export interface paths {
         };
         /** Operational KPI report: projection ranges plus live snapshot */
         get: operations["ReportController_getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/control-tower/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hubs and rider positions for the live map. Rider positions never reach public tracking. */
+        get: operations["MapController_getMap"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1015,7 +1254,7 @@ export interface components {
             events: string[];
         };
         CreateApiKeyDto: {
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "keys:manage")[];
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "keys:manage")[];
         };
         CreateShipmentDto: {
             senderName: string;
@@ -1071,6 +1310,14 @@ export interface components {
             shipmentId: string;
             note: string;
         };
+        CreateManifestDto: {
+            /** Format: uuid */
+            tripId: string;
+            shipmentIds: string[];
+        };
+        TripDto: {
+            routeCode: string;
+        };
         RequestPickupDto: {
             shipmentIds: string[];
             totalWeightGrams: number;
@@ -1091,8 +1338,36 @@ export interface components {
             phone: string;
             capacity?: number;
         };
+        DeviceCommandDto: {
+            /** @description The device's own monotonic counter. With `createdAt` it forms the dedupe key and the order. */
+            deviceSequence: number;
+            /** @description The device's clock. Deliberately not the server's — the server cannot know when it was pressed. */
+            createdAt: string;
+            commandType: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description What the device believed at the time. `{ status }` for a command about the rider,
+             *     `{ shipmentId, shipmentStatus }` for one about a parcel — the latter is what lets the server
+             *     reject a scan of something that was cancelled while the phone was in a pocket.
+             */
+            expectedState?: {
+                [key: string]: unknown;
+            };
+        };
+        ReplayDto: {
+            commands: components["schemas"]["DeviceCommandDto"][];
+        };
         AckDto: {
             commandId: string;
+        };
+        RecordPositionDto: {
+            latitude: number;
+            longitude: number;
+            /** @description The device's clock. A stale ping is refused by the service rather than applied. */
+            recordedAt: string;
+            accuracyMeters?: number;
         };
         RecordAttemptDto: {
             /** @enum {string} */
@@ -1108,10 +1383,6 @@ export interface components {
         CompleteDeliveryDto: {
             /** @description Integer minor units collected at the door. A decimal here is a bug, not a convenience. */
             collectedMinor: number;
-        };
-        CreateSettlementDto: {
-            /** Format: uuid */
-            merchantId: string;
         };
         ApproveSettlementDto: {
             /** Format: uuid */
@@ -1328,6 +1599,27 @@ export interface operations {
             };
         };
     };
+    WebhookController_deliveryLog: {
+        parameters: {
+            query?: {
+                endpointId?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     WebhookController_replayDelivery: {
         parameters: {
             query?: never;
@@ -1374,6 +1666,25 @@ export interface operations {
             header?: never;
             path: {
                 trackingCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PublicTrackingController_trackByToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
             };
             cookie?: never;
         };
@@ -1800,6 +2111,162 @@ export interface operations {
             };
         };
     };
+    ManifestController_list: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateManifestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_scheduleTrip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TripDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_seal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ManifestController_reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ListPickupsController_listPickups: {
         parameters: {
             query?: {
@@ -1911,6 +2378,29 @@ export interface operations {
             };
         };
     };
+    RiderSyncController_replay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     RiderSyncController_ack: {
         parameters: {
             query?: never;
@@ -1929,6 +2419,29 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RiderPositionController_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPositionDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2110,11 +2623,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSettlementDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
@@ -2375,6 +2884,44 @@ export interface operations {
             };
         };
     };
+    HubConsoleController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    HubConsoleController_parcels: {
+        parameters: {
+            query?: {
+                limit?: string;
+            };
+            header?: never;
+            path: {
+                hubCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     DashboardController_getLiveCounts: {
         parameters: {
             query?: never;
@@ -2400,6 +2947,23 @@ export interface operations {
                 /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today. */
                 to?: string;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MapController_getMap: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;

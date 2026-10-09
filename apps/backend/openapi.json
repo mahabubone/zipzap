@@ -201,6 +201,49 @@
         ]
       }
     },
+    "/v1/webhooks/deliveries": {
+      "get": {
+        "operationId": "WebhookController_deliveryLog",
+        "parameters": [
+          {
+            "name": "endpointId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every webhook delivery attempt for your endpoints, newest first",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
     "/v1/webhooks/deliveries/{deliveryId}/replay": {
       "post": {
         "operationId": "WebhookController_replayDelivery",
@@ -274,6 +317,30 @@
         ]
       }
     },
+    "/track/token/{token}": {
+      "get": {
+        "operationId": "PublicTrackingController_trackByToken",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Public tracking by unguessable token (26 chars, 130 bits) — not enumerable",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
     "/track/{trackingCode}": {
       "get": {
         "operationId": "PublicTrackingController_track",
@@ -292,7 +359,7 @@
             "description": ""
           }
         },
-        "summary": "Public shipment tracking",
+        "summary": "Public shipment tracking by tracking code",
         "tags": [
           "tracking"
         ]
@@ -847,6 +914,198 @@
         ]
       }
     },
+    "/v1/manifests": {
+      "get": {
+        "operationId": "ManifestController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Manifests, newest first, optionally by status",
+        "tags": [
+          "manifests"
+        ]
+      },
+      "post": {
+        "operationId": "ManifestController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManifestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Schedule a trip, or create a DRAFT manifest on an existing one",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/{id}": {
+      "get": {
+        "operationId": "ManifestController_one",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "One manifest and the parcels on it",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/trips": {
+      "post": {
+        "operationId": "ManifestController_scheduleTrip",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Schedule one run of a seeded route",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/{id}/seal": {
+      "post": {
+        "operationId": "ManifestController_seal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "DRAFT → SEALED. A sealed manifest is evidence of what left.",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/{id}/dispatch": {
+      "post": {
+        "operationId": "ManifestController_dispatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "SEALED → DISPATCHED",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/{id}/receive": {
+      "post": {
+        "operationId": "ManifestController_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "DISPATCHED → RECEIVED",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
+    "/v1/manifests/{id}/reconcile": {
+      "post": {
+        "operationId": "ManifestController_reconcile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "RECEIVED → RECONCILED, refused while any parcel has not arrived",
+        "tags": [
+          "manifests"
+        ]
+      }
+    },
     "/v1/pickups": {
       "post": {
         "operationId": "RequestPickupController_create",
@@ -1018,6 +1277,40 @@
         ]
       }
     },
+    "/v1/riders/{riderId}/sync/replay": {
+      "post": {
+        "operationId": "RiderSyncController_replay",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "A device pushing its own offline commands back, in device order, exactly once each",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
     "/v1/riders/{riderId}/sync/ack": {
       "post": {
         "operationId": "RiderSyncController_ack",
@@ -1055,6 +1348,40 @@
           }
         },
         "summary": "Acknowledge one queued command",
+        "tags": [
+          "riders"
+        ]
+      }
+    },
+    "/v1/riders/{riderId}/position": {
+      "post": {
+        "operationId": "RiderPositionController_record",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Record a rider position. Never visible on public tracking.",
         "tags": [
           "riders"
         ]
@@ -1269,22 +1596,12 @@
       "post": {
         "operationId": "CreateSettlementController_create",
         "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSettlementDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": ""
           }
         },
-        "summary": "Freeze unsettled entries into a settlement",
+        "summary": "Freeze your unsettled entries into a settlement",
         "tags": [
           "settlements"
         ]
@@ -1670,6 +1987,53 @@
         ]
       }
     },
+    "/v1/hubs": {
+      "get": {
+        "operationId": "HubConsoleController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every hub and how many parcels are waiting at it",
+        "tags": [
+          "hubs"
+        ]
+      }
+    },
+    "/v1/hubs/{hubCode}/parcels": {
+      "get": {
+        "operationId": "HubConsoleController_parcels",
+        "parameters": [
+          {
+            "name": "hubCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Parcels waiting at one hub, and the scan each needs next",
+        "tags": [
+          "hubs"
+        ]
+      }
+    },
     "/v1/control-tower/live-counts": {
       "get": {
         "operationId": "DashboardController_getLiveCounts",
@@ -1716,6 +2080,21 @@
           }
         },
         "summary": "Operational KPI report: projection ranges plus live snapshot",
+        "tags": [
+          "control-tower"
+        ]
+      }
+    },
+    "/v1/control-tower/map": {
+      "get": {
+        "operationId": "MapController_getMap",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Hubs and rider positions for the live map. Rider positions never reach public tracking.",
         "tags": [
           "control-tower"
         ]
@@ -1824,6 +2203,9 @@
                 "shipments:read",
                 "shipments:write",
                 "tracking:read",
+                "hub:read",
+                "hub:scan",
+                "rider:sync",
                 "pickup:create",
                 "pickup:read",
                 "delivery:create",
@@ -2056,6 +2438,36 @@
           "note"
         ]
       },
+      "CreateManifestDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shipmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "tripId",
+          "shipmentIds"
+        ]
+      },
+      "TripDto": {
+        "type": "object",
+        "properties": {
+          "routeCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "routeCode"
+        ]
+      },
       "RequestPickupDto": {
         "type": "object",
         "properties": {
@@ -2141,6 +2553,54 @@
           "phone"
         ]
       },
+      "DeviceCommandDto": {
+        "type": "object",
+        "properties": {
+          "deviceSequence": {
+            "type": "number",
+            "description": "The device's own monotonic counter. With `createdAt` it forms the dedupe key and the order.",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The device's clock. Deliberately not the server's — the server cannot know when it was pressed."
+          },
+          "commandType": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "expectedState": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "What the device believed at the time. `{ status }` for a command about the rider,\n`{ shipmentId, shipmentStatus }` for one about a parcel — the latter is what lets the server\nreject a scan of something that was cancelled while the phone was in a pocket."
+          }
+        },
+        "required": [
+          "deviceSequence",
+          "createdAt",
+          "commandType",
+          "payload"
+        ]
+      },
+      "ReplayDto": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceCommandDto"
+            }
+          }
+        },
+        "required": [
+          "commands"
+        ]
+      },
       "AckDto": {
         "type": "object",
         "properties": {
@@ -2150,6 +2610,29 @@
         },
         "required": [
           "commandId"
+        ]
+      },
+      "RecordPositionDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "recordedAt": {
+            "type": "string",
+            "description": "The device's clock. A stale ping is refused by the service rather than applied."
+          },
+          "accuracyMeters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "recordedAt"
         ]
       },
       "RecordAttemptDto": {
@@ -2205,18 +2688,6 @@
         },
         "required": [
           "collectedMinor"
-        ]
-      },
-      "CreateSettlementDto": {
-        "type": "object",
-        "properties": {
-          "merchantId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "merchantId"
         ]
       },
       "ApproveSettlementDto": {

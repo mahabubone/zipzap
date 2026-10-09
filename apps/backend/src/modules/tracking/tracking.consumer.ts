@@ -19,12 +19,13 @@
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { consumeOnce } from '../system/consume-once.ts';
 import { SHIPMENT_LOOKUP, type ShipmentLookup } from '../shipment/shipment.lookup.ts';
 import type { TrackingEventType } from './rules/tracking-event.ts';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { TrackingFanout } from './tracking-fanout.ts';
+import { generatePublicToken } from './public-token.ts';
 
 export const TRACKING_CONSUMER = 'tracking';
 
@@ -140,6 +141,18 @@ export class TrackingConsumer {
                 projection.eventType,
                 envelope.occurredAt,
               ],
+            );
+
+            // Minted here, not at shipment creation: the shipment module cannot write this table
+            // (rule 2), and the projection is the one place that already holds both the shipment id and
+            // the `tracking` connection. `DO NOTHING` because a replayed event must not rotate a token a
+            // customer has already bookmarked — every event in a parcel's life re-projects it, so a plain
+            // INSERT would mint a fresh public link per scan.
+            await manager.query(
+              `INSERT INTO tracking.public_tokens (shipment_id, token)
+                 VALUES ($1, $2)
+                 ON CONFLICT (shipment_id) DO NOTHING`,
+              [projection.shipmentId, generatePublicToken(randomBytes)],
             );
 
             projected.push({

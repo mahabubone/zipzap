@@ -773,6 +773,26 @@ Competitive deltas, in order of value:
 4. **Proof of delivery image** after delivery. Three competitors: none
 5. Keep the rating widget idea — all three collect public feedback
 
+**What the token actually needed.** Reading the code first changed this item twice.
+
+| This plan originally said   | Reality                                                                                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "swap in a token"           | **Added alongside.** `/track/:code` stays. Those links are already in customers' inboxes and on printed labels; a cut-over breaks all of them |
+| "mint it where the parcel is created" | The shipment module cannot write `tracking.public_tokens` (rule 2). Minted by the projection consumer, `ON CONFLICT DO NOTHING` so a replay cannot rotate a link |
+
+Proved by `apps/backend/scripts/verify-tokens.mjs`, 36 assertions against a running API and real
+Postgres. The token is minted by the real consumer booted from `dist/`, not inserted by the script —
+"a row exists" is not the claim, "the consumer mints one" is.
+
+**The proof found a defect the token was not looking for.** The consumer allocates
+`public_timeline.sequence` as `MAX(sequence) + 1` with no lock, so concurrent projections collide;
+1,658 duplicate `(tracking_code, sequence)` pairs exist. `ORDER BY sequence` is therefore a partial
+order, and two routes over the same rows returned them in *different* orders — and since `status` is
+read off the last row, one parcel reported two different current states. Reads now order by
+`sequence, occurred_at, id`, confirmed by A/B against the pre-fix build. The allocation race itself is
+**unfixed**: a unique index cannot be added while duplicates exist and rule 8 forbids editing history,
+so it needs a repair migration. Recorded in [domains/tracking.md](../../domains/tracking.md).
+
 ### 6b. Developer portal
 
 **Nobody in this market has one.** CarryBee: "contact your KAM". RedX: docs and a sandbox exist but no
@@ -795,7 +815,7 @@ Excluded by decision: sandbox credentials on request, store plugins, SDKs in oth
 - [ ] A merchant registers a webhook, sees each delivery attempt in a log, and replays a failed one
 - [ ] A signature is verified from the raw body by a script a stranger could write from the docs alone
 - [ ] A published OpenAPI request round-trips against the seeded sandbox from a fresh client
-- [ ] The tracking token is unguessable at 20+ characters and rate limiting still applies
+- [x] The tracking token is unguessable at 20+ characters and rate limiting still applies
 
 ---
 

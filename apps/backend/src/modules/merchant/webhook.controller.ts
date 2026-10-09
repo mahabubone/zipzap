@@ -6,12 +6,40 @@
  * be one.
  */
 
-import { Body, Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { WebhookEndpointService, type EndpointView } from './webhook-endpoint.service.ts';
 import { WebhookReplayService } from './webhook-replay.service.ts';
+import {
+  ListWebhookDeliveriesService,
+  type DeliveryLogPage,
+} from './list-webhook-deliveries.service.ts';
+
+export class DeliveryLogQuery {
+  @IsOptional()
+  @IsUUID('4')
+  endpointId?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  cursor?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}
 
 export class CreateWebhookDto {
   @IsUrl({ require_tld: false })
@@ -30,6 +58,7 @@ export class WebhookController {
   constructor(
     @Inject(WebhookEndpointService) private readonly endpoints: WebhookEndpointService,
     @Inject(WebhookReplayService) private readonly replay: WebhookReplayService,
+    @Inject(ListWebhookDeliveriesService) private readonly deliveries: ListWebhookDeliveriesService,
   ) {}
 
   private merchantId(request: AuthenticatedRequest): string {
@@ -86,6 +115,27 @@ export class WebhookController {
     @Req() request: AuthenticatedRequest,
   ): Promise<EndpointView> {
     return this.endpoints.setStatus(this.merchantId(request), id, 'ACTIVE');
+  }
+
+  /**
+   * The delivery log. Added because `replay` was unreachable without it — a merchant could not learn
+   * that a delivery id existed, let alone that it had failed. Every attempt, every status code, and
+   * whether the ladder has ended.
+   */
+  @Get('deliveries')
+  @UseGuards(new ScopeGuard('webhooks:manage'))
+  @ApiOperation({
+    summary: 'Every webhook delivery attempt for your endpoints, newest first',
+  })
+  async deliveryLog(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: DeliveryLogQuery,
+  ): Promise<DeliveryLogPage> {
+    return this.deliveries.execute(this.merchantId(request), {
+      endpointId: query.endpointId,
+      cursor: query.cursor,
+      limit: query.limit,
+    });
   }
 
   @Post('deliveries/:deliveryId/replay')
