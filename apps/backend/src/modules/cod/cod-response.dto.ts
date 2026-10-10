@@ -14,15 +14,24 @@ export class CollectedCodDto {
   @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
   shipmentId!: string;
 
-  @ApiProperty({ example: 125050, description: 'Expected COD amount in minor units (poisha)' })
+  @ApiProperty({
+    example: 125050,
+    description: 'Expected COD amount in minor units (poisha)',
+    type: 'integer',
+  })
   expectedMinor!: number;
 
-  @ApiProperty({ example: 125050, description: 'Collected COD amount in minor units (poisha)' })
+  @ApiProperty({
+    example: 125050,
+    description: 'Collected COD amount in minor units (poisha)',
+    type: 'integer',
+  })
   collectedMinor!: number;
 
   @ApiProperty({
     example: 0,
     description: 'Shortfall: expected - collected, 0 when fully collected',
+    type: 'integer',
   })
   shortfallMinor!: number;
 
@@ -54,10 +63,10 @@ export class CodRecordSummaryDto {
   @ApiProperty({ example: 'COLLECTED' })
   status!: string;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   expectedMinor!: number;
 
-  @ApiProperty({ example: 125050, nullable: true })
+  @ApiProperty({ example: 125050, nullable: true, type: 'integer' })
   collectedMinor!: number | null;
 
   @ApiProperty({ example: 'BDT' })
@@ -82,13 +91,17 @@ export class CodExceptionDto {
   @ApiProperty({ example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901' })
   shipmentId!: string;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   expectedMinor!: number;
 
-  @ApiProperty({ example: 100000, nullable: true })
+  @ApiProperty({ example: 100000, nullable: true, type: 'integer' })
   collectedMinor!: number | null;
 
-  @ApiProperty({ example: -25050, description: 'collected - expected; negative means shortfall' })
+  @ApiProperty({
+    example: -25050,
+    description: 'collected - expected; negative means shortfall',
+    type: 'integer',
+  })
   differenceMinor!: number;
 
   @ApiProperty({ example: 'BDT' })

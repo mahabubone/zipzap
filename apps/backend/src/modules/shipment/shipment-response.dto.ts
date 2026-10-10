@@ -11,7 +11,7 @@ import { CursorPaginationDto } from '../../common/dto/pagination.dto.ts';
 export { CursorPaginationDto };
 
 export class CodAmountDto {
-  @ApiProperty({ example: 125050, description: 'Integer minor units (poisha)' })
+  @ApiProperty({ example: 125050, description: 'Integer minor units (poisha)', type: 'integer' })
   amountMinor!: number;
 
   @ApiProperty({ example: 'BDT', description: 'ISO currency code' })
@@ -54,7 +54,7 @@ export class ShipmentSummaryDto {
   @ApiProperty({ example: 'INV-1001', nullable: true })
   merchantReference!: string | null;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   codAmountMinor!: number;
 
   @ApiProperty({ example: 'BDT' })
@@ -129,7 +129,7 @@ export class ShipmentDetailDto {
   @ApiProperty({ example: 'Books and stationery' })
   parcelDescription!: string;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   codAmountMinor!: number;
 
   @ApiProperty({ example: 'BDT' })

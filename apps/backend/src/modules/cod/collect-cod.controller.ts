@@ -8,7 +8,7 @@
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { CollectCodService } from './collect-cod.service.ts';
@@ -22,6 +22,10 @@ export class CollectCodDto {
   /** Integer minor units. A decimal here is a bug, not a convenience. */
   @IsInt()
   @Min(0)
+  @ApiProperty({
+    type: 'integer',
+    description: 'Integer minor units (poisha). A decimal here is a bug, not a convenience.',
+  })
   collectedMinor!: number;
 }
 

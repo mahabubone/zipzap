@@ -11,6 +11,7 @@
 import { Controller, Get, Inject, NotFoundException, Param, Sse, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiProperty,
@@ -129,6 +130,10 @@ export class PublicTrackingController {
       'event per message, filtered to this tracking code. Requires no credential. Each message ' +
       'is a `MessageEvent` whose `data` is the SSE event schema below.',
   })
+  // `@ApiExtraModels` registers the schema. Without it the `$ref` below points at a schema nobody
+  // declares, which is an unresolvable reference in the very document a client is generated from —
+  // and only the spec test catches it, not the compiler.
+  @ApiExtraModels(PublicTrackingEventDto)
   @ApiOkResponse({
     description:
       'A stream of `text/event-stream` messages. Each `data` payload is a PublicTrackingEventDto.',

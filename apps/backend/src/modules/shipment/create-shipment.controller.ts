@@ -8,7 +8,7 @@
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -48,7 +48,17 @@ export class CreateShipmentDto {
   @IsString() @IsNotEmpty() @MaxLength(200) parcelDescription!: string;
 
   /** Money as integer minor units. A decimal here is a bug, not a convenience. */
-  @IsOptional() @IsInt() @IsPositive() codAmountMinor?: number;
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  @ApiProperty({
+    type: 'integer',
+    required: false,
+    description:
+      'Cash on delivery, in integer minor units (poisha). Omit for a non-COD shipment; zero is not ' +
+      'the same as omitted.',
+  })
+  codAmountMinor?: number;
   @IsOptional() @Matches(/^[A-Z]{3}$/) codCurrency?: string;
 
   @IsString() @MaxLength(80) zone!: string;

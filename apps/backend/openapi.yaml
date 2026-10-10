@@ -6114,6 +6114,32 @@ components:
         - keyId
         - secret
         - scopes
+    PublicTrackingEventDto:
+      type: object
+      properties:
+        trackingCode:
+          type: string
+          example: ZZ-7F3K9Q2M
+          description: The tracking code this event belongs to.
+        sequence:
+          type: number
+          example: 4
+          description: >-
+            Monotonic counter within a tracking code. NOT unique, so a client must not use it as a
+            key.
+        event:
+          type: string
+          example: OUT_FOR_DELIVERY
+          description: The event type, uppercase snake case.
+        occurredAt:
+          type: string
+          example: '2026-10-10T11:42:00.000Z'
+          description: ISO 8601 instant. The projection is eventually consistent with the live log.
+      required:
+        - trackingCode
+        - sequence
+        - event
+        - occurredAt
     PublicTimelineEventDto:
       type: object
       properties:
@@ -6160,6 +6186,12 @@ components:
     CreateShipmentDto:
       type: object
       properties:
+        codAmountMinor:
+          type: integer
+          description: >-
+            Cash on delivery, in integer minor units (poisha). Omit for a non-COD shipment; zero is
+            not the same as omitted.
+          minimum: 1
         senderName:
           type: string
           maxLength: 120
@@ -6184,10 +6216,6 @@ components:
         parcelDescription:
           type: string
           maxLength: 200
-        codAmountMinor:
-          type: number
-          description: Money as integer minor units. A decimal here is a bug, not a convenience.
-          minimum: 1
         codCurrency:
           type: string
           pattern: ^[A-Z]{3}$
@@ -6217,7 +6245,7 @@ components:
       type: object
       properties:
         amountMinor:
-          type: number
+          type: integer
           example: 125050
           description: Integer minor units (poisha)
         currency:
@@ -6272,7 +6300,7 @@ components:
           nullable: true
           example: INV-1001
         codAmountMinor:
-          type: number
+          type: integer
           example: 125050
         codCurrency:
           type: string
@@ -6389,7 +6417,7 @@ components:
           type: string
           example: Books and stationery
         codAmountMinor:
-          type: number
+          type: integer
           example: 125050
         codCurrency:
           type: string
@@ -6580,12 +6608,13 @@ components:
     QuoteDto:
       type: object
       properties:
+        codAmountMinor:
+          type: integer
+          minimum: 0
+          description: Cash on delivery, in integer minor units (poisha). Zero means no COD.
         weightGrams:
           type: number
           minimum: 1
-        codAmountMinor:
-          type: number
-          minimum: 0
         zone:
           type: string
           maxLength: 80
@@ -6605,8 +6634,8 @@ components:
           type: number
           minimum: 1
       required:
-        - weightGrams
         - codAmountMinor
+        - weightGrams
         - zone
         - remoteArea
         - fragile
@@ -6614,7 +6643,7 @@ components:
       type: object
       properties:
         amountMinor:
-          type: number
+          type: integer
           example: 125050
           description: Integer minor units (poisha). 125050 is ৳1,250.50 — never a decimal amount.
         currency:
@@ -6679,7 +6708,7 @@ components:
           type: string
           example: 1 kg parcel, inside Dhaka, no COD
         totalMinor:
-          type: number
+          type: integer
           example: 95000
           description: Integer minor units (poisha).
       required:
@@ -6700,11 +6729,11 @@ components:
           example: growth
           description: The plan THIS merchant is on. Not a list of plans — theirs.
         baseFeeMinor:
-          type: number
+          type: integer
           example: 6000
           description: Base delivery fee in integer minor units (poisha).
         perKgMinor:
-          type: number
+          type: integer
           example: 2000
           description: Per billable kilogram, in integer minor units (poisha).
         codFeeBps:
@@ -6712,21 +6741,21 @@ components:
           example: 180
           description: 'COD fee in basis points: 180 is 1.8%.'
         remoteAreaFeeMinor:
-          type: number
+          type: integer
           example: 4000
           description: Remote-area surcharge in integer minor units (poisha).
         fragileFeeMinor:
-          type: number
+          type: integer
           example: 1500
           description: Fragile handling surcharge in integer minor units (poisha).
         packagingFeesMinor:
           type: object
           additionalProperties:
-            type: number
+            type: integer
+          description: Packaging fee per kind, in integer minor units (poisha).
           example:
             box_s: 800
             box_m: 1500
-          description: Packaging fee per kind, in integer minor units (poisha).
         taxBps:
           type: number
           example: 500
@@ -6758,16 +6787,16 @@ components:
     CollectCodDto:
       type: object
       properties:
+        collectedMinor:
+          type: integer
+          description: Integer minor units (poisha). A decimal here is a bug, not a convenience.
+          minimum: 0
         shipmentId:
           type: string
           format: uuid
-        collectedMinor:
-          type: number
-          description: Integer minor units. A decimal here is a bug, not a convenience.
-          minimum: 0
       required:
-        - shipmentId
         - collectedMinor
+        - shipmentId
     CollectedCodDto:
       type: object
       properties:
@@ -6775,15 +6804,15 @@ components:
           type: string
           example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         expectedMinor:
-          type: number
+          type: integer
           example: 125050
           description: Expected COD amount in minor units (poisha)
         collectedMinor:
-          type: number
+          type: integer
           example: 125050
           description: Collected COD amount in minor units (poisha)
         shortfallMinor:
-          type: number
+          type: integer
           example: 0
           description: 'Shortfall: expected - collected, 0 when fully collected'
         status:
@@ -6839,10 +6868,10 @@ components:
           type: string
           example: COLLECTED
         expectedMinor:
-          type: number
+          type: integer
           example: 125050
         collectedMinor:
-          type: number
+          type: integer
           nullable: true
           example: 125050
         currency:
@@ -6881,14 +6910,14 @@ components:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
         expectedMinor:
-          type: number
+          type: integer
           example: 125050
         collectedMinor:
-          type: number
+          type: integer
           nullable: true
           example: 100000
         differenceMinor:
-          type: number
+          type: integer
           example: -25050
           description: collected - expected; negative means shortfall
         currency:
@@ -7719,8 +7748,8 @@ components:
       type: object
       properties:
         collectedMinor:
-          type: number
-          description: Integer minor units collected at the door. A decimal here is a bug, not a convenience.
+          type: integer
+          description: Integer minor units (poisha). A decimal here is a bug, not a convenience.
           minimum: 0
       required:
         - collectedMinor
@@ -7826,7 +7855,7 @@ components:
           type: number
           example: 1
         amountMinor:
-          type: number
+          type: integer
           example: 125050
       required:
         - entryId
@@ -7853,7 +7882,7 @@ components:
           items:
             $ref: '#/components/schemas/SettlementItemDto'
         netMinor:
-          type: number
+          type: integer
           example: 1250500
         currency:
           type: string
@@ -7887,7 +7916,7 @@ components:
           type: string
           example: APPROVED
         netMinor:
-          type: number
+          type: integer
           example: 1250500
         currency:
           type: string
@@ -7924,7 +7953,7 @@ components:
           type: string
           example: SETTLED
         frozenNetMinor:
-          type: number
+          type: integer
           example: 1250500
         currency:
           type: string
@@ -7967,7 +7996,7 @@ components:
           type: string
           example: PAY-PROVIDER-123
         netMinor:
-          type: number
+          type: integer
           example: 1250500
         currency:
           type: string
@@ -8003,7 +8032,7 @@ components:
           type: string
           example: COMPLETED
         netMinor:
-          type: number
+          type: integer
           example: 1250500
         currency:
           type: string
@@ -8032,7 +8061,7 @@ components:
           example: 1
           description: 1 for credit (owed to merchant), -1 for debit (owed by merchant)
         amountMinor:
-          type: number
+          type: integer
           example: 125050
           description: Sum of entries of this type in minor units
         entries:
@@ -8063,7 +8092,7 @@ components:
           type: string
           example: SET-2610-0001
         netMinor:
-          type: number
+          type: integer
           example: 250000
       required:
         - reference
@@ -8075,7 +8104,7 @@ components:
           type: string
           example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         balanceMinor:
-          type: number
+          type: integer
           example: -1250500
           description: 'Signed minor units: negative means owed to merchant'
         currency:
@@ -8123,7 +8152,7 @@ components:
           type: number
           example: 1
         amountMinor:
-          type: number
+          type: integer
           example: 125050
         memo:
           type: string
@@ -8160,7 +8189,7 @@ components:
           type: string
           example: '2026-10-10T06:00:00.000Z'
         netMinor:
-          type: number
+          type: integer
           example: 1250500
         lines:
           type: array

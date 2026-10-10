@@ -25,14 +25,19 @@ GET /v1/shipments?limit=50&cursor=eyJpZCI6IjNiZi4uLiJ9
 {
   "data": [/* … */],
   "pagination": {
-    "next_cursor": "eyJpZCI6IjNiZi4uLiJ9",
-    "has_more": true
+    "nextCursor": "eyJpZCI6IjNiZi4uLiJ9",
+    "hasMore": true
   }
 }
 ```
 
-`next_cursor` is `null` and `has_more` is `false` on the last page. **An empty `data` with
-`has_more: true` is a valid page** — do not treat it as the end.
+`nextCursor` is `null` and `hasMore` is `false` on the last page. **An empty `data` with
+`hasMore: true` is a valid page** — do not treat it as the end.
+
+Field names are `camelCase`, like every other JSON field this API returns. This page used to
+document `next_cursor` / `has_more`, which no endpoint has ever returned; it was corrected on
+2026-10-10 while wiring the response schemas, after the generated client had silently inherited
+the wrong names.
 
 ## Cursors
 

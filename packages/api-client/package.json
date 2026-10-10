@@ -11,14 +11,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./generated": {
+      "types": "./src/generated.d.ts"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "generate": "openapi-typescript ../../apps/backend/openapi.json -o src/generated.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "pretest": "pnpm generate"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

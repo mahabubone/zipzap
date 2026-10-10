@@ -27,10 +27,11 @@ import { RateLimitGuard } from './modules/identity/rate-limit.guard.ts';
  * `ApiTags` supplies the name per controller; these supply the prose.
  *
  * Keys are the literal `@ApiTags` values used in controllers, not the module names: `auth`, not
- * `identity`. An entry with no matching tag is dead and an untagged controller is undocumented, so
- * `openapi-contract.test.ts` asserts the two sets are equal.
+ * `identity`. The spec test asserts this map is exactly the set of tags the controllers use, in
+ * both directions — a stale entry is a lie about the API and a missing one is an undocumented
+ * resource, so neither is tolerable and the test fails either way.
  */
-const TAG_DESCRIPTIONS: Record<string, string> = {
+export const TAG_DESCRIPTIONS: Record<string, string> = {
   analytics: 'Read-only projections of your own parcels and money.',
   'api-keys': 'Long-lived machine credentials for your account.',
   auth: 'Sessions: sign in with email and password, and back out again.',

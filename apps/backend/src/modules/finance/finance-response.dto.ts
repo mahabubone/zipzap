@@ -20,7 +20,11 @@ export class BalanceLineDto {
   })
   direction!: number;
 
-  @ApiProperty({ example: 125050, description: 'Sum of entries of this type in minor units' })
+  @ApiProperty({
+    example: 125050,
+    description: 'Sum of entries of this type in minor units',
+    type: 'integer',
+  })
   amountMinor!: number;
 
   @ApiProperty({ example: 42, description: 'How many ledger rows made up this line' })
@@ -39,7 +43,7 @@ export class NextSettlementSummaryDto {
   @ApiProperty({ example: 'SET-2610-0001' })
   reference!: string;
 
-  @ApiProperty({ example: 250000 })
+  @ApiProperty({ example: 250000, type: 'integer' })
   netMinor!: number;
 }
 
@@ -50,6 +54,7 @@ export class MerchantBalanceDto {
   @ApiProperty({
     example: -1250500,
     description: 'Signed minor units: negative means owed to merchant',
+    type: 'integer',
   })
   balanceMinor!: number;
 
@@ -82,7 +87,7 @@ export class SettlementItemDto {
   @ApiProperty({ example: 1 })
   direction!: 1 | -1;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   amountMinor!: number;
 }
 
@@ -102,7 +107,7 @@ export class CreatedSettlementDto {
   @ApiProperty({ type: SettlementItemDto, isArray: true })
   items!: readonly SettlementItemDto[];
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   netMinor!: number;
 
   @ApiProperty({ example: 'BDT' })
@@ -119,7 +124,7 @@ export class SettlementSummaryDto {
   @ApiProperty({ example: 'SETTLED' })
   status!: string;
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   frozenNetMinor!: number;
 
   @ApiProperty({ example: 'BDT' })
@@ -147,7 +152,7 @@ export class StatementLineDto {
   @ApiProperty({ example: 1 })
   direction!: 1 | -1;
 
-  @ApiProperty({ example: 125050 })
+  @ApiProperty({ example: 125050, type: 'integer' })
   amountMinor!: number;
 
   @ApiProperty({ example: 'Delivery to Dhanmondi', nullable: true })
@@ -173,7 +178,7 @@ export class SettlementStatementDto {
   @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
   createdAt!: string;
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   netMinor!: number;
 
   @ApiProperty({ type: StatementLineDto, isArray: true })
@@ -190,7 +195,7 @@ export class ApprovedSettlementDto {
   @ApiProperty({ example: 'APPROVED' })
   status!: string;
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   netMinor!: number;
 
   @ApiProperty({ example: 'BDT' })
@@ -222,7 +227,7 @@ export class InitiatedSettlementPaymentDto {
   @ApiProperty({ example: 'PAY-PROVIDER-123' })
   paymentReference!: string;
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   netMinor!: number;
 
   @ApiProperty({ example: 'BDT' })
@@ -251,7 +256,7 @@ export class ConfirmedSettlementPaymentDto {
   @ApiProperty({ example: 'COMPLETED' })
   providerStatus!: string;
 
-  @ApiProperty({ example: 1250500 })
+  @ApiProperty({ example: 1250500, type: 'integer' })
   netMinor!: number;
 
   @ApiProperty({ example: 'BDT' })

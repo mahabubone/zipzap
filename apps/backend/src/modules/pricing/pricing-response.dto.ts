@@ -13,6 +13,7 @@ export class MoneyDto {
   @ApiProperty({
     example: 125050,
     description: 'Integer minor units (poisha). 125050 is ৳1,250.50 — never a decimal amount.',
+    type: 'integer',
   })
   amountMinor!: number;
 
@@ -62,7 +63,7 @@ export class RateCardExampleDto {
   @ApiProperty({ example: '1 kg parcel, inside Dhaka, no COD' })
   label!: string;
 
-  @ApiProperty({ example: 95000, description: 'Integer minor units (poisha).' })
+  @ApiProperty({ example: 95000, description: 'Integer minor units (poisha).', type: 'integer' })
   totalMinor!: number;
 }
 
@@ -86,12 +87,14 @@ export class RateCardResponseDto {
   @ApiProperty({
     example: 6000,
     description: 'Base delivery fee in integer minor units (poisha).',
+    type: 'integer',
   })
   baseFeeMinor!: number;
 
   @ApiProperty({
     example: 2000,
     description: 'Per billable kilogram, in integer minor units (poisha).',
+    type: 'integer',
   })
   perKgMinor!: number;
 
@@ -101,17 +104,28 @@ export class RateCardResponseDto {
   @ApiProperty({
     example: 4000,
     description: 'Remote-area surcharge in integer minor units (poisha).',
+    type: 'integer',
   })
   remoteAreaFeeMinor!: number;
 
   @ApiProperty({
     example: 1500,
     description: 'Fragile handling surcharge in integer minor units (poisha).',
+    type: 'integer',
   })
   fragileFeeMinor!: number;
 
+  /**
+   * A fee per packaging kind. A map rather than a fixed field, because the rate card's kinds are
+   * seeded data and would otherwise need a migration every time a box is added.
+   *
+   * The values are money, so `additionalProperties` must say `integer` — a bare
+   * `Record<string, number>` documents them as doubles, which is the same rule-4 failure as
+   * anywhere else, just one level down.
+   */
   @ApiProperty({
-    type: Object,
+    type: 'object',
+    additionalProperties: { type: 'integer' },
     example: { box_s: 800, box_m: 1500 },
     description: 'Packaging fee per kind, in integer minor units (poisha).',
   })

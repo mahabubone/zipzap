@@ -6,7 +6,13 @@
  */
 
 import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -30,6 +36,10 @@ export class QuoteDto {
 
   @IsInt()
   @Min(0)
+  @ApiProperty({
+    type: 'integer',
+    description: 'Cash on delivery, in integer minor units (poisha). Zero means no COD.',
+  })
   codAmountMinor!: number;
 
   @IsString()

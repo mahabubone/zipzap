@@ -16,15 +16,24 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"]
     },
-    "typecheck": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
     "lint": {
       "outputs": []
     },
+    "openapi:export": {
+      "dependsOn": ["@zipzap/backend#build"],
+      "outputs": ["openapi.json", "openapi.yaml"]
+    },
+    "generate": {
+      "dependsOn": ["@zipzap/backend#openapi:export"],
+      "outputs": ["src/generated.d.ts"],
+      "inputs": ["$TURBO_ROOT$/apps/backend/openapi.json", "src/index.ts"]
+    },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@zipzap/backend#openapi:export"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "@zipzap/api-client#generate"],
       "outputs": []
     },
     "dev": {

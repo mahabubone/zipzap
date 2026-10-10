@@ -11,7 +11,7 @@
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsInt, Min } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { AdvanceDeliveryService } from './advance-delivery.service.ts';
@@ -22,6 +22,10 @@ export class CompleteDeliveryDto {
   /** Integer minor units collected at the door. A decimal here is a bug, not a convenience. */
   @IsInt()
   @Min(0)
+  @ApiProperty({
+    type: 'integer',
+    description: 'Integer minor units (poisha). A decimal here is a bug, not a convenience.',
+  })
   collectedMinor!: number;
 }
 
