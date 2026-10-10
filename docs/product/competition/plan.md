@@ -665,13 +665,22 @@ retried forever.
    behind it.** A replayed command is applied in the same transaction and never sits pending, so a
    `queueSize`-derived warning would have been dead code that never fired.
 
-### Not built
+### What landed after that note
 
-**The Expo app shell.** There is no React Native screen here — no login, no job list, no route, no
-proof-of-delivery UI. What exists is the offline queue and its proof. That is a deliberate split: the
-queue is the part that can lose a rider's day and no screenshot would catch it, and building a UI
-around an unproven queue would have proved less. A screen asserting "synced" over a queue with no
-exact-once guarantee is a lie with a spinner.
+The device half now exists as an Expo app. `apps/mobile-rider` — auth, today's jobs (pickups and
+deliveries merged), job detail (pickup scan, failed attempt, complete-with-COD), a sync screen showing
+pending commands with the state the device believed and the ruling the server gave, and profile. Every
+write appends to the proven `OfflineQueue` and returns immediately; no screen waits on the network.
+Nine screenshots in [shots/mobile](../../../shots/mobile), captured by
+[shots.mjs](../../../apps/mobile-rider/scripts/shots.mjs) through `expo export --platform web`.
+
+**What is still missing on the device:** route and map, proof of delivery (photo/signature/OTP), the
+notification feed, and exceptions as their own screen. The backend already requires OTP + photo +
+timestamp + GPS for `DELIVERED`, so POD is the one screen that blocks Stage 4's real completion —
+the offline guarantee is proven, the capture of _why_ it was delivered is not built.
+
+Also unbuilt: AsyncStorage/SecureStore persistence (the in-memory store behind the `QueueStorage`
+port is a one-line swap) and a real navigation library.
 
 ---
 
@@ -812,9 +821,17 @@ Excluded by decision: sandbox credentials on request, store plugins, SDKs in oth
 
 **Exit check**
 
-- [ ] A merchant registers a webhook, sees each delivery attempt in a log, and replays a failed one
-- [ ] A signature is verified from the raw body by a script a stranger could write from the docs alone
-- [ ] A published OpenAPI request round-trips against the seeded sandbox from a fresh client
+- [x] A merchant registers a webhook, sees each delivery attempt in a log, and replays a failed one
+      — [verify-webhook-portal.mjs](../../../apps/backend/scripts/verify-webhook-portal.mjs), 18
+      assertions against a live server, worker and publisher. A 4xx is terminal on the first attempt
+      and replays with a FRESH delivery id; a 5xx stays on the ladder and is not replayable.
+- [x] A signature is verified from the raw body by a script a stranger could write from the docs alone
+      — [verify-webhook-signature.mjs](../../../apps/backend/scripts/verify-webhook-signature.mjs), 23
+      assertions. The verifier imports only `node:crypto`; if it needed a helper from `rules/` the
+      docs would have failed to say something.
+- [x] A published OpenAPI request round-trips against the seeded sandbox from a fresh client
+      — [verify-openapi-roundtrip.mjs](../../../apps/backend/scripts/verify-openapi-roundtrip.mjs), 19
+      assertions against the live spec fetched from `/docs-json`, not the committed file.
 - [x] The tracking token is unguessable at 20+ characters and rate limiting still applies
 
 ---

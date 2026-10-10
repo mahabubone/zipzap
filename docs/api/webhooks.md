@@ -42,10 +42,33 @@ ZipZap-Attempt:   3
 HMAC-SHA256 over `{timestamp}.{raw_body}` with the endpoint's signing secret, comparing in
 constant time.
 
-**Sign the raw body, not re-serialised JSON.** Key order and whitespace change when a payload is
-parsed and re-stringified, and the signature will not match. This is the most common webhook
-integration bug, and the docs must say so explicitly — receivers cannot debug a signature that
-was never going to match.
+### Sign the raw bytes you received
+
+Verify against the body **exactly as it arrived** — before parsing, before re-serialising, before
+touching whitespace or number formatting. Three things silently change it:
+
+| What a receiver does                            | Why the signature breaks                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unmarshals into a typed model, then re-marshals | Field order comes from the **type declaration**, not the wire. A Go struct, a Java class, a PHP assoc array all emit their declared order. |
+| Pretty-prints, or your HTTP client reformats    | Whitespace is part of the signed string. `{"a":1}` and `{\n  "a": 1\n}` are different inputs.                                              |
+| Parses numbers into floats                      | `125050` may come back as `125050.0`. Money as a decimal is not a formatting detail — it is a different byte sequence.                     |
+
+**In JavaScript this bites less than elsewhere, and that is a trap.** `JSON.parse` followed by
+`JSON.stringify` round-trips byte-identically — key order is preserved for string keys — so a
+Node receiver that does the naive thing often still verifies. The same code in Go, Java or PHP
+does not. Do not conclude from JavaScript that re-serialising is safe.
+
+Buffer the raw bytes first, verify, and only then parse:
+
+```python
+raw = request.body            # the exact bytes on the wire
+if not verify(secret, request.headers["ZipZap-Signature"], raw):
+    return 401
+event = json.loads(raw)       # parse AFTER verifying
+```
+
+This is the most common webhook integration bug, and it is undebuggable from the sender's side: a
+merchant whose verifier re-serialises sees a mismatch that looks like a wrong secret.
 
 ## Receiver obligations
 

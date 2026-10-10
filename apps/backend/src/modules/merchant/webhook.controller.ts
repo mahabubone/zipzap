@@ -8,16 +8,7 @@
 
 import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUrl,
-  IsUUID,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { WebhookEndpointService, type EndpointView } from './webhook-endpoint.service.ts';
 import { WebhookReplayService } from './webhook-replay.service.ts';
@@ -25,21 +16,7 @@ import {
   ListWebhookDeliveriesService,
   type DeliveryLogPage,
 } from './list-webhook-deliveries.service.ts';
-
-export class DeliveryLogQuery {
-  @IsOptional()
-  @IsUUID('4')
-  endpointId?: string;
-
-  @IsOptional()
-  @IsUUID('4')
-  cursor?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  limit?: number;
-}
+import { DeliveryLogQuery } from './webhook-delivery-log-query.dto.ts';
 
 export class CreateWebhookDto {
   @IsUrl({ require_tld: false })
