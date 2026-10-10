@@ -62,6 +62,9 @@ function stubFetch(
         get: (name: string) => headers?.[name.toLowerCase()] ?? headers?.[name] ?? null,
       },
       json: async () => body,
+      // `statementCsv` and `bulkResultCsv` read text, not JSON — a stub without this fails with
+      // "response.text is not a function" and looks like a client bug rather than a stub gap.
+      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
     };
   }) as unknown as typeof fetch;
   return {
@@ -350,5 +353,89 @@ describe('ZipZapClient', () => {
     expect(shipment.recipientName).toBe('Rahim');
     expect(shipment.codAmountMinor).toBe(125050);
     expect(seen[0]!.url).toBe('http://api.test/v1/shipments/s-1');
+  });
+
+  /**
+   * The browser console's request path. Both faults here are silent, which is why they are pinned:
+   *
+   * 1. sending an Authorization header the server rejects — it treats a header naming neither
+   *    recognised scheme as a rejection rather than falling through to the cookie, so `ApiKey ` with
+   *    an empty value is a malformed credential, not an absent one;
+   * 2. `onRequest` returning a URL that `fetch` never sees — `fetch` takes the URL as its first
+   *    argument, so a translator that puts an absolute URL in the init is ignored, and a server-side
+   *    render with a relative `baseUrl` fails with ERR_INVALID_URL.
+   */
+  describe('browser console requests', () => {
+    it('sends no Authorization header when no credential was configured', async () => {
+      const { client, seen } = stubFetch(() => ({ status: 200, body: { kind: 'machine' } }));
+      // A console client: cookie-based, no apiKey and no bearerToken.
+      const console = new ZipZapClient({
+        baseUrl: 'http://api.test',
+        fetchImpl: client['fetchImpl' as keyof typeof client] as unknown as typeof fetch,
+      });
+
+      await console.getMe();
+
+      const init = seen[0]!.init as { headers?: Record<string, string> };
+      expect(init.headers?.Authorization).toBeUndefined();
+    });
+
+    it('rewrites the URL through onRequest, so a relative baseUrl can render on the server', async () => {
+      // A server-side render has no origin to resolve `/api/v1/me` against, so the caller rewrites
+      // it. If the client ignores the rewritten URL, fetch throws ERR_INVALID_URL and the guard
+      // redirects every signed-in visitor to /login — with no console error anywhere.
+      const { client, seen } = stubFetch(() => ({ status: 200, body: { kind: 'machine' } }));
+      const consoleClient = new ZipZapClient({
+        baseUrl: '/api',
+        fetchImpl: client['fetchImpl' as keyof typeof client] as unknown as typeof fetch,
+        onRequest: (url, init) => ({
+          ...init,
+          url: new URL(url, 'https://console.example').toString(),
+        }),
+      });
+
+      await consoleClient.getMe();
+
+      expect(seen[0]!.url).toBe('https://console.example/api/v1/me');
+    });
+
+    it('carries a forwarded cookie through onRequest, with no Authorization header', async () => {
+      const { client, seen } = stubFetch(() => ({ status: 200, body: { kind: 'machine' } }));
+      const consoleClient = new ZipZapClient({
+        baseUrl: '/api',
+        fetchImpl: client['fetchImpl' as keyof typeof client] as unknown as typeof fetch,
+        onRequest: (url, init) => {
+          const headers = new Headers(init.headers as Record<string, string>);
+          headers.set('cookie', 'zipzap_session=tok');
+          return { ...init, url: new URL(url, 'https://console.example').toString(), headers };
+        },
+      });
+
+      await consoleClient.getMe();
+
+      const init = seen[0]!.init as { headers?: Headers };
+      const headers = Object.fromEntries(init.headers ?? []);
+      expect(headers.cookie).toBe('zipzap_session=tok');
+      expect(headers.authorization).toBeUndefined();
+    });
+
+    it('honours onRequest on the CSV endpoint, not only the JSON ones', async () => {
+      // `statement.csv` called fetchImpl directly, bypassing the translator entirely — so a
+      // server-side render that needs the cookie rewritten downloaded the error envelope here and
+      // saved it as `statement.csv`.
+      const { client, seen } = stubFetch(() => ({ status: 200, body: 'day,count\n' }));
+      const consoleClient = new ZipZapClient({
+        baseUrl: '/api',
+        fetchImpl: client['fetchImpl' as keyof typeof client] as unknown as typeof fetch,
+        onRequest: (url, init) => ({
+          ...init,
+          url: new URL(url, 'https://console.example').toString(),
+        }),
+      });
+
+      await consoleClient.statementCsv('s-1');
+
+      expect(seen[0]!.url).toBe('https://console.example/api/v1/settlements/s-1/statement.csv');
+    });
   });
 });

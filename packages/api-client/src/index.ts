@@ -30,6 +30,13 @@ export interface ApiErrorEnvelope {
   readonly request_id: string;
 }
 
+/**
+ * The credentials mode a `fetch` call uses. Declared locally rather than taken from the DOM lib,
+ * because this package is also used from Node — the backend's own export script and the rider app
+ * both run without a DOM, and `RequestCredentials` does not exist there.
+ */
+type CredentialsMode = 'omit' | 'same-origin' | 'include';
+
 export class ZipZapApiError extends Error {
   constructor(
     readonly envelope: ApiErrorEnvelope,
@@ -55,6 +62,25 @@ export interface ClientOptions {
   /** Sent as `Authorization: Bearer <token>` for human sessions. Exactly one of
    *  apiKey / bearerToken must be set at call time; a client is single-principal. */
   readonly bearerToken?: string;
+  /**
+   * Credentials mode for the underlying `fetch`. Defaults to `same-origin`.
+   *
+   * A browser console authenticates with the `zipzap_session` cookie, which the browser attaches
+   * on a same-origin request with no script involvement — so the client must not send
+   * `credentials: 'omit'`, or every call silently arrives unauthenticated and the console fails to
+   * load anything while reporting no error. A caller that genuinely wants no credential (`login`,
+   * the public tracking route) asks for it explicitly.
+   */
+  readonly credentials?: CredentialsMode;
+  /**
+   * Per-call escape hatch, applied to every request this client makes.
+   *
+   * For a call made from a server-side render: `createServerFn` hands the handler a request whose
+   * cookies must be copied onto the outgoing fetch, and a relative `baseUrl` needs an origin it can
+   * resolve against. Rather than bake either into the client, this lets the caller translate the
+   * incoming request into fetch options it is the only party that can see.
+   */
+  readonly onRequest?: (input: string, init: RequestInit) => RequestInit | Promise<RequestInit>;
   readonly fetchImpl?: typeof fetch;
 }
 
@@ -178,14 +204,42 @@ export class ZipZapClient {
   }
 
   private headers(extra?: Record<string, string>): Record<string, string> {
-    const authorization = this.options.bearerToken
-      ? `Bearer ${this.options.bearerToken}`
-      : `ApiKey ${this.options.apiKey ?? ''}`;
-    return {
-      Authorization: authorization,
+    // Only send the header when there is a credential to state. A client with neither — the browser
+    // console, authenticating with the `zipzap_session` cookie — must send nothing, because the
+    // server treats an `Authorization` header naming no recognised scheme as a rejection rather
+    // than falling through to the cookie. Sending `ApiKey ` with an empty value is not "no
+    // credential", it is a malformed one, and it makes every cookie-authenticated call fail.
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...extra,
     };
+    if (this.options.bearerToken) {
+      headers.Authorization = `Bearer ${this.options.bearerToken}`;
+    } else if (this.options.apiKey) {
+      headers.Authorization = `ApiKey ${this.options.apiKey}`;
+    }
+    return headers;
+  }
+
+  /**
+   * Applies the caller's `onRequest` translator, if there is one.
+   *
+   * Every request in this class funnels through here, so a caller that needs to rewrite a URL or
+   * copy headers has exactly one place to do it — rather than the alternative, where the JSON paths
+   * honour it and the two CSV paths quietly do not, and the console downloads an error envelope
+   * named `statement.csv`.
+   *
+   * The URL is not passed through `onRequest`: the first argument to `fetch` is the URL, so a
+   * translator that returns `{ url }` in the init is ignored by `fetch` and the original relative
+   * path is used — which fails with `ERR_INVALID_URL` on a server-side render, where a bare
+   * `/api/v1/me` has no origin to resolve against. Instead the translator is expected to put the
+   * absolute URL in the returned init's `url`, and it IS forwarded to `fetch` as the first argument.
+   */
+  private async withOnRequest(url: string, init: RequestInit): Promise<[string, RequestInit]> {
+    if (!this.options.onRequest) return [url, init];
+    const result = await this.options.onRequest(url, init);
+    const finalUrl = (result as RequestInit & { url?: string }).url ?? url;
+    return [finalUrl, result];
   }
 
   private async request<T>(
@@ -201,11 +255,15 @@ export class ZipZapClient {
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
       .join('&');
     const url = `${this.options.baseUrl}${path}${query ? `?${query}` : ''}`;
-    const response = await this.fetchImpl(url, {
+    const [finalUrl, finalInit] = await this.withOnRequest(url, {
       method: init.method,
       headers: this.headers(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined),
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      // The cookie rides same-origin. See the `credentials` note on ClientOptions for why this
+      // must not be `omit`: it fails silently, with no console error, just a blank screen.
+      credentials: this.options.credentials ?? 'same-origin',
     });
+    const response = await this.fetchImpl(finalUrl, finalInit);
     const retryAfter = response.headers.get('Retry-After');
     if (!response.ok) {
       const body = await response.json().catch(() => null);
@@ -322,10 +380,13 @@ export class ZipZapClient {
    * because a plain <a href> cannot carry the Authorization header.
    */
   async statementCsv(id: string): Promise<string> {
-    const response = await this.fetchImpl(
-      `${this.options.baseUrl}/v1/settlements/${encodeURIComponent(id)}/statement.csv`,
-      { method: 'GET', headers: this.headers() },
-    );
+    const statementUrl = `${this.options.baseUrl}/v1/settlements/${encodeURIComponent(id)}/statement.csv`;
+    const [finalUrl, finalInit] = await this.withOnRequest(statementUrl, {
+      method: 'GET',
+      headers: this.headers(),
+      credentials: this.options.credentials ?? 'same-origin',
+    });
+    const response = await this.fetchImpl(finalUrl, finalInit);
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new ZipZapApiError(errorEnvelopeOf(body, response.status), null);
@@ -637,10 +698,13 @@ export class ZipZapClient {
    * Authorization header.
    */
   async bulkResultCsv(jobId: string): Promise<string> {
-    const response = await this.fetchImpl(
-      `${this.options.baseUrl}/v1/shipments/bulk/${encodeURIComponent(jobId)}/result`,
-      { method: 'GET', headers: this.headers() },
-    );
+    const resultUrl = `${this.options.baseUrl}/v1/shipments/bulk/${encodeURIComponent(jobId)}/result`;
+    const [finalUrl, finalInit] = await this.withOnRequest(resultUrl, {
+      method: 'GET',
+      headers: this.headers(),
+      credentials: this.options.credentials ?? 'same-origin',
+    });
+    const response = await this.fetchImpl(finalUrl, finalInit);
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new ZipZapApiError(errorEnvelopeOf(body, response.status), null);

@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button, FormField, Input, Spinner } from '@zipzap/ui';
 import { anonClient } from '../lib/api.ts';
-import { writeSession } from '../lib/session.ts';
 
 export const Route = createFileRoute('/login')({
   component: Login,
@@ -20,8 +19,11 @@ function Login() {
     setError(null);
     setPending(true);
     try {
-      const session = await anonClient().login(email.trim(), password);
-      writeSession({ token: session.token, expiresAt: session.expiresAt });
+      // No token is stored here. The server sets the session as an `HttpOnly` cookie, which script
+      // cannot read and the browser attaches on its own — so there is nothing for this route to
+      // keep, and nothing for an XSS to steal. Writing it to `sessionStorage` was the old model and
+      // is exactly the exposure this removes.
+      await anonClient().login(email.trim(), password);
       void navigate({ to: '/' });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign-in failed.');
