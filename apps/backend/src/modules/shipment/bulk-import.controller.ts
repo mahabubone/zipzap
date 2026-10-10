@@ -12,6 +12,7 @@ import {
   ApiAcceptedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
@@ -19,6 +20,7 @@ import { IsString, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { BulkImportService } from './bulk-import.service.ts';
 import { BulkJobViewDto, BulkPreviewDto } from './shipment-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 export class UploadBulkDto {
   @IsString()
@@ -49,6 +51,7 @@ export class BulkImportController {
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Upload CSV, get the human preview checkpoint' })
   @ApiAcceptedResponse({ type: BulkPreviewDto })
+  @ApiErrors()
   async upload(
     @Body() body: UploadBulkDto,
     @Req() request: AuthenticatedRequest,
@@ -60,6 +63,7 @@ export class BulkImportController {
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Accept the preview — enqueue chunked processing' })
   @ApiAcceptedResponse({ type: BulkJobViewDto })
+  @ApiErrors()
   async accept(
     @Body() body: AcceptBulkDto,
     @Req() request: AuthenticatedRequest,
@@ -69,8 +73,13 @@ export class BulkImportController {
 
   @Get(':jobId')
   @UseGuards(new ScopeGuard('shipments:write'))
-  @ApiOperation({ summary: 'Poll job progress' })
+  @ApiOperation({
+    summary: 'Poll job progress',
+    description: 'Returns the job view in its current state. Poll it; there is no push.',
+  })
+  @ApiParam({ name: 'jobId', description: 'The job id returned by `upload`.' })
   @ApiOkResponse({ type: BulkJobViewDto })
+  @ApiErrors()
   async progress(
     @Param('jobId') jobId: string,
     @Req() request: AuthenticatedRequest,
@@ -87,6 +96,15 @@ export class BulkImportController {
   @Header('Content-Disposition', 'attachment; filename="zipzap-bulk-result.csv"')
   @ApiProduces('text/csv')
   @ApiOperation({ summary: 'Download the row-level result CSV' })
+  @ApiParam({ name: 'jobId', description: 'Bulk import job id.' })
+  // CSV, not JSON: the api-client fetches this with `.text()` and hands the caller a Blob, so the
+  // spec must advertise text/csv or a generated client would try to parse the CSV as an envelope.
+  @ApiOkResponse({
+    content: { 'text/csv': { schema: { type: 'string' } } },
+    description:
+      'Row-level outcome CSV: line_number,invoice,outcome,reason,shipment_id for every row in the job.',
+  })
+  @ApiErrors()
   async result(
     @Param('jobId') jobId: string,
     @Req() request: AuthenticatedRequest,

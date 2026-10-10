@@ -6,7 +6,7 @@
  */
 
 import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -18,9 +18,10 @@ import {
   Min,
 } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { PricingService, type RateCard } from './pricing.service.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { QuoteResponseDto, RateCardResponseDto } from './pricing-response.dto.ts';
+import { PricingService } from './pricing.service.ts';
 import type { Currency } from '../../common/money.ts';
-import type { Quote } from './rules/pricing.ts';
 
 export class QuoteDto {
   @IsInt()
@@ -64,7 +65,12 @@ export class PricingController {
 
   @Post('quote')
   @ApiOperation({ summary: 'Quote a shipment price' })
-  async quote(@Body() body: QuoteDto, @Req() request: AuthenticatedRequest): Promise<Quote> {
+  @ApiCreatedResponse({ type: QuoteResponseDto })
+  @ApiErrors()
+  async quote(
+    @Body() body: QuoteDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<QuoteResponseDto> {
     return this.pricing.quote({
       weightGrams: body.weightGrams,
       codAmountMinor: body.codAmountMinor,
@@ -82,7 +88,9 @@ export class PricingController {
 
   @Get('rate-card')
   @ApiOperation({ summary: 'Your rate card, with worked examples' })
-  async rateCard(@Req() request: AuthenticatedRequest): Promise<RateCard> {
+  @ApiOkResponse({ type: RateCardResponseDto })
+  @ApiErrors()
+  async rateCard(@Req() request: AuthenticatedRequest): Promise<RateCardResponseDto> {
     return this.pricing.rateCard(request.principal!.merchantId!);
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -31,6 +32,7 @@ export class ListSettlementsQuery {
 export class ListSettlementsController {
   constructor(@Inject(ListSettlementsService) private readonly list: ListSettlementsService) {}
 
+  @ApiErrors()
   @Get()
   @UseGuards(new ScopeGuard('settlements:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your settlements, newest first' })

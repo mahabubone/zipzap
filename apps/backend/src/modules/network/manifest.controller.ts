@@ -1,8 +1,21 @@
 import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import { ManifestService, type ManifestDetail, type ManifestView } from './manifest.service.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import {
+  ManifestDetailDto,
+  ManifestListDto,
+  ManifestViewDto,
+  ScheduledTripDto,
+} from './network-response.dto.ts';
+import { ManifestService } from './manifest.service.ts';
 
 export class CreateManifestDto {
   @IsUUID('4')
@@ -45,49 +58,67 @@ export class ManifestController {
   @Get()
   @UseGuards(new ScopeGuard('hub:read'))
   @ApiOperation({ summary: 'Manifests, newest first, optionally by status' })
-  list(@Query() query: ListManifestsQuery): Promise<{ data: ManifestView[] }> {
+  @ApiOkResponse({ type: ManifestListDto })
+  @ApiErrors()
+  list(@Query() query: ListManifestsQuery): Promise<ManifestListDto> {
     return this.manifests.list(query.status ?? null).then((data) => ({ data }));
   }
 
   @Get(':id')
   @UseGuards(new ScopeGuard('hub:read'))
   @ApiOperation({ summary: 'One manifest and the parcels on it' })
-  async one(@Param('id') id: string): Promise<ManifestDetail> {
+  @ApiParam({ name: 'id', description: 'Manifest id' })
+  @ApiOkResponse({ type: ManifestDetailDto })
+  @ApiErrors()
+  async one(@Param('id') id: string): Promise<ManifestDetailDto> {
     return this.manifests.detail(id);
   }
 
   @Post()
   @UseGuards(new ScopeGuard('hub:scan'))
   @ApiOperation({ summary: 'Schedule a trip, or create a DRAFT manifest on an existing one' })
-  create(@Body() body: CreateManifestDto): Promise<ManifestView> {
+  @ApiCreatedResponse({ type: ManifestViewDto })
+  @ApiErrors()
+  create(@Body() body: CreateManifestDto): Promise<ManifestViewDto> {
     return this.manifests.createManifest(body.tripId, body.shipmentIds);
   }
 
   @Post('trips')
   @UseGuards(new ScopeGuard('hub:scan'))
   @ApiOperation({ summary: 'Schedule one run of a seeded route' })
-  scheduleTrip(@Body() body: TripDto): Promise<{ tripId: string; routeId: string }> {
+  @ApiCreatedResponse({ type: ScheduledTripDto })
+  @ApiErrors()
+  scheduleTrip(@Body() body: TripDto): Promise<ScheduledTripDto> {
     return this.manifests.scheduleTrip(body.routeCode);
   }
 
   @Post(':id/seal')
   @UseGuards(new ScopeGuard('hub:scan'))
   @ApiOperation({ summary: 'DRAFT → SEALED. A sealed manifest is evidence of what left.' })
-  seal(@Param('id') id: string): Promise<ManifestView> {
+  @ApiParam({ name: 'id', description: 'Manifest id' })
+  @ApiCreatedResponse({ type: ManifestViewDto })
+  @ApiErrors()
+  seal(@Param('id') id: string): Promise<ManifestViewDto> {
     return this.manifests.seal(id);
   }
 
   @Post(':id/dispatch')
   @UseGuards(new ScopeGuard('hub:scan'))
   @ApiOperation({ summary: 'SEALED → DISPATCHED' })
-  dispatch(@Param('id') id: string): Promise<ManifestView> {
+  @ApiParam({ name: 'id', description: 'Manifest id' })
+  @ApiCreatedResponse({ type: ManifestViewDto })
+  @ApiErrors()
+  dispatch(@Param('id') id: string): Promise<ManifestViewDto> {
     return this.manifests.dispatch(id);
   }
 
   @Post(':id/receive')
   @UseGuards(new ScopeGuard('hub:scan'))
   @ApiOperation({ summary: 'DISPATCHED → RECEIVED' })
-  receive(@Param('id') id: string): Promise<ManifestView> {
+  @ApiParam({ name: 'id', description: 'Manifest id' })
+  @ApiCreatedResponse({ type: ManifestViewDto })
+  @ApiErrors()
+  receive(@Param('id') id: string): Promise<ManifestViewDto> {
     return this.manifests.receive(id);
   }
 
@@ -96,7 +127,10 @@ export class ManifestController {
   @ApiOperation({
     summary: 'RECEIVED → RECONCILED, refused while any parcel has not arrived',
   })
-  reconcile(@Param('id') id: string): Promise<ManifestView> {
+  @ApiParam({ name: 'id', description: 'Manifest id' })
+  @ApiCreatedResponse({ type: ManifestViewDto })
+  @ApiErrors()
+  reconcile(@Param('id') id: string): Promise<ManifestViewDto> {
     return this.manifests.reconcile(id);
   }
 }

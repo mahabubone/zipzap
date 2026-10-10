@@ -6,10 +6,12 @@
  */
 
 import { Controller, Get, Inject, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
-import { NetworkService, type CoverageCheck } from './network.service.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { CoverageCheckDto, ServiceableZonesDto } from './network-response.dto.ts';
+import { NetworkService } from './network.service.ts';
 
 export class CoverageQuery {
   @IsString()
@@ -24,13 +26,17 @@ export class CoverageController {
 
   @Get('coverage')
   @ApiOperation({ summary: 'Serviceability check for one zone' })
-  async coverage(@Query() query: CoverageQuery): Promise<CoverageCheck> {
+  @ApiOkResponse({ type: CoverageCheckDto })
+  @ApiErrors()
+  async coverage(@Query() query: CoverageQuery): Promise<CoverageCheckDto> {
     return this.network.checkZone(query.zone);
   }
 
   @Get('zones')
   @ApiOperation({ summary: 'Every zone you can ship to' })
-  async zones(): Promise<{ zones: string[] }> {
+  @ApiOkResponse({ type: ServiceableZonesDto })
+  @ApiErrors()
+  async zones(): Promise<ServiceableZonesDto> {
     return { zones: await this.network.listServiceableZones() };
   }
 }

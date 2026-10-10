@@ -7,7 +7,8 @@
 
 import { ApiProperty } from '@nestjs/swagger';
 import type { RiderStatus } from './rules/rider.ts';
-import type { AckOutcome } from './offline-sync.service.ts';
+import type { PickupStatus } from '../pickup/rules/pickup.ts';
+import type { DeliveryStatus } from '../delivery/rules/delivery.ts';
 
 export class RegisteredRiderDto {
   @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
@@ -75,11 +76,11 @@ export class PullCommandDto {
   @ApiProperty({ example: 'zipzap.rider.command' })
   commandType!: string;
 
-  @ApiProperty({ example: {} })
-  payload!: Record<string, unknown>;
+  @ApiProperty({ type: Object, example: { note: 'device-supplied' } })
+  payload!: Readonly<object>;
 
-  @ApiProperty({ example: null, nullable: true })
-  expectedState!: Record<string, unknown> | null;
+  @ApiProperty({ type: Object, example: null, nullable: true })
+  expectedState!: Readonly<object> | null;
 
   @ApiProperty({ example: 1 })
   deviceSequence!: number;
@@ -124,12 +125,30 @@ export class ReplayResultDto {
   capWarning!: boolean;
 }
 
-export class AckResultDto {
+/**
+ * The verdict on one acknowledged command, mirroring `AckOutcome` in offline-sync.service.ts.
+ *
+ * A fresh ack resolves to delivered or rejected; the already_* variants are a replayed
+ * Idempotency-Key handing back what the first ack recorded, so the device reconciles rather than
+ * retries. `replayed` tracks the kind: false on a fresh decision, true on a replay.
+ */
+export class AckOutcomeDto {
   @ApiProperty({
-    example: { kind: 'delivered', replayed: false },
-    description: 'Outcome of command acknowledgement',
+    example: 'delivered',
+    enum: ['delivered', 'rejected', 'already_delivered', 'already_rejected'],
+    description:
+      'A fresh ack is delivered or rejected; the already_* variants return what a prior ' +
+      'Idempotency-Key recorded.',
   })
-  outcome!: AckOutcome;
+  kind!: 'delivered' | 'rejected' | 'already_delivered' | 'already_rejected';
+
+  @ApiProperty({ example: false })
+  replayed!: boolean;
+}
+
+export class AckResultDto {
+  @ApiProperty({ type: AckOutcomeDto, description: 'Outcome of command acknowledgement' })
+  outcome!: AckOutcomeDto;
 
   @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
   createdAt!: Date;
@@ -141,10 +160,74 @@ export class AckResultDto {
   replayed!: boolean;
 }
 
-export class RiderJobsDto {
-  @ApiProperty({ type: [Object], description: 'List of pickup jobs assigned to this rider' })
-  pickups!: unknown[];
+export class RiderPickupJobDto {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  id!: string;
 
-  @ApiProperty({ type: [Object], description: 'List of delivery jobs assigned to this rider' })
-  deliveries!: unknown[];
+  @ApiProperty({ example: 'b1c2d3e4-f6a7-8901-bcde-f12345678901' })
+  merchantId!: string;
+
+  @ApiProperty({ type: [String], example: ['shp-1', 'shp-2'] })
+  shipmentIds!: string[];
+
+  @ApiProperty({ example: 'r-123', nullable: true })
+  riderId!: string | null;
+
+  @ApiProperty({ example: 'ASSIGNED' })
+  status!: PickupStatus;
+
+  @ApiProperty({ example: null, nullable: true })
+  failureReason!: string | null;
+
+  @ApiProperty({ example: 12000, description: 'Total batch weight, integer grams' })
+  totalWeightGrams!: number;
+
+  @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: '2026-10-10T06:05:00.000Z' })
+  updatedAt!: Date;
+}
+
+export class RiderDeliveryJobDto {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  id!: string;
+
+  @ApiProperty({ example: 'shp-123' })
+  shipmentId!: string;
+
+  @ApiProperty({ example: 'r-123' })
+  riderId!: string;
+
+  @ApiProperty({ example: 'ACCEPTED' })
+  status!: DeliveryStatus;
+
+  @ApiProperty({ example: 0 })
+  attemptsMade!: number;
+
+  @ApiProperty({ example: null, nullable: true })
+  lastFailureReason!: string | null;
+
+  @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: '2026-10-10T06:05:00.000Z' })
+  updatedAt!: Date;
+}
+
+/** A rider's home feed: the two ordered lists the rider app merges, each newest first. */
+export class RiderJobsDto {
+  @ApiProperty({
+    type: RiderPickupJobDto,
+    isArray: true,
+    description: 'Pickup batches assigned to this rider, newest first',
+  })
+  pickups!: RiderPickupJobDto[];
+
+  @ApiProperty({
+    type: RiderDeliveryJobDto,
+    isArray: true,
+    description: 'Delivery jobs assigned to this rider, newest first',
+  })
+  deliveries!: RiderDeliveryJobDto[];
 }

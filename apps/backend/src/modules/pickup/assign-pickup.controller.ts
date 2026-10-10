@@ -6,11 +6,13 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { AssignPickupService, type AssignedPickup } from './assign-pickup.service.ts';
+import { AssignPickupService } from './assign-pickup.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { AssignedPickupDto } from './pickup-response.dto.ts';
 
 export class AssignmentCandidateDto {
   @IsUUID('4')
@@ -51,13 +53,16 @@ export class AssignPickupController {
   @Post(':id/assign')
   @UseGuards(new ScopeGuard('pickup:create'))
   @ApiOperation({ summary: 'Assign a rider to a pickup' })
+  @ApiParam({ name: 'id', description: 'The pickup aggregate id to assign.' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOkResponse({ type: AssignedPickupDto })
+  @ApiErrors()
   async assign(
     @Param('id') id: string,
     @Body() body: AssignPickupDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<AssignedPickup & { replayed: boolean }> {
+  ): Promise<AssignedPickupDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }

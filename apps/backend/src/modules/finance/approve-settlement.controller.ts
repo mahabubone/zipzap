@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -27,6 +28,7 @@ export class ApproveSettlementController {
     @Inject(ApproveSettlementService) private readonly approveSettlement: ApproveSettlementService,
   ) {}
 
+  @ApiErrors()
   @Post(':id/approve')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Approve a settlement — the point of no return' })

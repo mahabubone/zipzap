@@ -12,6 +12,7 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiExtraModels, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, Matches } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -111,6 +112,7 @@ export class MerchantAnalyticsController {
     private readonly projections: ProjectionQueriesService,
   ) {}
 
+  @ApiErrors()
   @Get('merchant')
   @UseGuards(new ScopeGuard('cod:read'))
   @ApiOperation({ summary: 'Your own daily parcel counts and COD money, one point per day' })

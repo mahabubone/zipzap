@@ -7,11 +7,13 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ListPickupsService, type PickupPage } from './list-pickups.service.ts';
+import { ListPickupsService } from './list-pickups.service.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { PickupPageDto } from './pickup-response.dto.ts';
 
 export class ListPickupsQuery {
   @IsOptional()
@@ -32,10 +34,12 @@ export class ListPickupsController {
   @Get()
   @UseGuards(new ScopeGuard('pickup:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your pickups, newest first' })
+  @ApiOkResponse({ type: PickupPageDto })
+  @ApiErrors()
   async listPickups(
     @Query() query: ListPickupsQuery,
     @Req() request: AuthenticatedRequest,
-  ): Promise<PickupPage> {
+  ): Promise<PickupPageDto> {
     return this.list.execute(request.principal!.merchantId!, query.limit, query.cursor);
   }
 }

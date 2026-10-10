@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -31,6 +32,7 @@ export class RecordAttemptDto {
 export class RecordAttemptController {
   constructor(@Inject(RecordAttemptService) private readonly recordAttempt: RecordAttemptService) {}
 
+  @ApiErrors()
   @Post(':id/attempts')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Record a failed delivery attempt' })

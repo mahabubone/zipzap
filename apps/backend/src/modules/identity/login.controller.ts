@@ -16,11 +16,13 @@
  */
 
 import { Body, Controller, Inject, Post, Req } from '@nestjs/common';
-import { ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
 import type { Request } from 'express';
 import { AuthenticationRequiredError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { MerchantAuthService, type IssuedSession } from '../merchant/sessions.service.ts';
+import { IssuedSessionResponseDto } from './identity-response.dto.ts';
 
 export class LoginDto {
   @IsEmail()
@@ -42,7 +44,15 @@ export class LoginController {
   constructor(@Inject(MerchantAuthService) private readonly auth: MerchantAuthService) {}
 
   @Post('login')
-  @ApiOperation({ summary: 'Log in with email + password, returns a bearer session token' })
+  @ApiOperation({
+    summary: 'Sign in with email and password',
+    description:
+      'Returns a bearer session token, shown exactly once. A browser console sends it back as ' +
+      '`Bearer` on the Authorization header; the ZipZap consoles instead let the server set it as ' +
+      'an HttpOnly cookie. Whatever the transport, it is stored hashed, so it cannot be recovered.',
+  })
+  @ApiCreatedResponse({ type: IssuedSessionResponseDto })
+  @ApiErrors()
   async login(
     @Body() body: LoginDto,
     @Req() req: Request & { requestId?: string },

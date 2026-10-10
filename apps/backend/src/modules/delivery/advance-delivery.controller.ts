@@ -10,6 +10,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, Min } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -30,6 +31,7 @@ export class CompleteDeliveryDto {
 export class AdvanceDeliveryController {
   constructor(@Inject(AdvanceDeliveryService) private readonly advance: AdvanceDeliveryService) {}
 
+  @ApiErrors()
   @Post(':id/accept')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Rider accepts a delivery job' })
@@ -39,6 +41,7 @@ export class AdvanceDeliveryController {
     return { id, status };
   }
 
+  @ApiErrors()
   @Post(':id/dispatch')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Rider heads out for delivery' })
@@ -51,6 +54,7 @@ export class AdvanceDeliveryController {
     return { id, status };
   }
 
+  @ApiErrors()
   @Post(':id/complete')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Confirm delivery and collect COD' })

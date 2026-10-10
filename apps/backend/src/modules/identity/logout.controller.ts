@@ -1,7 +1,8 @@
 import { Controller, HttpCode, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiNoContentResponse } from '@nestjs/swagger';
 import { ApiKeyGuard, type AuthenticatedRequest } from './api-key.guard.ts';
 import { MerchantAuthService } from '../merchant/sessions.service.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('auth')
 @Controller('v1/auth')
@@ -12,8 +13,17 @@ export class LogoutController {
   @Post('logout')
   @HttpCode(204)
   @UseGuards(ApiKeyGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Revoke the current bearer session' })
+  @ApiOperation({
+    summary: 'Revoke the current session',
+    description:
+      'Revokes this session only, not every session the person holds. An API key principal has no ' +
+      'session, so calling it with one revokes nothing and still returns 204.',
+  })
+  @ApiNoContentResponse({
+    description:
+      'The session is revoked, or there was none to revoke. Indistinguishable by design.',
+  })
+  @ApiErrors()
   async logout(@Req() req: AuthenticatedRequest & { requestId?: string }): Promise<void> {
     const p = req.principal;
     if (p?.kind !== 'human' || !p.credentialId) return;

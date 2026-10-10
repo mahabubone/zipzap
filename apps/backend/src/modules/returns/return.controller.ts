@@ -6,13 +6,14 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { ReturnService } from './return.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { RETURN_REASONS } from './rules/returns.ts';
-import type { ReturnStatus } from './rules/returns.ts';
+import { RequestedReturnDto, ReturnStatusDto } from './returns-response.dto.ts';
 
 export class RequestReturnDto {
   @IsUUID('4')
@@ -46,11 +47,13 @@ export class ReturnController {
   @UseGuards(new ScopeGuard('returns:write'))
   @ApiOperation({ summary: 'Request a return against the original shipment' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOkResponse({ type: RequestedReturnDto })
+  @ApiErrors()
   async request(
     @Body() body: RequestReturnDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ id: string; shipmentId: string; status: ReturnStatus; replayed: boolean }> {
+  ): Promise<RequestedReturnDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }
@@ -66,10 +69,10 @@ export class ReturnController {
   @Post(':id/approve')
   @UseGuards(new ScopeGuard('returns:write'))
   @ApiOperation({ summary: 'Approve a return — the merchant decision' })
-  async approve(
-    @Param('id') id: string,
-    @Body() body: DecideReturnDto,
-  ): Promise<{ id: string; status: ReturnStatus }> {
+  @ApiParam({ name: 'id', description: 'The return aggregate id being decided.' })
+  @ApiOkResponse({ type: ReturnStatusDto })
+  @ApiErrors()
+  async approve(@Param('id') id: string, @Body() body: DecideReturnDto): Promise<ReturnStatusDto> {
     return this.returns.decide({
       returnId: id,
       approverId: body.approverId,
@@ -81,10 +84,10 @@ export class ReturnController {
   @Post(':id/reject')
   @UseGuards(new ScopeGuard('returns:write'))
   @ApiOperation({ summary: 'Reject a return — the merchant decision' })
-  async reject(
-    @Param('id') id: string,
-    @Body() body: DecideReturnDto,
-  ): Promise<{ id: string; status: ReturnStatus }> {
+  @ApiParam({ name: 'id', description: 'The return aggregate id being decided.' })
+  @ApiOkResponse({ type: ReturnStatusDto })
+  @ApiErrors()
+  async reject(@Param('id') id: string, @Body() body: DecideReturnDto): Promise<ReturnStatusDto> {
     return this.returns.decide({
       returnId: id,
       approverId: body.approverId,
@@ -96,10 +99,13 @@ export class ReturnController {
   @Post(':id/advance')
   @UseGuards(new ScopeGuard('returns:write'))
   @ApiOperation({ summary: 'Walk one transit leg toward the merchant' })
+  @ApiParam({ name: 'id', description: 'The return aggregate id being advanced.' })
+  @ApiOkResponse({ type: ReturnStatusDto })
+  @ApiErrors()
   async advance(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ id: string; status: ReturnStatus }> {
+  ): Promise<ReturnStatusDto> {
     return this.returns.advance({ returnId: id, actorId: request.principal?.subjectId ?? null });
   }
 }

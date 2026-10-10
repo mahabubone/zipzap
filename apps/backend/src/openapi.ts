@@ -25,26 +25,32 @@ import { RateLimitGuard } from './modules/identity/rate-limit.guard.ts';
 /**
  * Tags carry descriptions because the names alone do not say what a resource is for.
  * `ApiTags` supplies the name per controller; these supply the prose.
+ *
+ * Keys are the literal `@ApiTags` values used in controllers, not the module names: `auth`, not
+ * `identity`. An entry with no matching tag is dead and an untagged controller is undocumented, so
+ * `openapi-contract.test.ts` asserts the two sets are equal.
  */
 const TAG_DESCRIPTIONS: Record<string, string> = {
-  shipments: 'Shipment lifecycle: create, quote, track, hold, release, cancel.',
-  pickups: 'Pickup requests and rider assignment.',
-  deliveries: 'Delivery jobs, attempts, and proof of delivery.',
-  returns: 'Return requests and decisions.',
-  cod: 'Cash-on-delivery records, exceptions, and reconciliation.',
-  finance: 'Settlements, statements and merchant balance.',
+  analytics: 'Read-only projections of your own parcels and money.',
+  'api-keys': 'Long-lived machine credentials for your account.',
+  auth: 'Sessions: sign in with email and password, and back out again.',
+  cod: 'Cash-on-delivery records, exceptions and reconciliation.',
+  'control-tower': 'The network-wide operational picture.',
+  coverage: 'Serviceable postcodes and their zones.',
+  deliveries: 'Delivery jobs, attempts and proof of delivery.',
+  health: 'Liveness and readiness probes.',
   hubs: 'Hub inventory and the scan-first dock console.',
-  network: 'Manifests, line-haul trips, coverage and zones.',
+  identity: 'The authenticated principal.',
+  manifests: 'Manifests and the line-haul trips that carry them.',
+  notifications: 'Which messages your customers receive, on which channel.',
+  pickups: 'Pickup requests and rider assignment.',
+  pricing: 'Quotes and the rate card they are drawn from.',
+  returns: 'Return requests and their decisions.',
   riders: 'Rider registration, positions, utilisation and the offline command queue.',
+  settlements: 'Settlements, statements and your balance.',
+  shipments: 'Shipment lifecycle: create, quote, track, hold, release, cancel.',
   tracking: 'Public, credential-free parcel tracking by code.',
   webhooks: 'Outbound webhook endpoints, delivery log and replay.',
-  identity: 'Sessions, credentials and the authenticated principal.',
-  merchant: 'Merchant-scoped settings: API keys and notification preferences.',
-  analytics: 'Read-only projections of your own parcel and money history.',
-  dashboard: 'Live operational counts and the control-tower report.',
-  'control-tower': 'The network-wide operational picture.',
-  notifications: 'Which messages a merchant sends, and over which channel.',
-  health: 'Liveness and readiness probes.',
 };
 
 /** Security scheme names. */

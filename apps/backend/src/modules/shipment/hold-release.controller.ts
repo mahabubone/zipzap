@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -42,6 +43,7 @@ export class HoldReleaseController {
     if (!rows[0]) throw new ResourceNotFoundError('Shipment not found.');
   }
 
+  @ApiErrors()
   @Post(':id/hold')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Put one of your shipments on hold (pauses movement)' })
@@ -59,6 +61,7 @@ export class HoldReleaseController {
     });
   }
 
+  @ApiErrors()
   @Post(':id/release')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Release a held shipment back to its interrupted state' })

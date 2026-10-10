@@ -7,6 +7,7 @@
  */
 
 import { Controller, Headers, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
 import { ConfirmSettlementPaymentService } from './confirm-settlement-payment.service.ts';
@@ -35,6 +36,7 @@ export class SettlementPaymentController {
     private readonly confirm: ConfirmSettlementPaymentService,
   ) {}
 
+  @ApiErrors()
   @Post(':id/initiate-payment')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Initiate the provider payout for an approved settlement' })
@@ -51,6 +53,7 @@ export class SettlementPaymentController {
     return { ...result, replayed };
   }
 
+  @ApiErrors()
   @Post(':id/confirm-payment')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Confirm the provider payout and settle' })

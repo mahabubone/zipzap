@@ -11,6 +11,7 @@
  */
 
 import { Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { CreateSettlementService } from './create-settlement.service.ts';
@@ -35,6 +36,7 @@ export class CreateSettlementController {
     @Inject(CreateSettlementService) private readonly createSettlement: CreateSettlementService,
   ) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Freeze your unsettled entries into a settlement' })

@@ -7,10 +7,11 @@
  */
 
 import { Controller, Get, Inject, Param, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
 import { UtilisationService } from './utilisation.service.ts';
-import type { PoolUtilisation } from './utilisation.service.ts';
+import { PoolUtilisationDto, RiderLoadDto } from './rider-response.dto.ts';
 
 @ApiTags('riders')
 @Controller('v1/riders')
@@ -20,14 +21,19 @@ export class UtilisationController {
 
   @Get(':riderId/utilisation')
   @ApiOperation({ summary: "Rider's current load factor" })
-  async riderUtilisation(@Param('riderId') riderId: string) {
+  @ApiParam({ name: 'riderId', description: 'The rider whose current load factor is read.' })
+  @ApiOkResponse({ type: RiderLoadDto, nullable: true })
+  @ApiErrors()
+  async riderUtilisation(@Param('riderId') riderId: string): Promise<RiderLoadDto | null> {
     const load = await this.util.getRiderLoad(riderId);
     return load ?? null;
   }
 
   @Get('pool-utilisation')
   @ApiOperation({ summary: 'Pool-wide rider utilisation KPI' })
-  async poolUtilisation(): Promise<PoolUtilisation> {
+  @ApiOkResponse({ type: PoolUtilisationDto })
+  @ApiErrors()
+  async poolUtilisation(): Promise<PoolUtilisationDto> {
     return this.util.getPoolLoad();
   }
 }

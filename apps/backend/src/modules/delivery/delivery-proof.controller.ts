@@ -11,6 +11,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsLatitude, IsLongitude, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -47,6 +48,7 @@ export class SubmitProofDto {
 export class DeliveryProofController {
   constructor(@Inject(DeliveryProofService) private readonly proofs: DeliveryProofService) {}
 
+  @ApiErrors()
   @Post(':id/proof/code')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({
@@ -67,6 +69,7 @@ export class DeliveryProofController {
     });
   }
 
+  @ApiErrors()
   @Post(':id/proof')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({

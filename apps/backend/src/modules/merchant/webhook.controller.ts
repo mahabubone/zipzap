@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -47,6 +48,7 @@ export class WebhookController {
     return request.principal!.merchantId!;
   }
 
+  @ApiErrors()
   @Get()
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'List your webhook endpoints' })
@@ -55,6 +57,7 @@ export class WebhookController {
     return this.endpoints.list(this.merchantId(request));
   }
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Register a webhook endpoint; secret returned once' })
@@ -70,6 +73,7 @@ export class WebhookController {
     });
   }
 
+  @ApiErrors()
   @Post(':id/rotate')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Rotate the signing secret; new secret returned once' })
@@ -81,6 +85,7 @@ export class WebhookController {
     return this.endpoints.rotateSecret(this.merchantId(request), id);
   }
 
+  @ApiErrors()
   @Post(':id/pause')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Pause delivery to an endpoint' })
@@ -92,6 +97,7 @@ export class WebhookController {
     return this.endpoints.setStatus(this.merchantId(request), id, 'PAUSED');
   }
 
+  @ApiErrors()
   @Post(':id/resume')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Resume delivery to an endpoint' })
@@ -108,6 +114,7 @@ export class WebhookController {
    * that a delivery id existed, let alone that it had failed. Every attempt, every status code, and
    * whether the ladder has ended.
    */
+  @ApiErrors()
   @Get('deliveries')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({
@@ -125,6 +132,7 @@ export class WebhookController {
     });
   }
 
+  @ApiErrors()
   @Post('deliveries/:deliveryId/replay')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Replay a terminal delivery with a fresh delivery id' })

@@ -3,6 +3,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
@@ -27,6 +28,7 @@ export class CreateDeliveryController {
     @Inject(CreateDeliveryService) private readonly createDelivery: CreateDeliveryService,
   ) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('delivery:create'))
   @ApiOperation({ summary: 'Open a delivery job' })

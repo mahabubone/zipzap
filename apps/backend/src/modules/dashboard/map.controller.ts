@@ -11,9 +11,11 @@
  */
 
 import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import { MapService, type NetworkMap } from './map.service.ts';
+import { MapService } from './map.service.ts';
+import { NetworkMapDto } from './dashboard-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('control-tower')
 @Controller('v1/control-tower')
@@ -27,7 +29,9 @@ export class MapController {
     summary:
       'Hubs and rider positions for the live map. Rider positions never reach public tracking.',
   })
-  getMap(): Promise<NetworkMap> {
+  @ApiOkResponse({ type: NetworkMapDto })
+  @ApiErrors()
+  getMap(): Promise<NetworkMapDto> {
     return this.map.getMap();
   }
 }

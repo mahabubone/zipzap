@@ -3,6 +3,7 @@
  */
 
 import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
@@ -29,6 +30,7 @@ export class RegisterRiderDto {
 export class RegisterRiderController {
   constructor(@Inject(RegisterRiderService) private readonly registerRider: RegisterRiderService) {}
 
+  @ApiErrors()
   @Post()
   @ApiOperation({ summary: 'Register a rider' })
   @ApiCreatedResponse({ type: RegisteredRiderDto })

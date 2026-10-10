@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsIn } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -27,6 +28,7 @@ export class CreateApiKeyDto {
 export class CreateApiKeyController {
   constructor(@Inject(CreateApiKeyService) private readonly keys: CreateApiKeyService) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('keys:manage'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a scoped API key (secret shown once)' })

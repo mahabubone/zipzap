@@ -7,6 +7,7 @@
  */
 
 import { Controller, Get, Inject, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { MerchantBalanceService } from './merchant-balance.service.ts';
@@ -18,6 +19,7 @@ import { MerchantBalanceDto } from './finance-response.dto.ts';
 export class MerchantBalanceController {
   constructor(@Inject(MerchantBalanceService) private readonly balance: MerchantBalanceService) {}
 
+  @ApiErrors()
   @Get('balance')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Your derived balance, itemised, with anything blocking a payout' })

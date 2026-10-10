@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -40,6 +41,7 @@ export class ReportExceptionController {
     @Inject(ReportExceptionService) private readonly exceptions: ReportExceptionService,
   ) {}
 
+  @ApiErrors()
   @Post(':id/exception')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Report a LOST or DAMAGED exception for one of your shipments' })

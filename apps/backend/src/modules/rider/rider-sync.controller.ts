@@ -30,7 +30,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -46,13 +53,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import {
-  OfflineSyncService,
-  type PullResult,
-  type AckResult,
-  type ReplayResult,
-} from './offline-sync.service.ts';
+import { OfflineSyncService } from './offline-sync.service.ts';
+import { AckResultDto, PullResultDto, ReplayResultDto } from './rider-response.dto.ts';
 
 class PullDto {
   @IsOptional()
@@ -117,7 +121,10 @@ export class RiderSyncController {
   @Get(':riderId/sync')
   @UseGuards(new ScopeGuard('rider:sync'))
   @ApiOperation({ summary: 'Pull pending commands for an offline rider' })
-  async pull(@Param('riderId') riderId: string, @Query() dto: PullDto): Promise<PullResult> {
+  @ApiParam({ name: 'riderId', description: 'The rider whose offline command queue is pulled.' })
+  @ApiOkResponse({ type: PullResultDto })
+  @ApiErrors()
+  async pull(@Param('riderId') riderId: string, @Query() dto: PullDto): Promise<PullResultDto> {
     const since = dto.sinceSeq !== undefined ? Number(dto.sinceSeq) : undefined;
     const limit = dto.limit !== undefined ? Number(dto.limit) : undefined;
     return this.sync.pull(riderId, since, limit);
@@ -129,7 +136,13 @@ export class RiderSyncController {
   @ApiOperation({
     summary: 'A device pushing its own offline commands back, in device order, exactly once each',
   })
-  async replay(@Param('riderId') riderId: string, @Body() dto: ReplayDto): Promise<ReplayResult> {
+  @ApiParam({ name: 'riderId', description: 'The rider whose device is replaying its commands.' })
+  @ApiOkResponse({ type: ReplayResultDto })
+  @ApiErrors()
+  async replay(
+    @Param('riderId') riderId: string,
+    @Body() dto: ReplayDto,
+  ): Promise<ReplayResultDto> {
     return this.sync.replay(
       riderId,
       dto.commands.map((command) => ({
@@ -146,11 +159,14 @@ export class RiderSyncController {
   @UseGuards(new ScopeGuard('rider:sync'))
   @ApiOperation({ summary: 'Acknowledge one queued command' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiParam({ name: 'riderId', description: 'The rider who owns the command being acknowledged.' })
+  @ApiCreatedResponse({ type: AckResultDto })
+  @ApiErrors()
   async ack(
     @Param('riderId') riderId: string,
     @Body() dto: AckDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-  ): Promise<AckResult & { replayed: boolean }> {
+  ): Promise<AckResultDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }

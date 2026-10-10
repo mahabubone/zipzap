@@ -7,12 +7,14 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsPositive, IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { RequestPickupService, type RequestedPickup } from './request-pickup.service.ts';
+import { RequestPickupService } from './request-pickup.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { MAX_BATCH_PARCELS } from './rules/pickup.ts';
+import { RequestedPickupDto } from './pickup-response.dto.ts';
 
 export class RequestPickupDto {
   @IsArray()
@@ -36,11 +38,13 @@ export class RequestPickupController {
   @UseGuards(new ScopeGuard('pickup:create'))
   @ApiOperation({ summary: 'Request a pickup' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiCreatedResponse({ type: RequestedPickupDto })
+  @ApiErrors()
   async create(
     @Body() body: RequestPickupDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<RequestedPickup & { replayed: boolean }> {
+  ): Promise<RequestedPickupDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       // Mandatory on this operation: a retried pickup request would dispatch a second rider.
       throw new DuplicateRequestError('Idempotency-Key header is required.');

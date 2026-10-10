@@ -9,10 +9,12 @@
  */
 
 import { Controller, Get, Inject, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, Matches } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import { ReportService, type OperationsReport } from './report.service.ts';
+import { ReportService } from './report.service.ts';
+import { OperationsReportDto } from './dashboard-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 export class ControlTowerReportQuery {
   /** Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: last 30 days. */
@@ -37,7 +39,9 @@ export class ReportController {
   @Get('report')
   @UseGuards(new ScopeGuard('network:read'))
   @ApiOperation({ summary: 'Operational KPI report: projection ranges plus live snapshot' })
-  async getReport(@Query() query: ControlTowerReportQuery): Promise<OperationsReport> {
+  @ApiOkResponse({ type: OperationsReportDto })
+  @ApiErrors()
+  async getReport(@Query() query: ControlTowerReportQuery): Promise<OperationsReportDto> {
     return this.report.getReport(query.from, query.to);
   }
 }

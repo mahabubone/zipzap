@@ -10,10 +10,12 @@
  */
 
 import { Body, Controller, HttpCode, Inject, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { IsISO8601, IsLatitude, IsLongitude, IsNumber, IsOptional } from 'class-validator';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import { RecordPositionService, type RiderPosition } from './record-position.service.ts';
+import { RecordPositionService } from './record-position.service.ts';
+import { RiderPositionDto } from './rider-response.dto.ts';
 
 export class RecordPositionDto {
   @IsLatitude()
@@ -41,10 +43,13 @@ export class RiderPositionController {
   @UseGuards(new ScopeGuard('rider:sync'))
   @HttpCode(200)
   @ApiOperation({ summary: 'Record a rider position. Never visible on public tracking.' })
+  @ApiParam({ name: 'riderId', description: 'The rider whose position is recorded.' })
+  @ApiOkResponse({ type: RiderPositionDto })
+  @ApiErrors()
   async record(
     @Param('riderId') riderId: string,
     @Body() body: RecordPositionDto,
-  ): Promise<RiderPosition> {
+  ): Promise<RiderPositionDto> {
     return this.positions.execute({
       riderId,
       latitude: body.latitude,

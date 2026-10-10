@@ -9,17 +9,11 @@
  */
 
 import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import { DashboardService, type LiveCounts } from './dashboard.service.ts';
-
-/** Money crosses the wire as a decimal string, never a JSON number — a bigint
- *  poisha amount above 2^53 would silently lose precision as a float. */
-type LiveCountsJson = Omit<LiveCounts, 'cod'> & {
-  readonly cod: Omit<LiveCounts['cod'], 'outstandingAmountMinor'> & {
-    readonly outstandingAmountMinor: string;
-  };
-};
+import { DashboardService } from './dashboard.service.ts';
+import { LiveCountsDto } from './dashboard-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('control-tower')
 @Controller('v1/control-tower')
@@ -30,7 +24,9 @@ export class DashboardController {
   @Get('live-counts')
   @UseGuards(new ScopeGuard('network:read'))
   @ApiOperation({ summary: 'Live network counts, one snapshot in time' })
-  async getLiveCounts(): Promise<LiveCountsJson> {
+  @ApiOkResponse({ type: LiveCountsDto })
+  @ApiErrors()
+  async getLiveCounts(): Promise<LiveCountsDto> {
     const counts = await this.dashboard.getLiveCounts();
     return {
       ...counts,

@@ -12,6 +12,7 @@
  */
 
 import { Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
@@ -28,6 +29,7 @@ export class ShipmentDetailController {
     @Inject(CancelShipmentService) private readonly cancel: CancelShipmentService,
   ) {}
 
+  @ApiErrors()
   @Get(':id')
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'Get one of your shipments' })
@@ -45,6 +47,7 @@ export class ShipmentDetailController {
     });
   }
 
+  @ApiErrors()
   @Post(':id/cancel')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Cancel a shipment that has not shipped yet' })

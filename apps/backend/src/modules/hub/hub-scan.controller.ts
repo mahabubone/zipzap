@@ -14,11 +14,13 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { HubScanService, type HubScanResult } from './hub-scan.service.ts';
+import { HubScanService } from './hub-scan.service.ts';
+import { HubScanResultDto } from './hub-response.dto.ts';
 import { HUB_SCAN_ORDER } from './rules/scan.ts';
 
 export class HubScanDto {
@@ -42,10 +44,12 @@ export class HubScanController {
   @Post('scans')
   @UseGuards(new ScopeGuard('hub:scan'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Record a hub scan for a shipment' })
+  @ApiCreatedResponse({ type: HubScanResultDto })
+  @ApiErrors()
   async scan(
     @Body() body: HubScanDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<HubScanResult> {
+  ): Promise<HubScanResultDto> {
     return this.hubScan.execute({
       shipmentId: body.shipmentId,
       scan: body.scan,

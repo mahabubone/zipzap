@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -30,6 +31,7 @@ export class CollectCodDto {
 export class CollectCodController {
   constructor(@Inject(CollectCodService) private readonly collectCod: CollectCodService) {}
 
+  @ApiErrors()
   @Post('collect')
   @ApiOperation({ summary: 'Record a COD collection' })
   @ApiOkResponse({ type: CollectedCodDto })

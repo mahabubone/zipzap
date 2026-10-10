@@ -8,6 +8,7 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -30,6 +31,7 @@ export class ReconcileCodDto {
 export class ReconcileCodController {
   constructor(@Inject(ReconcileCodService) private readonly reconcileCod: ReconcileCodService) {}
 
+  @ApiErrors()
   @Post('reconcile')
   @ApiOperation({ summary: 'Resolve a COD mismatch after human review' })
   @ApiOkResponse({ type: ReconciledCodDto })

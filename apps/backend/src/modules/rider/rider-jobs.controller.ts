@@ -8,12 +8,14 @@
  */
 
 import { Controller, Get, Inject, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
 import { PickupRepository } from '../pickup/pickup.repository.ts';
 import { DeliveryRepository } from '../delivery/delivery.repository.ts';
+import { RiderJobsDto } from './rider-response.dto.ts';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -38,7 +40,16 @@ export class RiderJobsController {
 
   @Get(':riderId/jobs')
   @ApiOperation({ summary: "A rider's pickup and delivery jobs, newest first" })
-  async jobs(@Param('riderId') riderId: string, @Query('limit') limit?: string) {
+  @ApiParam({
+    name: 'riderId',
+    description: 'The rider whose pickup and delivery jobs are listed.',
+  })
+  @ApiOkResponse({ type: RiderJobsDto })
+  @ApiErrors()
+  async jobs(
+    @Param('riderId') riderId: string,
+    @Query('limit') limit?: string,
+  ): Promise<RiderJobsDto> {
     const take = parseLimit(limit);
     const [pickups, deliveries] = await Promise.all([
       this.pickups.listByRider(this.pickupDs.manager, riderId, take),

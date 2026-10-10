@@ -7,6 +7,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -64,6 +65,7 @@ export class CreateShipmentController {
     @Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService,
   ) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a shipment' })

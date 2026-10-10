@@ -14,11 +14,12 @@
 
 import { Controller, Get, Header, Inject, Param, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiOkResponse, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { GetSettlementService } from './get-settlement.service.ts';
 import { statementCsv } from './rules/statement.ts';
 import { SettlementStatementDto } from './finance-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('settlements')
 @Controller('v1/settlements')
@@ -29,7 +30,9 @@ export class GetSettlementController {
   @Get(':id')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'One settlement, itemised' })
+  @ApiParam({ name: 'id', description: 'Settlement id.' })
   @ApiOkResponse({ type: SettlementStatementDto })
+  @ApiErrors()
   async one(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -42,6 +45,16 @@ export class GetSettlementController {
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @ApiProduces('text/csv')
   @ApiOperation({ summary: 'Download the itemised statement' })
+  @ApiParam({ name: 'id', description: 'Settlement id.' })
+  // CSV, not JSON: the api-client fetches this with `.text()` and hands the caller a Blob, so the
+  // spec must advertise text/csv or a generated client would try to parse the CSV as an envelope.
+  @ApiOkResponse({
+    content: { 'text/csv': { schema: { type: 'string' } } },
+    description:
+      'The itemised statement as CSV — the same lines and frozen net as GET /v1/settlements/:id. ' +
+      'Content-Disposition names the file after the settlement reference.',
+  })
+  @ApiErrors()
   async csv(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,

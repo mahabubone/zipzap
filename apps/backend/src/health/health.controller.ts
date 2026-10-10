@@ -9,9 +9,11 @@
  */
 
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
+import { HealthzDto, ReadyzDto } from './health.dto.ts';
+import { ApiErrors } from '../common/api-errors.decorator.ts';
 
 @ApiTags('health')
 @Controller()
@@ -19,14 +21,22 @@ export class HealthController {
   constructor(@InjectDataSource('system') private readonly dataSource: DataSource) {}
 
   @Get('healthz')
-  @ApiOperation({ summary: 'Liveness — the process is up' })
-  healthz(): { status: 'ok'; uptimeSeconds: number } {
+  @ApiOperation({
+    summary: 'Liveness — the process is up',
+    description:
+      'Deliberately checks nothing: a Postgres blip must not restart every process at once. ' +
+      'Use /readyz for dependency health. Never returns an error envelope.',
+  })
+  @ApiOkResponse({ type: HealthzDto })
+  healthz(): HealthzDto {
     return { status: 'ok', uptimeSeconds: Math.trunc(process.uptime()) };
   }
 
   @Get('readyz')
   @ApiOperation({ summary: 'Readiness — Postgres is reachable' })
-  async readyz(): Promise<{ status: 'ready'; database: 'up' }> {
+  @ApiOkResponse({ type: ReadyzDto })
+  @ApiErrors()
+  async readyz(): Promise<ReadyzDto> {
     try {
       await this.dataSource.query('SELECT 1');
     } catch {

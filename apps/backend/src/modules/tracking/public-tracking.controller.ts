@@ -9,12 +9,20 @@
  */
 
 import { Controller, Get, Inject, NotFoundException, Param, Sse, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+} from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { Observable, filter, map } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { TrackingFanout } from './tracking-fanout.ts';
 
 interface TimelineRow {
@@ -27,12 +35,82 @@ interface TimelineRow {
 /**
  * The public projection's shape. Declared here rather than inlined so the two routes that return it
  * cannot drift, and so `api-client` has a stable thing to generate from.
+ *
+ * A decorated class, not an interface: an interface is erased by TypeScript and `SwaggerModule`
+ * cannot introspect one, which is how the highest-traffic route in the product came to respond
+ * with no schema at all.
  */
-export interface PublicTrackingView {
-  trackingCode: string;
-  status: string | null;
-  timeline: { sequence: number; event: string; occurredAt: string }[];
+/** The SSE event payload — one timeline step, pushed as it happens. */
+export class PublicTrackingEventDto {
+  @ApiProperty({
+    example: 'ZZ-7F3K9Q2M',
+    description: 'The tracking code this event belongs to.',
+  })
+  trackingCode!: string;
+
+  @ApiProperty({
+    example: 4,
+    description:
+      'Monotonic counter within a tracking code. NOT unique, so a client must not use it as a key.',
+  })
+  sequence!: number;
+
+  @ApiProperty({
+    example: 'OUT_FOR_DELIVERY',
+    description: 'The event type, uppercase snake case.',
+  })
+  event!: string;
+
+  @ApiProperty({
+    example: '2026-10-10T11:42:00.000Z',
+    description: 'ISO 8601 instant. The projection is eventually consistent with the live log.',
+  })
+  occurredAt!: string;
 }
+
+/** One entry in the timeline array on the tracking routes. */
+export class PublicTimelineEventDto {
+  @ApiProperty({
+    example: 4,
+    description:
+      'Monotonic counter within a tracking code. NOT unique — see the ordering note on timelineFor — so a client must not use it as a key.',
+  })
+  sequence!: number;
+
+  @ApiProperty({
+    example: 'OUT_FOR_DELIVERY',
+    description: 'The event type, uppercase snake case.',
+  })
+  event!: string;
+
+  @ApiProperty({
+    example: '2026-10-10T11:42:00.000Z',
+    description: 'ISO 8601 instant. The projection is eventually consistent with the live log.',
+  })
+  occurredAt!: string;
+}
+
+export class PublicTrackingViewDto {
+  @ApiProperty({ example: 'ZZ-7F3K9Q2M' })
+  trackingCode!: string;
+
+  @ApiProperty({
+    example: 'OUT_FOR_DELIVERY',
+    nullable: true,
+    description: 'The latest event type. Null only when the timeline is empty, which 404s first.',
+  })
+  status!: string | null;
+
+  @ApiProperty({
+    type: PublicTimelineEventDto,
+    isArray: true,
+    description:
+      'Ordered by occurredAt then id — a deterministic sort, because `sequence` alone is a partial order and the status is read off the last row.',
+  })
+  timeline!: PublicTimelineEventDto[];
+}
+
+export type PublicTrackingView = PublicTrackingViewDto;
 
 @ApiTags('tracking')
 @Controller('track')
@@ -44,7 +122,22 @@ export class PublicTrackingController {
 
   @Sse(':trackingCode/events')
   @UseGuards(new RateLimitGuard('public', false))
-  @ApiOperation({ summary: 'Live timeline events for one tracking code (SSE)' })
+  @ApiOperation({
+    summary: 'Live timeline events for one tracking code (SSE)',
+    description:
+      'Server-sent events. Emits the same shape as the timeline array on the tracking route, one ' +
+      'event per message, filtered to this tracking code. Requires no credential. Each message ' +
+      'is a `MessageEvent` whose `data` is the SSE event schema below.',
+  })
+  @ApiOkResponse({
+    description:
+      'A stream of `text/event-stream` messages. Each `data` payload is a PublicTrackingEventDto.',
+    content: {
+      'text/event-stream': { schema: { $ref: '#/components/schemas/PublicTrackingEventDto' } },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'The tracking code is malformed.' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limited. Honour `Retry-After`.' })
   events(@Param('trackingCode') trackingCode: string): Observable<MessageEvent> {
     return this.fanout.observable().pipe(
       filter((event) => event.trackingCode === trackingCode),
@@ -74,6 +167,8 @@ export class PublicTrackingController {
   @ApiOperation({
     summary: 'Public tracking by unguessable token (26 chars, 130 bits) — not enumerable',
   })
+  @ApiOkResponse({ type: PublicTrackingViewDto })
+  @ApiErrors()
   async trackByToken(@Param('token') token: string): Promise<PublicTrackingView> {
     const rows: Array<{ shipment_id: string }> = await this.tracking.query(
       `SELECT shipment_id FROM tracking.public_tokens WHERE token = $1`,
@@ -90,6 +185,8 @@ export class PublicTrackingController {
   @Get(':trackingCode')
   @UseGuards(new RateLimitGuard('public', false))
   @ApiOperation({ summary: 'Public shipment tracking by tracking code' })
+  @ApiOkResponse({ type: PublicTrackingViewDto })
+  @ApiErrors()
   async track(@Param('trackingCode') trackingCode: string): Promise<PublicTrackingView> {
     const rows: TimelineRow[] = await this.timelineFor(trackingCode);
     return this.viewFromTimeline(trackingCode, rows);
