@@ -25,7 +25,13 @@ Regenerate and commit both, in the same commit as the controller change.
 Supporting decisions:
 
 - DTO classes with `@ApiProperty` are the request and response shapes. There is no second
-  definition.
+  definition. Hand-declared `interface`s in services do not generate OpenAPI schemas because
+  TypeScript erases them; responses MUST use DTO classes decorated with `@ApiProperty` and be bound
+  at the route with `@ApiOkResponse({ type: ... })` (or `@ApiCreatedResponse`).
+- Response DTOs carry `Dto` suffix, sit beside the controller (or in `<module>.dto.ts`), and are
+  aliased as the service return type — never duplicated into an interface.
+- Mutation endpoints returning `{ ...result, replayed: boolean }` use a reusable generic or
+  explicit DTO so the replay flag is in the spec, not guessed by the client.
 - Validation uses `class-validator` at the transport boundary, and only there.
 - Swagger UI at `/docs`, gated in production.
 - Contract tests assert the generated spec matches observed behaviour.

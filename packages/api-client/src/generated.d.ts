@@ -1281,6 +1281,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/analytics/merchant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own daily parcel counts and COD money, one point per day */
+        get: operations["MerchantAnalyticsController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/riders/{riderId}/jobs": {
         parameters: {
             query?: never;
@@ -1312,13 +1329,87 @@ export interface components {
             email: string;
             password: string;
         };
+        EndpointViewDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example m-1 */
+            merchantId: string;
+            /** @example https://example.com/webhook */
+            url: string;
+            events: string[][];
+            /**
+             * @example ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "PAUSED" | "FAILING";
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
         CreateWebhookDto: {
             /** Format: uri */
             url: string;
             events: string[];
         };
+        CreatedEndpointDto: {
+            endpoint: components["schemas"]["EndpointViewDto"];
+            /**
+             * @description Signing secret, shown once at creation
+             * @example whsec_abc123...
+             */
+            secret: string;
+        };
+        RotatedSecretDto: {
+            /**
+             * @description New signing secret, shown once upon rotation
+             * @example whsec_new123...
+             */
+            secret: string;
+        };
+        DeliveryLogRowDto: {
+            /** @example del-123 */
+            id: string;
+            /** @example ep-123 */
+            endpointId: string;
+            /** @example shipment.delivered */
+            eventType: string;
+            /** @example 1 */
+            attempt: number;
+            /** @example 200 */
+            statusCode: number | null;
+            /** @example null */
+            error: string | null;
+            /** @example true */
+            delivered: boolean;
+            /** @example true */
+            terminal: boolean;
+            /** @example 2026-10-10T06:00:00.000Z */
+            attemptedAt: string;
+        };
+        DeliveryLogPageDto: {
+            data: components["schemas"]["DeliveryLogRowDto"][];
+            /** @example cursor_xyz */
+            nextCursor: string | null;
+        };
+        ReplayedDeliveryDto: {
+            /** @example del-456 */
+            deliveryId: string;
+            /** @example ep-123 */
+            endpointId: string;
+            /** @example shipment.delivered */
+            wireEvent: string;
+        };
         CreateApiKeyDto: {
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage")[];
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "network:read")[];
+        };
+        CreatedApiKeyDto: {
+            /** @example key_123456789 */
+            keyId: string;
+            /**
+             * @description Raw secret, shown once at creation
+             * @example zz_live_abc123...
+             */
+            secret: string;
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "network:read")[][];
         };
         CreateShipmentDto: {
             senderName: string;
@@ -1337,9 +1428,169 @@ export interface components {
             fragile: boolean;
             packagingKind?: string;
         };
+        CodAmountDto: {
+            /**
+             * @description Integer minor units (poisha)
+             * @example 125050
+             */
+            amountMinor: number;
+            /**
+             * @description ISO currency code
+             * @example BDT
+             */
+            currency: string;
+        };
+        CreatedShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            cod: components["schemas"]["CodAmountDto"];
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        ShipmentSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            /** @example INV-1001 */
+            merchantReference: string | null;
+            /** @example 125050 */
+            codAmountMinor: number;
+            /** @example BDT */
+            codCurrency: string;
+            /** @example dhaka-metro */
+            zone: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CursorPaginationDto: {
+            /**
+             * @description Opaque cursor for the next page; null on the last page
+             * @example eyJsYXN0SWQiOiIxMjMifQ==
+             */
+            nextCursor: string | null;
+            /**
+             * @description True when more rows exist past this page
+             * @example false
+             */
+            hasMore: boolean;
+        };
+        ShipmentPageDto: {
+            data: components["schemas"]["ShipmentSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        TimelineEntryDto: {
+            /** @example ShipmentCreated */
+            eventType: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            occurredAt: string;
+            /**
+             * @description human | system | rider
+             * @example human
+             */
+            actorType: string;
+            /**
+             * @example {
+             *       "hubCode": "DHK-01"
+             *     }
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** @example null */
+            correctsEventId: string | null;
+        };
+        ShipmentDetailDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            /** @example INV-1001 */
+            merchantReference: string | null;
+            /** @example Rahim */
+            senderName: string;
+            /** @example +8801700000000 */
+            senderPhone: string;
+            /** @example House 1, Road 2, Dhanmondi, Dhaka */
+            senderAddress: string;
+            /** @example Karim */
+            recipientName: string;
+            /** @example +8801800000000 */
+            recipientPhone: string;
+            /** @example Agrabad, Chattogram */
+            recipientAddress: string;
+            /** @example 1000 */
+            parcelWeightGrams: number;
+            /** @example Books and stationery */
+            parcelDescription: string;
+            /** @example 125050 */
+            codAmountMinor: number;
+            /** @example BDT */
+            codCurrency: string;
+            /** @example dhaka-metro */
+            zone: string | null;
+            /** @example 1 */
+            pricingVersion: number;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            timeline: components["schemas"]["TimelineEntryDto"][];
+        };
+        CancelledShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example CANCELLED */
+            status: string;
+        };
         UploadBulkDto: {
             csv: string;
             filename: string;
+        };
+        BulkJobViewDto: {
+            /** @example job-123 */
+            id: string;
+            /** @example merchant-456 */
+            merchantId: string;
+            /** @example shipments.csv */
+            filename: string;
+            /** @example PENDING */
+            status: string;
+            /** @example 100 */
+            totalRows: number;
+            /** @example 0 */
+            processedRows: number;
+            /** @example 0 */
+            succeededRows: number;
+            /** @example 0 */
+            failedRows: number;
+            /** @example 0 */
+            skippedRows: number;
+        };
+        BulkPreviewRowDto: {
+            /** @example 2 */
+            lineNumber: number;
+            /** @example INV-1001 */
+            invoice: string;
+            /** @example VALID */
+            outcome: string;
+            /** @example null */
+            reason: string | null;
+        };
+        BulkPreviewDto: {
+            job: components["schemas"]["BulkJobViewDto"];
+            rows: components["schemas"]["BulkPreviewRowDto"][];
         };
         AcceptBulkDto: {
             jobId: string;
@@ -1349,8 +1600,23 @@ export interface components {
             reason: "LOST" | "DAMAGED";
             note?: string | null;
         };
+        ReportedExceptionDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description Target exception status (e.g. LOST, DAMAGED)
+             * @example LOST
+             */
+            status: string;
+        };
         HoldDto: {
             reason?: string | null;
+        };
+        HeldShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /** @example HOLD */
+            status: string;
         };
         QuoteDto: {
             weightGrams: number;
@@ -1369,10 +1635,90 @@ export interface components {
             /** @description Integer minor units. A decimal here is a bug, not a convenience. */
             collectedMinor: number;
         };
+        CollectedCodDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description Expected COD amount in minor units (poisha)
+             * @example 125050
+             */
+            expectedMinor: number;
+            /**
+             * @description Collected COD amount in minor units (poisha)
+             * @example 125050
+             */
+            collectedMinor: number;
+            /**
+             * @description Shortfall: expected - collected, 0 when fully collected
+             * @example 0
+             */
+            shortfallMinor: number;
+            /**
+             * @description COLLECTED | PARTIALLY_COLLECTED
+             * @example COLLECTED
+             */
+            status: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
         ReconcileCodDto: {
             /** Format: uuid */
             shipmentId: string;
             note: string;
+        };
+        ReconciledCodDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /** @example RECONCILED */
+            status: string;
+        };
+        CodRecordSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /** @example COLLECTED */
+            status: string;
+            /** @example 125050 */
+            expectedMinor: number;
+            /** @example 125050 */
+            collectedMinor: number | null;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CodRecordPageDto: {
+            data: components["schemas"]["CodRecordSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        CodExceptionDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /** @example 125050 */
+            expectedMinor: number;
+            /** @example 100000 */
+            collectedMinor: number | null;
+            /**
+             * @description collected - expected; negative means shortfall
+             * @example -25050
+             */
+            differenceMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example null */
+            reviewNote: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CodExceptionPageDto: {
+            data: components["schemas"]["CodExceptionDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
         };
         CreateManifestDto: {
             /** Format: uuid */
@@ -1401,6 +1747,15 @@ export interface components {
             displayName: string;
             phone: string;
             capacity?: number;
+        };
+        RegisteredRiderDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example AVAILABLE
+             * @enum {string}
+             */
+            status: "SUSPENDED" | "OFFLINE" | "AVAILABLE" | "ON_PICKUP" | "ON_DELIVERY" | "ON_BREAK";
         };
         DeviceCommandDto: {
             /** @description The device's own monotonic counter. With `createdAt` it forms the dedupe key and the order. */
@@ -1438,15 +1793,78 @@ export interface components {
             reason: "CUSTOMER_UNAVAILABLE" | "WRONG_ADDRESS" | "PHONE_UNREACHABLE" | "CUSTOMER_REFUSED" | "ADDRESS_INCOMPLETE" | "PAYMENT_ISSUE" | "DAMAGED_PACKAGE" | "WEATHER" | "OPERATIONAL_EXCEPTION";
             note?: string;
         };
+        RecordedAttemptDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /** @example 1 */
+            sequence: number;
+            /**
+             * @example OUT_FOR_DELIVERY
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+            /** @example true */
+            retryScheduled: boolean;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
         CreateDeliveryDto: {
             /** Format: uuid */
             shipmentId: string;
             /** Format: uuid */
             riderId?: string;
         };
+        CreatedDeliveryJobDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example shp-123 */
+            shipmentId: string;
+            /** @example r-123 */
+            riderId?: string | null;
+            /**
+             * @example CREATED
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        DeliveryStatusDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example ACCEPTED
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+        };
         CompleteDeliveryDto: {
             /** @description Integer minor units collected at the door. A decimal here is a bug, not a convenience. */
             collectedMinor: number;
+        };
+        IssuedDeliveryCodeDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /**
+             * @example PENDING
+             * @enum {string}
+             */
+            status: "PENDING";
+            /** @example 2026-10-10T06:10:00.000Z */
+            expiresAt: string;
+            /** @example 5 */
+            attemptsRemaining: number;
+            /**
+             * @description Plaintext OTP returned once and never stored
+             * @example 123456
+             */
+            code: string;
         };
         SubmitProofDto: {
             /** @description Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request. */
@@ -1459,9 +1877,213 @@ export interface components {
             latitude: number;
             longitude: number;
         };
+        SubmittedDeliveryProofDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /** @example prf-123 */
+            proofId: string;
+            /**
+             * @example VERIFIED
+             * @enum {string}
+             */
+            status: "VERIFIED";
+            /** @example e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 */
+            photoSha256: string;
+            /** @example 254321 */
+            photoByteLength: number;
+            /** @example 2026-10-10T06:05:00.000Z */
+            otpVerifiedAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        SettlementItemDto: {
+            /** @example entry-123 */
+            entryId: string;
+            /** @example COD_COLLECTED */
+            type: string;
+            /** @example 1 */
+            direction: number;
+            /** @example 125050 */
+            amountMinor: number;
+        };
+        CreatedSettlementDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example m-1 */
+            merchantId: string;
+            /** @example PENDING */
+            status: string;
+            items: components["schemas"]["SettlementItemDto"][];
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+        };
         ApproveSettlementDto: {
             /** Format: uuid */
             approverId: string;
+        };
+        ApprovedSettlementDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example APPROVED */
+            status: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example u-1 */
+            approvedBy: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            approvedAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        SettlementSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example SETTLED */
+            status: string;
+            /** @example 1250500 */
+            frozenNetMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        SettlementPageDto: {
+            data: components["schemas"]["SettlementSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        InitiatedSettlementPaymentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example PROCESSING */
+            status: string;
+            /** @example PAY-PROVIDER-123 */
+            paymentReference: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        ConfirmedSettlementPaymentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example SETTLED */
+            status: string;
+            /** @example PAY-PROVIDER-123 */
+            paymentReference: string;
+            /** @example COMPLETED */
+            providerStatus: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        BalanceLineDto: {
+            /** @example DELIVERY_FEE */
+            type: string;
+            /**
+             * @description 1 for credit (owed to merchant), -1 for debit (owed by merchant)
+             * @example 1
+             */
+            direction: number;
+            /**
+             * @description Sum of entries of this type in minor units
+             * @example 125050
+             */
+            amountMinor: number;
+            /**
+             * @description How many ledger rows made up this line
+             * @example 42
+             */
+            entries: number;
+        };
+        BalanceBlockDto: {
+            /** @example RECONCILIATION_EXCEPTION */
+            status: string;
+            /** @example 2 */
+            count: number;
+        };
+        NextSettlementSummaryDto: {
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example 250000 */
+            netMinor: number;
+        };
+        MerchantBalanceDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            merchantId: string;
+            /**
+             * @description Signed minor units: negative means owed to merchant
+             * @example -1250500
+             */
+            balanceMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            asOf: string;
+            lines: components["schemas"]["BalanceLineDto"][];
+            blocked: components["schemas"]["BalanceBlockDto"][];
+            /** @example null */
+            blockedReason: string | null;
+            nextSettlement: components["schemas"]["NextSettlementSummaryDto"] | null;
+        };
+        StatementLineDto: {
+            /** @example entry-123 */
+            entryId: string;
+            /** @example COD_COLLECTED */
+            type: string;
+            /** @example 1 */
+            direction: number;
+            /** @example 125050 */
+            amountMinor: number;
+            /** @example Delivery to Dhanmondi */
+            memo: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            occurredAt: string;
+            /** @example shp-123 */
+            shipmentId: string | null;
+        };
+        SettlementStatementDto: {
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example APPROVED */
+            status: string;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /** @example 1250500 */
+            netMinor: number;
+            lines: components["schemas"]["StatementLineDto"][];
         };
         RequestReturnDto: {
             /** Format: uuid */
@@ -1485,6 +2107,61 @@ export interface components {
             /** @enum {string} */
             scan: "INBOUND" | "SORT" | "OUTBOUND" | "DEPARTED" | "ARRIVED";
             hubCode?: string | null;
+        };
+        MerchantDayPointDto: {
+            /**
+             * @description Asia/Dhaka day bucket
+             * @example 2026-10-09
+             */
+            day: string;
+            /**
+             * @description Shipments created that day
+             * @example 42
+             */
+            shipmentsCreated: number;
+            /**
+             * @description Parcels picked up that day
+             * @example 38
+             */
+            pickedUp: number;
+            /**
+             * @description Parcels delivered that day
+             * @example 31
+             */
+            delivered: number;
+            /**
+             * @description Null when no COD was recorded that day
+             * @example BDT
+             */
+            currency: string | null;
+            /**
+             * @description Expected COD in minor units (poisha), as a string
+             * @example 1250500
+             */
+            expectedMinor: string;
+            /**
+             * @description Collected COD in minor units (poisha), as a string
+             * @example 900000
+             */
+            collectedMinor: string;
+            /**
+             * @description Settled COD in minor units (poisha), as a string
+             * @example 700000
+             */
+            settledMinor: string;
+        };
+        MerchantSeriesDto: {
+            /**
+             * @description First day of the requested window, inclusive
+             * @example 2026-09-10
+             */
+            from: string;
+            /**
+             * @description Last day of the requested window, inclusive
+             * @example 2026-10-09
+             */
+            to: string;
+            days: components["schemas"]["MerchantDayPointDto"][];
         };
     };
     responses: never;
@@ -1597,7 +2274,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"][];
+                };
             };
         };
     };
@@ -1618,7 +2297,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedEndpointDto"];
+                };
             };
         };
     };
@@ -1633,11 +2314,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RotatedSecretDto"];
+                };
             };
         };
     };
@@ -1652,11 +2335,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"];
+                };
             };
         };
     };
@@ -1671,11 +2356,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"];
+                };
             };
         };
     };
@@ -1696,7 +2383,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryLogPageDto"];
+                };
             };
         };
     };
@@ -1711,11 +2400,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReplayedDeliveryDto"];
+                };
             };
         };
     };
@@ -1736,7 +2427,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedApiKeyDto"];
+                };
             };
         };
     };
@@ -1823,7 +2516,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ShipmentPageDto"];
+                };
             };
         };
     };
@@ -1846,7 +2541,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedShipmentDto"];
+                };
             };
         };
     };
@@ -1865,7 +2562,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ShipmentDetailDto"];
+                };
             };
         };
     };
@@ -1880,11 +2579,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CancelledShipmentDto"];
+                };
             };
         };
     };
@@ -1901,11 +2602,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkPreviewDto"];
+                };
             };
         };
     };
@@ -1922,11 +2625,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkJobViewDto"];
+                };
             };
         };
     };
@@ -1945,7 +2650,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkJobViewDto"];
+                };
             };
         };
     };
@@ -1983,11 +2690,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReportedExceptionDto"];
+                };
             };
         };
     };
@@ -2006,11 +2715,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HeldShipmentDto"];
+                };
             };
         };
     };
@@ -2025,11 +2736,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HeldShipmentDto"];
+                };
             };
         };
     };
@@ -2086,11 +2799,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CollectedCodDto"];
+                };
             };
         };
     };
@@ -2107,11 +2822,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReconciledCodDto"];
+                };
             };
         };
     };
@@ -2131,7 +2848,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CodRecordPageDto"];
+                };
             };
         };
     };
@@ -2151,7 +2870,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CodExceptionPageDto"];
+                };
             };
         };
     };
@@ -2432,7 +3153,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RegisteredRiderDto"];
+                };
             };
         };
     };
@@ -2582,11 +3305,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RecordedAttemptDto"];
+                };
             };
         };
     };
@@ -2609,7 +3334,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedDeliveryJobDto"];
+                };
             };
         };
     };
@@ -2624,11 +3351,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
             };
         };
     };
@@ -2643,11 +3372,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
             };
         };
     };
@@ -2668,11 +3399,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
             };
         };
     };
@@ -2689,11 +3422,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IssuedDeliveryCodeDto"];
+                };
             };
         };
     };
@@ -2714,11 +3449,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SubmittedDeliveryProofDto"];
+                };
             };
         };
     };
@@ -2738,7 +3475,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SettlementPageDto"];
+                };
             };
         };
     };
@@ -2755,7 +3494,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedSettlementDto"];
+                };
             };
         };
     };
@@ -2776,11 +3517,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApprovedSettlementDto"];
+                };
             };
         };
     };
@@ -2797,11 +3540,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["InitiatedSettlementPaymentDto"];
+                };
             };
         };
     };
@@ -2818,11 +3563,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ConfirmedSettlementPaymentDto"];
+                };
             };
         };
     };
@@ -2839,7 +3586,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["MerchantBalanceDto"];
+                };
             };
         };
     };
@@ -2858,7 +3607,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SettlementStatementDto"];
+                };
             };
         };
     };
@@ -3139,6 +3890,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    MerchantAnalyticsController_mine: {
+        parameters: {
+            query?: {
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: 30 days ago. */
+                from?: string;
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One point per day, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantSeriesDto"];
+                };
             };
         };
     };

@@ -8,10 +8,11 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { ReconcileCodService, type ReconciledCod } from './reconcile-cod.service.ts';
+import { ReconcileCodService } from './reconcile-cod.service.ts';
+import { ReconciledCodDto } from './cod-response.dto.ts';
 
 export class ReconcileCodDto {
   @IsUUID('4')
@@ -31,10 +32,11 @@ export class ReconcileCodController {
 
   @Post('reconcile')
   @ApiOperation({ summary: 'Resolve a COD mismatch after human review' })
+  @ApiOkResponse({ type: ReconciledCodDto })
   async reconcile(
     @Body() body: ReconcileCodDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<ReconciledCod> {
+  ): Promise<ReconciledCodDto> {
     return this.reconcileCod.execute({
       shipmentId: body.shipmentId,
       note: body.note,

@@ -7,17 +7,15 @@
  */
 
 import { Controller, Headers, Inject, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
-import {
-  ConfirmSettlementPaymentService,
-  type ConfirmedSettlementPayment,
-} from './confirm-settlement-payment.service.ts';
-import {
-  InitiateSettlementPaymentService,
-  type InitiatedSettlementPayment,
-} from './initiate-settlement-payment.service.ts';
+import { ConfirmSettlementPaymentService } from './confirm-settlement-payment.service.ts';
+import { InitiateSettlementPaymentService } from './initiate-settlement-payment.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import {
+  ConfirmedSettlementPaymentDto,
+  InitiatedSettlementPaymentDto,
+} from './finance-response.dto.ts';
 
 function requireKey(key: string | undefined): string {
   if (!key || key.trim().length === 0) {
@@ -41,10 +39,11 @@ export class SettlementPaymentController {
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Initiate the provider payout for an approved settlement' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOkResponse({ type: InitiatedSettlementPaymentDto })
   async initiatePayment(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-  ): Promise<InitiatedSettlementPayment & { replayed: boolean }> {
+  ): Promise<InitiatedSettlementPaymentDto> {
     const { result, replayed } = await this.initiate.execute({
       settlementId: id,
       idempotencyKey: requireKey(idempotencyKey),
@@ -56,10 +55,11 @@ export class SettlementPaymentController {
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Confirm the provider payout and settle' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOkResponse({ type: ConfirmedSettlementPaymentDto })
   async confirmPayment(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-  ): Promise<ConfirmedSettlementPayment & { replayed: boolean }> {
+  ): Promise<ConfirmedSettlementPaymentDto> {
     const { result, replayed } = await this.confirm.execute({
       settlementId: id,
       idempotencyKey: requireKey(idempotencyKey),

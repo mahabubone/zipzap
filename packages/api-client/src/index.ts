@@ -1386,4 +1386,48 @@ export class ZipZapClient {
     }>('/v1/api-keys', { method: 'POST', body });
     return data;
   }
+
+  /**
+   * GET /v1/analytics/merchant — your own daily series: parcels and money.
+   *
+   * One point per day (Asia/Dhaka buckets). Money values are strings — poisha above
+   * 2^53 would lose precision as JSON numbers. Both projection halves carry the
+   * merchant id so the series is strictly scoped to the caller's account.
+   */
+  async merchantAnalytics(options?: {
+    from?: string; // yyyy-mm-dd inclusive
+    to?: string; // yyyy-mm-dd inclusive
+  }): Promise<{
+    from: string;
+    to: string;
+    days: readonly {
+      readonly day: string;
+      readonly shipmentsCreated: number;
+      readonly pickedUp: number;
+      readonly delivered: number;
+      readonly currency: string | null;
+      readonly expectedMinor: string;
+      readonly collectedMinor: string;
+      readonly settledMinor: string;
+    }[];
+  }> {
+    const { data } = await this.request<{
+      from: string;
+      to: string;
+      days: readonly {
+        readonly day: string;
+        readonly shipmentsCreated: number;
+        readonly pickedUp: number;
+        readonly delivered: number;
+        readonly currency: string | null;
+        readonly expectedMinor: string;
+        readonly collectedMinor: string;
+        readonly settledMinor: string;
+      }[];
+    }>('/v1/analytics/merchant', {
+      method: 'GET',
+      query: options,
+    });
+    return data;
+  }
 }

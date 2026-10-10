@@ -7,16 +7,20 @@
  */
 
 import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { WebhookEndpointService, type EndpointView } from './webhook-endpoint.service.ts';
+import { WebhookEndpointService } from './webhook-endpoint.service.ts';
 import { WebhookReplayService } from './webhook-replay.service.ts';
-import {
-  ListWebhookDeliveriesService,
-  type DeliveryLogPage,
-} from './list-webhook-deliveries.service.ts';
+import { ListWebhookDeliveriesService } from './list-webhook-deliveries.service.ts';
 import { DeliveryLogQuery } from './webhook-delivery-log-query.dto.ts';
+import {
+  CreatedEndpointDto,
+  DeliveryLogPageDto,
+  EndpointViewDto,
+  ReplayedDeliveryDto,
+  RotatedSecretDto,
+} from './merchant-response.dto.ts';
 
 export class CreateWebhookDto {
   @IsUrl({ require_tld: false })
@@ -46,17 +50,19 @@ export class WebhookController {
   @Get()
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'List your webhook endpoints' })
-  async list(@Req() request: AuthenticatedRequest): Promise<EndpointView[]> {
+  @ApiOkResponse({ type: EndpointViewDto, isArray: true })
+  async list(@Req() request: AuthenticatedRequest): Promise<readonly EndpointViewDto[]> {
     return this.endpoints.list(this.merchantId(request));
   }
 
   @Post()
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Register a webhook endpoint; secret returned once' })
+  @ApiCreatedResponse({ type: CreatedEndpointDto })
   async create(
     @Body() body: CreateWebhookDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ endpoint: EndpointView; secret: string }> {
+  ): Promise<CreatedEndpointDto> {
     return this.endpoints.create({
       merchantId: this.merchantId(request),
       url: body.url,
@@ -67,30 +73,33 @@ export class WebhookController {
   @Post(':id/rotate')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Rotate the signing secret; new secret returned once' })
+  @ApiOkResponse({ type: RotatedSecretDto })
   async rotate(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ secret: string }> {
+  ): Promise<RotatedSecretDto> {
     return this.endpoints.rotateSecret(this.merchantId(request), id);
   }
 
   @Post(':id/pause')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Pause delivery to an endpoint' })
+  @ApiOkResponse({ type: EndpointViewDto })
   async pause(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<EndpointView> {
+  ): Promise<EndpointViewDto> {
     return this.endpoints.setStatus(this.merchantId(request), id, 'PAUSED');
   }
 
   @Post(':id/resume')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Resume delivery to an endpoint' })
+  @ApiOkResponse({ type: EndpointViewDto })
   async resume(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<EndpointView> {
+  ): Promise<EndpointViewDto> {
     return this.endpoints.setStatus(this.merchantId(request), id, 'ACTIVE');
   }
 
@@ -104,10 +113,11 @@ export class WebhookController {
   @ApiOperation({
     summary: 'Every webhook delivery attempt for your endpoints, newest first',
   })
+  @ApiOkResponse({ type: DeliveryLogPageDto })
   async deliveryLog(
     @Req() request: AuthenticatedRequest,
     @Query() query: DeliveryLogQuery,
-  ): Promise<DeliveryLogPage> {
+  ): Promise<DeliveryLogPageDto> {
     return this.deliveries.execute(this.merchantId(request), {
       endpointId: query.endpointId,
       cursor: query.cursor,
@@ -118,10 +128,11 @@ export class WebhookController {
   @Post('deliveries/:deliveryId/replay')
   @UseGuards(new ScopeGuard('webhooks:manage'))
   @ApiOperation({ summary: 'Replay a terminal delivery with a fresh delivery id' })
+  @ApiOkResponse({ type: ReplayedDeliveryDto })
   async replayDelivery(
     @Param('deliveryId') deliveryId: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ deliveryId: string; endpointId: string; wireEvent: string }> {
+  ): Promise<ReplayedDeliveryDto> {
     return this.replay.replay({ merchantId: this.merchantId(request), deliveryId });
   }
 }

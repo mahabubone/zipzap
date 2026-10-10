@@ -14,11 +14,11 @@
 
 import { Controller, Get, Header, Inject, Param, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { GetSettlementService } from './get-settlement.service.ts';
 import { statementCsv } from './rules/statement.ts';
-import type { SettlementStatement } from './rules/statement.ts';
+import { SettlementStatementDto } from './finance-response.dto.ts';
 
 @ApiTags('settlements')
 @Controller('v1/settlements')
@@ -29,10 +29,11 @@ export class GetSettlementController {
   @Get(':id')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'One settlement, itemised' })
+  @ApiOkResponse({ type: SettlementStatementDto })
   async one(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SettlementStatement> {
+  ): Promise<SettlementStatementDto> {
     return this.settlement.execute(request.principal!, id);
   }
 

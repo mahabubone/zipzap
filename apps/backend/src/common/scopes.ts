@@ -37,6 +37,15 @@ export const API_SCOPES = [
   // creates shipments the power to silence every delivery notification the account sends.
   'notifications:manage',
   'keys:manage',
+  // The network's own operational picture: every merchant's shipment counts, COD money in
+  // poisha, return rates, hub volumes. `GET /v1/control-tower/report` and `.../live-counts` were
+  // guarded by ApiKeyGuard alone, so a merchant API key read all of it — the guard authenticated
+  // the caller and then the endpoint answered for every tenant. Same class as the rider queue in
+  // migration `0042`: the scope was missing rather than merely unenforced.
+  //
+  // Platform, because it is the network and not one account. A merchant gets their own numbers
+  // from `GET /v1/analytics/merchant`, which filters by the principal.
+  'network:read',
 ] as const;
 
 export type ApiScope = (typeof API_SCOPES)[number];

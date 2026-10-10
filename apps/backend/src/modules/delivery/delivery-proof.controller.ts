@@ -11,16 +11,13 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsLatitude, IsLongitude, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import {
-  DeliveryProofService,
-  type IssuedCode,
-  type SubmittedProof,
-} from './delivery-proof.service.ts';
+import { DeliveryProofService } from './delivery-proof.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 import { ALLOWED_PHOTO_TYPES, OTP_LENGTH } from './rules/proof.ts';
+import { IssuedDeliveryCodeDto, SubmittedDeliveryProofDto } from './delivery-response.dto.ts';
 
 export class SubmitProofDto {
   /** Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request. */
@@ -59,10 +56,11 @@ export class DeliveryProofController {
       'valid for ten minutes or five attempts, whichever comes first.',
   })
   @ApiHeader({ name: 'Idempotency-Key', required: false })
+  @ApiOkResponse({ type: IssuedDeliveryCodeDto })
   async issueCode(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<IssuedCode & { attemptsRemaining: number }> {
+  ): Promise<IssuedDeliveryCodeDto> {
     return this.proofs.issueCode({
       jobId: id,
       actorId: request.principal?.subjectId ?? null,
@@ -78,12 +76,13 @@ export class DeliveryProofController {
       'refuses to mark a parcel delivered until this has succeeded.',
   })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOkResponse({ type: SubmittedDeliveryProofDto })
   async submit(
     @Param('id') id: string,
     @Body() body: SubmitProofDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SubmittedProof & { replayed: boolean }> {
+  ): Promise<SubmittedDeliveryProofDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       // A guess is evidence too: replaying a submission must not spend a second attempt.
       throw new DuplicateRequestError('Idempotency-Key header is required.');

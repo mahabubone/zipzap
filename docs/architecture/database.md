@@ -147,6 +147,17 @@ The plan used to be a **request body field** on both `POST /v1/pricing/quote` an
 discount. It is a column now, read through `MERCHANT_PLAN_LOOKUP` (rule 2: pricing may not open
 `merchant`). The backfill is `standard` — 0bps — so no existing merchant's price changed.
 
+## Projections are re-grained, never duplicated
+
+`analytics.cod_summary` is keyed `(merchant_id, day, currency)` since migration `0047`. It used
+to be `(day, currency)` — network-wide, so a merchant had nowhere to read their own money from.
+Re-grained rather than copied beside a network table: two tables holding the same collections
+must agree, and the sum silently stopping equaling the whole is a bug you find by accident.
+Summing the merchant rows reproduces the network figure exactly.
+
+`analytics.merchant_daily_shipments` is keyed `(merchant_id, day)`. Both are projections —
+rebuildable from the outbox, never authoritative ([../domains/analytics.md](../domains/analytics.md)).
+
 ## A preference is a row, and its absence is the answer
 
 `notification.merchant_preferences` (migration `1759000000045`) is `(merchant_id, event_type,

@@ -12,11 +12,12 @@
  */
 
 import { Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { CancelShipmentService, type CancelledShipment } from './cancel-shipment.service.ts';
-import { GetShipmentService, type ShipmentDetail } from './get-shipment.service.ts';
+import { CancelShipmentService } from './cancel-shipment.service.ts';
+import { GetShipmentService } from './get-shipment.service.ts';
+import { CancelledShipmentDto, ShipmentDetailDto } from './shipment-response.dto.ts';
 
 @ApiTags('shipments')
 @Controller('v1/shipments')
@@ -30,10 +31,11 @@ export class ShipmentDetailController {
   @Get(':id')
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'Get one of your shipments' })
+  @ApiOkResponse({ type: ShipmentDetailDto })
   async detail(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest & { requestId?: string },
-  ): Promise<ShipmentDetail> {
+  ): Promise<ShipmentDetailDto> {
     const principal = req.principal!;
     return this.get.execute(principal.merchantId!, id, {
       actorType: principal.kind,
@@ -46,10 +48,11 @@ export class ShipmentDetailController {
   @Post(':id/cancel')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Cancel a shipment that has not shipped yet' })
+  @ApiOkResponse({ type: CancelledShipmentDto })
   async cancelShipment(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CancelledShipment> {
+  ): Promise<CancelledShipmentDto> {
     return this.cancel.execute(request.principal!.merchantId!, id);
   }
 }

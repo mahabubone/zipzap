@@ -16,6 +16,7 @@ const LINKS = [
   { label: 'Shipments', href: '/app/shipments' },
   { label: 'New shipment', href: '/app/shipments/new' },
   { label: 'Bulk import', href: '/app/shipments/bulk' },
+  { label: 'Analytics', href: '/app/analytics' },
   { label: 'Money', href: '/app/money' },
   { label: 'Reconciliation', href: '/app/cod' },
   { label: 'Settlements', href: '/app/settlements' },

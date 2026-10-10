@@ -7,7 +7,7 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -20,7 +20,8 @@ import {
 } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { CreateShipmentService, type CreatedShipment } from './create-shipment.service.ts';
+import { CreateShipmentService } from './create-shipment.service.ts';
+import { CreatedShipmentDto } from './shipment-response.dto.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 import { money } from '../../common/money.ts';
 
@@ -66,12 +67,13 @@ export class CreateShipmentController {
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a shipment' })
+  @ApiCreatedResponse({ type: CreatedShipmentDto })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   async create(
     @Body() body: CreateShipmentDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CreatedShipment & { replayed: boolean }> {
+  ): Promise<CreatedShipmentDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       // Mandatory on this operation (ADR-0010): a retried create would duplicate the parcel.
       throw new DuplicateRequestError('Idempotency-Key header is required.');

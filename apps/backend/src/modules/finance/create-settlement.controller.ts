@@ -11,9 +11,10 @@
  */
 
 import { Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { CreateSettlementService, type CreatedSettlement } from './create-settlement.service.ts';
+import { CreateSettlementService } from './create-settlement.service.ts';
+import { CreatedSettlementDto } from './finance-response.dto.ts';
 
 /**
  * **No body at all.**
@@ -37,7 +38,8 @@ export class CreateSettlementController {
   @Post()
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Freeze your unsettled entries into a settlement' })
-  async create(@Req() request: AuthenticatedRequest): Promise<CreatedSettlement> {
+  @ApiCreatedResponse({ type: CreatedSettlementDto })
+  async create(@Req() request: AuthenticatedRequest): Promise<CreatedSettlementDto> {
     return this.createSettlement.execute({
       merchantId: request.principal!.merchantId!,
       actorId: request.principal!.subjectId,

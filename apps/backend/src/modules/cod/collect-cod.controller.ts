@@ -7,10 +7,11 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { CollectCodService, type CollectedCod } from './collect-cod.service.ts';
+import { CollectCodService } from './collect-cod.service.ts';
+import { CollectedCodDto } from './cod-response.dto.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 
 export class CollectCodDto {
@@ -31,12 +32,13 @@ export class CollectCodController {
 
   @Post('collect')
   @ApiOperation({ summary: 'Record a COD collection' })
+  @ApiOkResponse({ type: CollectedCodDto })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   async collect(
     @Body() body: CollectCodDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CollectedCod & { replayed: boolean }> {
+  ): Promise<CollectedCodDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }

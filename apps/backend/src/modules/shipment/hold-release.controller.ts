@@ -7,14 +7,15 @@
  */
 
 import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
 import { ResourceNotFoundError } from '../../common/domain-error.ts';
-import { HoldReleaseService, type HeldShipment } from './hold-release.service.ts';
+import { HoldReleaseService } from './hold-release.service.ts';
+import { HeldShipmentDto } from './shipment-response.dto.ts';
 
 export class HoldDto {
   @IsOptional()
@@ -44,11 +45,12 @@ export class HoldReleaseController {
   @Post(':id/hold')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Put one of your shipments on hold (pauses movement)' })
+  @ApiOkResponse({ type: HeldShipmentDto })
   async hold(
     @Param('id') id: string,
     @Body() body: HoldDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<HeldShipment> {
+  ): Promise<HeldShipmentDto> {
     await this.assertOwned(id, request);
     return this.holdRelease.hold({
       shipmentId: id,
@@ -60,10 +62,11 @@ export class HoldReleaseController {
   @Post(':id/release')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Release a held shipment back to its interrupted state' })
+  @ApiOkResponse({ type: HeldShipmentDto })
   async release(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<HeldShipment> {
+  ): Promise<HeldShipmentDto> {
     await this.assertOwned(id, request);
     return this.holdRelease.release({
       shipmentId: id,

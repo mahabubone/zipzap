@@ -3,10 +3,11 @@
  */
 
 import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
-import { RegisterRiderService, type RegisteredRider } from './register-rider.service.ts';
+import { RegisterRiderService } from './register-rider.service.ts';
+import { RegisteredRiderDto } from './rider-response.dto.ts';
 
 export class RegisterRiderDto {
   @IsString()
@@ -30,7 +31,8 @@ export class RegisterRiderController {
 
   @Post()
   @ApiOperation({ summary: 'Register a rider' })
-  async register(@Body() body: RegisterRiderDto): Promise<RegisteredRider> {
+  @ApiCreatedResponse({ type: RegisteredRiderDto })
+  async register(@Body() body: RegisterRiderDto): Promise<RegisteredRiderDto> {
     return this.registerRider.execute({
       displayName: body.displayName,
       phone: body.phone,

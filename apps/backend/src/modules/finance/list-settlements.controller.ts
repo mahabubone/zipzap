@@ -8,11 +8,12 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ListSettlementsService, type SettlementPage } from './list-settlements.service.ts';
+import { ListSettlementsService } from './list-settlements.service.ts';
+import { SettlementPageDto } from './finance-response.dto.ts';
 
 export class ListSettlementsQuery {
   @IsOptional()
@@ -33,10 +34,11 @@ export class ListSettlementsController {
   @Get()
   @UseGuards(new ScopeGuard('settlements:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your settlements, newest first' })
+  @ApiOkResponse({ type: SettlementPageDto })
   async listSettlements(
     @Query() query: ListSettlementsQuery,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SettlementPage> {
+  ): Promise<SettlementPageDto> {
     return this.list.execute(request.principal!.merchantId!, query.limit, query.cursor);
   }
 }

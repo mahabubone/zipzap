@@ -8,10 +8,17 @@
  */
 
 import { Body, Controller, Get, Header, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsString, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { BulkImportService, type BulkJobView, type BulkPreview } from './bulk-import.service.ts';
+import { BulkImportService } from './bulk-import.service.ts';
+import { BulkJobViewDto, BulkPreviewDto } from './shipment-response.dto.ts';
 
 export class UploadBulkDto {
   @IsString()
@@ -41,30 +48,33 @@ export class BulkImportController {
   @Post('upload')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Upload CSV, get the human preview checkpoint' })
+  @ApiAcceptedResponse({ type: BulkPreviewDto })
   async upload(
     @Body() body: UploadBulkDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<BulkPreview> {
+  ): Promise<BulkPreviewDto> {
     return this.bulk.upload(this.merchantId(request), body.filename, body.csv);
   }
 
   @Post('accept')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Accept the preview — enqueue chunked processing' })
+  @ApiAcceptedResponse({ type: BulkJobViewDto })
   async accept(
     @Body() body: AcceptBulkDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<BulkJobView> {
+  ): Promise<BulkJobViewDto> {
     return this.bulk.accept(this.merchantId(request), body.jobId);
   }
 
   @Get(':jobId')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Poll job progress' })
+  @ApiOkResponse({ type: BulkJobViewDto })
   async progress(
     @Param('jobId') jobId: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<BulkJobView> {
+  ): Promise<BulkJobViewDto> {
     return this.bulk.progress(this.merchantId(request), jobId);
   }
 

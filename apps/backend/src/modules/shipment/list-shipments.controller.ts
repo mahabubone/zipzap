@@ -14,11 +14,12 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ListShipmentsService, type ShipmentPage } from './list-shipments.service.ts';
+import { ListShipmentsService } from './list-shipments.service.ts';
+import { ShipmentPageDto } from './shipment-response.dto.ts';
 
 export class ListShipmentsQuery {
   @IsOptional()
@@ -64,10 +65,11 @@ export class ListShipmentsController {
   @Get()
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your shipments, newest first' })
+  @ApiOkResponse({ type: ShipmentPageDto })
   async listShipments(
     @Query() query: ListShipmentsQuery,
     @Req() request: AuthenticatedRequest,
-  ): Promise<ShipmentPage> {
+  ): Promise<ShipmentPageDto> {
     return this.list.execute(request.principal!.merchantId!, query.limit, query.cursor, {
       status: query.status,
       zone: query.zone,

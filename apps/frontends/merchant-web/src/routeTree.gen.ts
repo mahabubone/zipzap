@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppAnalyticsRouteImport } from './routes/app/analytics'
 import { Route as AppCodRouteImport } from './routes/app/cod'
 import { Route as AppMoneyRouteImport } from './routes/app/money'
 import { Route as AppNotificationsRouteImport } from './routes/app/notifications'
@@ -45,6 +46,11 @@ const LoginRoute = LoginRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCodRoute = AppCodRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
   '/app/notifications': typeof AppNotificationsRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
   '/app/notifications': typeof AppNotificationsRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
   '/app/notifications': typeof AppNotificationsRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/analytics'
     | '/app/cod'
     | '/app/money'
     | '/app/notifications'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/app/analytics'
     | '/app/cod'
     | '/app/money'
     | '/app/notifications'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/analytics'
     | '/app/cod'
     | '/app/money'
     | '/app/notifications'
@@ -259,6 +271,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/cod': {
@@ -388,6 +407,7 @@ const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppCodRoute: typeof AppCodRoute
   AppMoneyRoute: typeof AppMoneyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
@@ -399,6 +419,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppCodRoute: AppCodRoute,
   AppMoneyRoute: AppMoneyRoute,
   AppNotificationsRoute: AppNotificationsRoute,

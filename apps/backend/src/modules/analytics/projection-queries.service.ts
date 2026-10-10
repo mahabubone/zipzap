@@ -64,6 +64,36 @@ export interface ProjectionKpis {
   readonly hubVolume: readonly HubVolumeKpi[];
 }
 
+/**
+ * One merchant's own daily series: parcels on the left, money on the right.
+ *
+ * Both halves come from projections and both are merchant-scoped, so this is the tenant's own
+ * numbers and nothing else. Deliberately not here: delivery success rate and return rate. Those
+ * projections are network-wide because their failure counts come from `DeliveryAttempted`, which
+ * carries no `merchantId` — a chart that drew them per merchant would be drawing a number this
+ * data cannot support (migration `0047`).
+ *
+ * Money crosses as `string`. A poisha amount above 2^53 loses precision as a JSON number, which is
+ * the same reason `DashboardController` serialises its bigint at the edge — but this one is a
+ * projection read, so the cast belongs on the row rather than in a controller.
+ */
+export interface MerchantDayPoint {
+  readonly day: string;
+  readonly shipmentsCreated: number;
+  readonly pickedUp: number;
+  readonly delivered: number;
+  readonly currency: string | null;
+  readonly expectedMinor: string;
+  readonly collectedMinor: string;
+  readonly settledMinor: string;
+}
+
+export interface MerchantSeries {
+  readonly from: string;
+  readonly to: string;
+  readonly days: readonly MerchantDayPoint[];
+}
+
 function ratio(numerator: number, denominator: number): number | null {
   return denominator > 0 ? numerator / denominator : null;
 }
@@ -189,5 +219,67 @@ export class ProjectionQueriesService {
         })),
       };
     });
+  }
+
+  /**
+   * One merchant's daily series over an inclusive `yyyy-mm-dd` range.
+   *
+   * `merchantId` is a required parameter rather than something read off a request, so the only way
+   * to reach this data is to already know whose it is. Both tables are filtered by it — the parcels
+   * half and the money half — so a merchant asking twice gets their own numbers twice.
+   *
+   * `ponytail:` a day is one point per currency, because `cod_summary` is keyed by currency and a
+   * figure without one is not money (rule 4). Every account in the product settles in BDT today, so
+   * this returns one point per day; if a second currency ever appears for the same merchant, add an
+   * explicit `currency` filter here rather than summing across currencies.
+   */
+  async merchantSeries(merchantId: string, from: string, to: string): Promise<MerchantSeries> {
+    const rows = await this.analytics.transaction(async (manager) => {
+      const shipments = await manager.query(
+        `SELECT day::text AS day,
+                COALESCE(shipments_created, 0)::int AS "created",
+                COALESCE(picked_up, 0)::int AS "pickedUp",
+                COALESCE(delivered, 0)::int AS delivered
+           FROM analytics.merchant_daily_shipments
+          WHERE merchant_id = $1 AND day BETWEEN $2 AND $3`,
+        [merchantId, from, to],
+      );
+
+      const cod = await manager.query(
+        `SELECT day::text AS day, currency,
+                SUM(expected_minor)::text  AS "expectedMinor",
+                SUM(collected_minor)::text AS "collectedMinor",
+                SUM(settled_minor)::text   AS "settledMinor"
+           FROM analytics.cod_summary
+          WHERE merchant_id = $1 AND day BETWEEN $2 AND $3
+          GROUP BY day, currency
+          ORDER BY day`,
+        [merchantId, from, to],
+      );
+
+      return { shipments, cod };
+    });
+
+    // LEFT JOIN from the parcel side: a day with collections but no shipments is still a day the
+    // reader is waiting for, and a full outer join would need both sides coalesced to nothing.
+    const codByDay = new Map<string, Record<string, unknown>>();
+    for (const row of rows.cod as Record<string, unknown>[]) codByDay.set(String(row.day), row);
+
+    const days: MerchantDayPoint[] = (rows.shipments as Record<string, unknown>[]).map((row) => {
+      const day = String(row.day);
+      const money = codByDay.get(day);
+      return {
+        day,
+        shipmentsCreated: int(row.created),
+        pickedUp: int(row.pickedUp),
+        delivered: int(row.delivered),
+        currency: money ? String(money.currency) : null,
+        expectedMinor: money ? String(money.expectedMinor) : '0',
+        collectedMinor: money ? String(money.collectedMinor) : '0',
+        settledMinor: money ? String(money.settledMinor) : '0',
+      };
+    });
+
+    return { from, to, days };
   }
 }

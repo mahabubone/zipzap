@@ -97,7 +97,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EndpointViewDto"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List your webhook endpoints",
@@ -120,7 +130,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedEndpointDto"
+                }
+              }
+            }
           }
         },
         "summary": "Register a webhook endpoint; secret returned once",
@@ -143,8 +160,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotatedSecretDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rotate the signing secret; new secret returned once",
@@ -167,8 +191,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Pause delivery to an endpoint",
@@ -191,8 +222,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Resume delivery to an endpoint",
@@ -235,7 +273,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryLogPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Every webhook delivery attempt for your endpoints, newest first",
@@ -258,8 +303,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayedDeliveryDto"
+                }
+              }
+            }
           }
         },
         "summary": "Replay a terminal delivery with a fresh delivery id",
@@ -284,7 +336,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiKeyDto"
+                }
+              }
+            }
           }
         },
         "summary": "Create a scoped API key (secret shown once)",
@@ -390,7 +449,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedShipmentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Create a shipment",
@@ -465,7 +531,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "List your shipments, newest first",
@@ -489,7 +562,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentDetailDto"
+                }
+              }
+            }
           }
         },
         "summary": "Get one of your shipments",
@@ -512,8 +592,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelledShipmentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Cancel a shipment that has not shipped yet",
@@ -537,8 +624,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPreviewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Upload CSV, get the human preview checkpoint",
@@ -562,8 +656,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkJobViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Accept the preview — enqueue chunked processing",
@@ -587,7 +688,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkJobViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Poll job progress",
@@ -644,8 +752,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportedExceptionDto"
+                }
+              }
+            }
           }
         },
         "summary": "Report a LOST or DAMAGED exception for one of your shipments",
@@ -678,8 +793,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeldShipmentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Put one of your shipments on hold (pauses movement)",
@@ -702,8 +824,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeldShipmentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Release a held shipment back to its interrupted state",
@@ -776,8 +905,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectedCodDto"
+                }
+              }
+            }
           }
         },
         "summary": "Record a COD collection",
@@ -801,8 +937,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciledCodDto"
+                }
+              }
+            }
           }
         },
         "summary": "Resolve a COD mismatch after human review",
@@ -834,7 +977,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodRecordPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "List your COD records, newest first",
@@ -866,7 +1016,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodExceptionPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "Unreviewed COD reconciliation exceptions, newest first",
@@ -1228,7 +1385,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredRiderDto"
+                }
+              }
+            }
           }
         },
         "summary": "Register a rider",
@@ -1458,8 +1622,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordedAttemptDto"
+                }
+              }
+            }
           }
         },
         "summary": "Record a failed delivery attempt",
@@ -1493,7 +1664,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedDeliveryJobDto"
+                }
+              }
+            }
           }
         },
         "summary": "Open a delivery job",
@@ -1516,8 +1694,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryStatusDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rider accepts a delivery job",
@@ -1540,8 +1725,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryStatusDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rider heads out for delivery",
@@ -1582,8 +1774,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryStatusDto"
+                }
+              }
+            }
           }
         },
         "summary": "Confirm delivery and collect COD",
@@ -1615,8 +1814,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedDeliveryCodeDto"
+                }
+              }
+            }
           }
         },
         "summary": "Issue a delivery code for the recipient to read out",
@@ -1658,8 +1864,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmittedDeliveryProofDto"
+                }
+              }
+            }
           }
         },
         "summary": "Redeem a delivery code with a photo and a location",
@@ -1674,7 +1887,14 @@
         "parameters": [],
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedSettlementDto"
+                }
+              }
+            }
           }
         },
         "summary": "Freeze your unsettled entries into a settlement",
@@ -1704,7 +1924,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementPageDto"
+                }
+              }
+            }
           }
         },
         "summary": "List your settlements, newest first",
@@ -1745,8 +1972,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedSettlementDto"
+                }
+              }
+            }
           }
         },
         "summary": "Approve a settlement — the point of no return",
@@ -1777,8 +2011,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitiatedSettlementPaymentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Initiate the provider payout for an approved settlement",
@@ -1809,8 +2050,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmedSettlementPaymentDto"
+                }
+              }
+            }
           }
         },
         "summary": "Confirm the provider payout and settle",
@@ -1825,7 +2073,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBalanceDto"
+                }
+              }
+            }
           }
         },
         "summary": "Your derived balance, itemised, with anything blocking a payout",
@@ -1849,7 +2104,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementStatementDto"
+                }
+              }
+            }
           }
         },
         "summary": "One settlement, itemised",
@@ -2216,6 +2478,49 @@
         ]
       }
     },
+    "/v1/analytics/merchant": {
+      "get": {
+        "operationId": "MerchantAnalyticsController_mine",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: 30 days ago.",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today.",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One point per day, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantSeriesDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your own daily parcel counts and COD money, one point per day",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
     "/v1/riders/{riderId}/jobs": {
       "get": {
         "operationId": "RiderJobsController_jobs",
@@ -2287,6 +2592,58 @@
           "password"
         ]
       },
+      "EndpointViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "merchantId": {
+            "type": "string",
+            "example": "m-1"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://example.com/webhook"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "required": true,
+              "example": [
+                "shipment.delivered",
+                "shipment.exception"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "FAILING"
+            ],
+            "type": "string",
+            "example": "ACTIVE"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "merchantId",
+          "url",
+          "events",
+          "status",
+          "createdAt"
+        ]
+      },
       "CreateWebhookDto": {
         "type": "object",
         "properties": {
@@ -2305,6 +2662,132 @@
         "required": [
           "url",
           "events"
+        ]
+      },
+      "CreatedEndpointDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "$ref": "#/components/schemas/EndpointViewDto"
+          },
+          "secret": {
+            "type": "string",
+            "example": "whsec_abc123...",
+            "description": "Signing secret, shown once at creation"
+          }
+        },
+        "required": [
+          "endpoint",
+          "secret"
+        ]
+      },
+      "RotatedSecretDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "whsec_new123...",
+            "description": "New signing secret, shown once upon rotation"
+          }
+        },
+        "required": [
+          "secret"
+        ]
+      },
+      "DeliveryLogRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "del-123"
+          },
+          "endpointId": {
+            "type": "string",
+            "example": "ep-123"
+          },
+          "eventType": {
+            "type": "string",
+            "example": "shipment.delivered"
+          },
+          "attempt": {
+            "type": "number",
+            "example": 1
+          },
+          "statusCode": {
+            "type": "number",
+            "nullable": true,
+            "example": 200
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "delivered": {
+            "type": "boolean",
+            "example": true
+          },
+          "terminal": {
+            "type": "boolean",
+            "example": true
+          },
+          "attemptedAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "endpointId",
+          "eventType",
+          "attempt",
+          "statusCode",
+          "error",
+          "delivered",
+          "terminal",
+          "attemptedAt"
+        ]
+      },
+      "DeliveryLogPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryLogRowDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "example": "cursor_xyz"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ReplayedDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "example": "del-456"
+          },
+          "endpointId": {
+            "type": "string",
+            "example": "ep-123"
+          },
+          "wireEvent": {
+            "type": "string",
+            "example": "shipment.delivered"
+          }
+        },
+        "required": [
+          "deliveryId",
+          "endpointId",
+          "wireEvent"
         ]
       },
       "CreateApiKeyDto": {
@@ -2334,12 +2817,69 @@
                 "settlements:approve",
                 "webhooks:manage",
                 "notifications:manage",
-                "keys:manage"
+                "keys:manage",
+                "network:read"
               ]
             }
           }
         },
         "required": [
+          "scopes"
+        ]
+      },
+      "CreatedApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "example": "key_123456789"
+          },
+          "secret": {
+            "type": "string",
+            "example": "zz_live_abc123...",
+            "description": "Raw secret, shown once at creation"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "required": true,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "shipments:read",
+                  "shipments:write",
+                  "tracking:read",
+                  "hub:read",
+                  "hub:scan",
+                  "rider:sync",
+                  "pickup:create",
+                  "pickup:read",
+                  "delivery:create",
+                  "delivery:read",
+                  "delivery:complete",
+                  "returns:read",
+                  "returns:write",
+                  "cod:read",
+                  "settlements:read",
+                  "settlements:approve",
+                  "webhooks:manage",
+                  "notifications:manage",
+                  "keys:manage",
+                  "network:read"
+                ]
+              },
+              "example": [
+                "shipments:read",
+                "shipments:write"
+              ],
+              "description": "Granted API scopes",
+              "type": "array"
+            }
+          }
+        },
+        "required": [
+          "keyId",
+          "secret",
           "scopes"
         ]
       },
@@ -2416,6 +2956,304 @@
           "fragile"
         ]
       },
+      "CodAmountDto": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "number",
+            "example": 125050,
+            "description": "Integer minor units (poisha)"
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT",
+            "description": "ISO currency code"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "currency"
+        ]
+      },
+      "CreatedShipmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "trackingCode": {
+            "type": "string",
+            "example": "ZZ-2610-ABCD"
+          },
+          "status": {
+            "type": "string",
+            "example": "CREATED"
+          },
+          "cod": {
+            "$ref": "#/components/schemas/CodAmountDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "id",
+          "trackingCode",
+          "status",
+          "cod",
+          "createdAt",
+          "replayed"
+        ]
+      },
+      "ShipmentSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "trackingCode": {
+            "type": "string",
+            "example": "ZZ-2610-ABCD"
+          },
+          "status": {
+            "type": "string",
+            "example": "CREATED"
+          },
+          "merchantReference": {
+            "type": "string",
+            "nullable": true,
+            "example": "INV-1001"
+          },
+          "codAmountMinor": {
+            "type": "number",
+            "example": 125050
+          },
+          "codCurrency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "zone": {
+            "type": "string",
+            "nullable": true,
+            "example": "dhaka-metro"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "trackingCode",
+          "status",
+          "merchantReference",
+          "codAmountMinor",
+          "codCurrency",
+          "zone",
+          "createdAt"
+        ]
+      },
+      "CursorPaginationDto": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "example": "eyJsYXN0SWQiOiIxMjMifQ==",
+            "description": "Opaque cursor for the next page; null on the last page"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when more rows exist past this page"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "hasMore"
+        ]
+      },
+      "ShipmentPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentSummaryDto"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ]
+      },
+      "TimelineEntryDto": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "example": "ShipmentCreated"
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "actorType": {
+            "type": "string",
+            "example": "human",
+            "description": "human | system | rider"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "hubCode": "DHK-01"
+            }
+          },
+          "correctsEventId": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "eventType",
+          "occurredAt",
+          "actorType",
+          "metadata",
+          "correctsEventId"
+        ]
+      },
+      "ShipmentDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "trackingCode": {
+            "type": "string",
+            "example": "ZZ-2610-ABCD"
+          },
+          "status": {
+            "type": "string",
+            "example": "CREATED"
+          },
+          "merchantReference": {
+            "type": "string",
+            "nullable": true,
+            "example": "INV-1001"
+          },
+          "senderName": {
+            "type": "string",
+            "example": "Rahim"
+          },
+          "senderPhone": {
+            "type": "string",
+            "example": "+8801700000000"
+          },
+          "senderAddress": {
+            "type": "string",
+            "example": "House 1, Road 2, Dhanmondi, Dhaka"
+          },
+          "recipientName": {
+            "type": "string",
+            "example": "Karim"
+          },
+          "recipientPhone": {
+            "type": "string",
+            "example": "+8801800000000"
+          },
+          "recipientAddress": {
+            "type": "string",
+            "example": "Agrabad, Chattogram"
+          },
+          "parcelWeightGrams": {
+            "type": "number",
+            "example": 1000
+          },
+          "parcelDescription": {
+            "type": "string",
+            "example": "Books and stationery"
+          },
+          "codAmountMinor": {
+            "type": "number",
+            "example": 125050
+          },
+          "codCurrency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "zone": {
+            "type": "string",
+            "nullable": true,
+            "example": "dhaka-metro"
+          },
+          "pricingVersion": {
+            "type": "number",
+            "example": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "trackingCode",
+          "status",
+          "merchantReference",
+          "senderName",
+          "senderPhone",
+          "senderAddress",
+          "recipientName",
+          "recipientPhone",
+          "recipientAddress",
+          "parcelWeightGrams",
+          "parcelDescription",
+          "codAmountMinor",
+          "codCurrency",
+          "zone",
+          "pricingVersion",
+          "createdAt",
+          "timeline"
+        ]
+      },
+      "CancelledShipmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "type": "string",
+            "example": "CANCELLED"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "UploadBulkDto": {
         "type": "object",
         "properties": {
@@ -2431,6 +3269,104 @@
         "required": [
           "csv",
           "filename"
+        ]
+      },
+      "BulkJobViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "job-123"
+          },
+          "merchantId": {
+            "type": "string",
+            "example": "merchant-456"
+          },
+          "filename": {
+            "type": "string",
+            "example": "shipments.csv"
+          },
+          "status": {
+            "type": "string",
+            "example": "PENDING"
+          },
+          "totalRows": {
+            "type": "number",
+            "example": 100
+          },
+          "processedRows": {
+            "type": "number",
+            "example": 0
+          },
+          "succeededRows": {
+            "type": "number",
+            "example": 0
+          },
+          "failedRows": {
+            "type": "number",
+            "example": 0
+          },
+          "skippedRows": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "id",
+          "merchantId",
+          "filename",
+          "status",
+          "totalRows",
+          "processedRows",
+          "succeededRows",
+          "failedRows",
+          "skippedRows"
+        ]
+      },
+      "BulkPreviewRowDto": {
+        "type": "object",
+        "properties": {
+          "lineNumber": {
+            "type": "number",
+            "example": 2
+          },
+          "invoice": {
+            "type": "string",
+            "example": "INV-1001"
+          },
+          "outcome": {
+            "type": "string",
+            "example": "VALID"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "lineNumber",
+          "invoice",
+          "outcome",
+          "reason"
+        ]
+      },
+      "BulkPreviewDto": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/BulkJobViewDto"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkPreviewRowDto"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "rows"
         ]
       },
       "AcceptBulkDto": {
@@ -2464,6 +3400,24 @@
           "reason"
         ]
       },
+      "ReportedExceptionDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "type": "string",
+            "example": "LOST",
+            "description": "Target exception status (e.g. LOST, DAMAGED)"
+          }
+        },
+        "required": [
+          "shipmentId",
+          "status"
+        ]
+      },
       "HoldDto": {
         "type": "object",
         "properties": {
@@ -2473,6 +3427,23 @@
             "maxLength": 500
           }
         }
+      },
+      "HeldShipmentDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "type": "string",
+            "example": "HOLD"
+          }
+        },
+        "required": [
+          "shipmentId",
+          "status"
+        ]
       },
       "QuoteDto": {
         "type": "object",
@@ -2537,6 +3508,48 @@
           "collectedMinor"
         ]
       },
+      "CollectedCodDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "expectedMinor": {
+            "type": "number",
+            "example": 125050,
+            "description": "Expected COD amount in minor units (poisha)"
+          },
+          "collectedMinor": {
+            "type": "number",
+            "example": 125050,
+            "description": "Collected COD amount in minor units (poisha)"
+          },
+          "shortfallMinor": {
+            "type": "number",
+            "example": 0,
+            "description": "Shortfall: expected - collected, 0 when fully collected"
+          },
+          "status": {
+            "type": "string",
+            "example": "COLLECTED",
+            "description": "COLLECTED | PARTIALLY_COLLECTED"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "shipmentId",
+          "expectedMinor",
+          "collectedMinor",
+          "shortfallMinor",
+          "status",
+          "replayed"
+        ]
+      },
       "ReconcileCodDto": {
         "type": "object",
         "properties": {
@@ -2553,6 +3566,152 @@
         "required": [
           "shipmentId",
           "note"
+        ]
+      },
+      "ReconciledCodDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "type": "string",
+            "example": "RECONCILED"
+          }
+        },
+        "required": [
+          "shipmentId",
+          "status"
+        ]
+      },
+      "CodRecordSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "shipmentId": {
+            "type": "string",
+            "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+          },
+          "status": {
+            "type": "string",
+            "example": "COLLECTED"
+          },
+          "expectedMinor": {
+            "type": "number",
+            "example": 125050
+          },
+          "collectedMinor": {
+            "type": "number",
+            "nullable": true,
+            "example": 125050
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "shipmentId",
+          "status",
+          "expectedMinor",
+          "collectedMinor",
+          "currency",
+          "createdAt"
+        ]
+      },
+      "CodRecordPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodRecordSummaryDto"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ]
+      },
+      "CodExceptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "shipmentId": {
+            "type": "string",
+            "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+          },
+          "expectedMinor": {
+            "type": "number",
+            "example": 125050
+          },
+          "collectedMinor": {
+            "type": "number",
+            "nullable": true,
+            "example": 100000
+          },
+          "differenceMinor": {
+            "type": "number",
+            "example": -25050,
+            "description": "collected - expected; negative means shortfall"
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "shipmentId",
+          "expectedMinor",
+          "collectedMinor",
+          "differenceMinor",
+          "currency",
+          "reviewNote",
+          "createdAt"
+        ]
+      },
+      "CodExceptionPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodExceptionDto"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
         ]
       },
       "CreateManifestDto": {
@@ -2670,6 +3829,31 @@
           "phone"
         ]
       },
+      "RegisteredRiderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "enum": [
+              "SUSPENDED",
+              "OFFLINE",
+              "AVAILABLE",
+              "ON_PICKUP",
+              "ON_DELIVERY",
+              "ON_BREAK"
+            ],
+            "type": "string",
+            "example": "AVAILABLE"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "DeviceCommandDto": {
         "type": "object",
         "properties": {
@@ -2778,6 +3962,48 @@
           "reason"
         ]
       },
+      "RecordedAttemptDto": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "sequence": {
+            "type": "number",
+            "example": 1
+          },
+          "status": {
+            "enum": [
+              "CREATED",
+              "OUT_FOR_DELIVERY",
+              "DELIVERED",
+              "FAILED",
+              "ASSIGNED",
+              "ACCEPTED",
+              "ATTEMPTED"
+            ],
+            "type": "string",
+            "example": "OUT_FOR_DELIVERY"
+          },
+          "retryScheduled": {
+            "type": "boolean",
+            "example": true
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "jobId",
+          "sequence",
+          "status",
+          "retryScheduled",
+          "replayed"
+        ]
+      },
       "CreateDeliveryDto": {
         "type": "object",
         "properties": {
@@ -2794,6 +4020,74 @@
           "shipmentId"
         ]
       },
+      "CreatedDeliveryJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "shipmentId": {
+            "type": "string",
+            "example": "shp-123"
+          },
+          "riderId": {
+            "type": "string",
+            "nullable": true,
+            "example": "r-123"
+          },
+          "status": {
+            "enum": [
+              "CREATED",
+              "OUT_FOR_DELIVERY",
+              "DELIVERED",
+              "FAILED",
+              "ASSIGNED",
+              "ACCEPTED",
+              "ATTEMPTED"
+            ],
+            "type": "string",
+            "example": "CREATED"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "id",
+          "shipmentId",
+          "status",
+          "replayed"
+        ]
+      },
+      "DeliveryStatusDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "enum": [
+              "CREATED",
+              "OUT_FOR_DELIVERY",
+              "DELIVERED",
+              "FAILED",
+              "ASSIGNED",
+              "ACCEPTED",
+              "ATTEMPTED"
+            ],
+            "type": "string",
+            "example": "ACCEPTED"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
       "CompleteDeliveryDto": {
         "type": "object",
         "properties": {
@@ -2805,6 +4099,42 @@
         },
         "required": [
           "collectedMinor"
+        ]
+      },
+      "IssuedDeliveryCodeDto": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "enum": [
+              "PENDING"
+            ],
+            "type": "string",
+            "example": "PENDING"
+          },
+          "expiresAt": {
+            "type": "string",
+            "example": "2026-10-10T06:10:00.000Z"
+          },
+          "attemptsRemaining": {
+            "type": "number",
+            "example": 5
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Plaintext OTP returned once and never stored"
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "expiresAt",
+          "attemptsRemaining",
+          "code"
         ]
       },
       "SubmitProofDto": {
@@ -2843,6 +4173,123 @@
           "longitude"
         ]
       },
+      "SubmittedDeliveryProofDto": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "proofId": {
+            "type": "string",
+            "example": "prf-123"
+          },
+          "status": {
+            "enum": [
+              "VERIFIED"
+            ],
+            "type": "string",
+            "example": "VERIFIED"
+          },
+          "photoSha256": {
+            "type": "string",
+            "example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "photoByteLength": {
+            "type": "number",
+            "example": 254321
+          },
+          "otpVerifiedAt": {
+            "type": "string",
+            "example": "2026-10-10T06:05:00.000Z"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "jobId",
+          "proofId",
+          "status",
+          "photoSha256",
+          "photoByteLength",
+          "otpVerifiedAt",
+          "replayed"
+        ]
+      },
+      "SettlementItemDto": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "example": "entry-123"
+          },
+          "type": {
+            "type": "string",
+            "example": "COD_COLLECTED"
+          },
+          "direction": {
+            "type": "number",
+            "example": 1
+          },
+          "amountMinor": {
+            "type": "number",
+            "example": 125050
+          }
+        },
+        "required": [
+          "entryId",
+          "type",
+          "direction",
+          "amountMinor"
+        ]
+      },
+      "CreatedSettlementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "merchantId": {
+            "type": "string",
+            "example": "m-1"
+          },
+          "status": {
+            "type": "string",
+            "example": "PENDING"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementItemDto"
+            }
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "merchantId",
+          "status",
+          "items",
+          "netMinor",
+          "currency"
+        ]
+      },
       "ApproveSettlementDto": {
         "type": "object",
         "properties": {
@@ -2853,6 +4300,405 @@
         },
         "required": [
           "approverId"
+        ]
+      },
+      "ApprovedSettlementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "status": {
+            "type": "string",
+            "example": "APPROVED"
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "approvedBy": {
+            "type": "string",
+            "example": "u-1"
+          },
+          "approvedAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "netMinor",
+          "currency",
+          "approvedBy",
+          "approvedAt",
+          "replayed"
+        ]
+      },
+      "SettlementSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "status": {
+            "type": "string",
+            "example": "SETTLED"
+          },
+          "frozenNetMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "frozenNetMinor",
+          "currency",
+          "createdAt"
+        ]
+      },
+      "SettlementPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementSummaryDto"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/CursorPaginationDto"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ]
+      },
+      "InitiatedSettlementPaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "status": {
+            "type": "string",
+            "example": "PROCESSING"
+          },
+          "paymentReference": {
+            "type": "string",
+            "example": "PAY-PROVIDER-123"
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "paymentReference",
+          "netMinor",
+          "currency",
+          "replayed"
+        ]
+      },
+      "ConfirmedSettlementPaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "status": {
+            "type": "string",
+            "example": "SETTLED"
+          },
+          "paymentReference": {
+            "type": "string",
+            "example": "PAY-PROVIDER-123"
+          },
+          "providerStatus": {
+            "type": "string",
+            "example": "COMPLETED"
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "replayed": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when request was replayed via Idempotency-Key"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "paymentReference",
+          "providerStatus",
+          "netMinor",
+          "currency",
+          "replayed"
+        ]
+      },
+      "BalanceLineDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "DELIVERY_FEE"
+          },
+          "direction": {
+            "type": "number",
+            "example": 1,
+            "description": "1 for credit (owed to merchant), -1 for debit (owed by merchant)"
+          },
+          "amountMinor": {
+            "type": "number",
+            "example": 125050,
+            "description": "Sum of entries of this type in minor units"
+          },
+          "entries": {
+            "type": "number",
+            "example": 42,
+            "description": "How many ledger rows made up this line"
+          }
+        },
+        "required": [
+          "type",
+          "direction",
+          "amountMinor",
+          "entries"
+        ]
+      },
+      "BalanceBlockDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "RECONCILIATION_EXCEPTION"
+          },
+          "count": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ]
+      },
+      "NextSettlementSummaryDto": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 250000
+          }
+        },
+        "required": [
+          "reference",
+          "netMinor"
+        ]
+      },
+      "MerchantBalanceDto": {
+        "type": "object",
+        "properties": {
+          "merchantId": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "balanceMinor": {
+            "type": "number",
+            "example": -1250500,
+            "description": "Signed minor units: negative means owed to merchant"
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "asOf": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceLineDto"
+            }
+          },
+          "blocked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BalanceBlockDto"
+            }
+          },
+          "blockedReason": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "nextSettlement": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NextSettlementSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "merchantId",
+          "balanceMinor",
+          "currency",
+          "asOf",
+          "lines",
+          "blocked",
+          "blockedReason",
+          "nextSettlement"
+        ]
+      },
+      "StatementLineDto": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "example": "entry-123"
+          },
+          "type": {
+            "type": "string",
+            "example": "COD_COLLECTED"
+          },
+          "direction": {
+            "type": "number",
+            "example": 1
+          },
+          "amountMinor": {
+            "type": "number",
+            "example": 125050
+          },
+          "memo": {
+            "type": "string",
+            "nullable": true,
+            "example": "Delivery to Dhanmondi"
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "shipmentId": {
+            "type": "string",
+            "nullable": true,
+            "example": "shp-123"
+          }
+        },
+        "required": [
+          "entryId",
+          "type",
+          "direction",
+          "amountMinor",
+          "memo",
+          "occurredAt",
+          "shipmentId"
+        ]
+      },
+      "SettlementStatementDto": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "example": "SET-2610-0001"
+          },
+          "status": {
+            "type": "string",
+            "example": "APPROVED"
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "netMinor": {
+            "type": "number",
+            "example": 1250500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatementLineDto"
+            }
+          }
+        },
+        "required": [
+          "reference",
+          "status",
+          "currency",
+          "createdAt",
+          "netMinor",
+          "lines"
         ]
       },
       "RequestReturnDto": {
@@ -2942,6 +4788,88 @@
         "required": [
           "shipmentId",
           "scan"
+        ]
+      },
+      "MerchantDayPointDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "example": "2026-10-09",
+            "description": "Asia/Dhaka day bucket"
+          },
+          "shipmentsCreated": {
+            "type": "number",
+            "example": 42,
+            "description": "Shipments created that day"
+          },
+          "pickedUp": {
+            "type": "number",
+            "example": 38,
+            "description": "Parcels picked up that day"
+          },
+          "delivered": {
+            "type": "number",
+            "example": 31,
+            "description": "Parcels delivered that day"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true,
+            "example": "BDT",
+            "description": "Null when no COD was recorded that day"
+          },
+          "expectedMinor": {
+            "type": "string",
+            "example": "1250500",
+            "description": "Expected COD in minor units (poisha), as a string"
+          },
+          "collectedMinor": {
+            "type": "string",
+            "example": "900000",
+            "description": "Collected COD in minor units (poisha), as a string"
+          },
+          "settledMinor": {
+            "type": "string",
+            "example": "700000",
+            "description": "Settled COD in minor units (poisha), as a string"
+          }
+        },
+        "required": [
+          "day",
+          "shipmentsCreated",
+          "pickedUp",
+          "delivered",
+          "currency",
+          "expectedMinor",
+          "collectedMinor",
+          "settledMinor"
+        ]
+      },
+      "MerchantSeriesDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-09-10",
+            "description": "First day of the requested window, inclusive"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-09",
+            "description": "Last day of the requested window, inclusive"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MerchantDayPointDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "days"
         ]
       }
     }

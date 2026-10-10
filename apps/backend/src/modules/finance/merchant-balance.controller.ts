@@ -7,9 +7,10 @@
  */
 
 import { Controller, Get, Inject, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { MerchantBalanceService, type MerchantBalance } from './merchant-balance.service.ts';
+import { MerchantBalanceService } from './merchant-balance.service.ts';
+import { MerchantBalanceDto } from './finance-response.dto.ts';
 
 @ApiTags('settlements')
 @Controller('v1/finance')
@@ -20,7 +21,8 @@ export class MerchantBalanceController {
   @Get('balance')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Your derived balance, itemised, with anything blocking a payout' })
-  async mine(@Req() request: AuthenticatedRequest): Promise<MerchantBalance> {
+  @ApiOkResponse({ type: MerchantBalanceDto })
+  async mine(@Req() request: AuthenticatedRequest): Promise<MerchantBalanceDto> {
     return this.balance.execute(request.principal!.merchantId!);
   }
 }

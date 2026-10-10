@@ -7,12 +7,13 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsIn } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
 import { CreateApiKeyService } from './create-api-key.service';
 import { API_SCOPES, type ApiScope } from '../../common/scopes.ts';
+import { CreatedApiKeyDto } from './merchant-response.dto.ts';
 
 export class CreateApiKeyDto {
   @ArrayNotEmpty()
@@ -29,10 +30,11 @@ export class CreateApiKeyController {
   @Post()
   @UseGuards(new ScopeGuard('keys:manage'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a scoped API key (secret shown once)' })
+  @ApiCreatedResponse({ type: CreatedApiKeyDto })
   async create(
     @Body() body: CreateApiKeyDto,
     @Req() request: AuthenticatedRequest & { requestId?: string },
-  ): Promise<{ keyId: string; secret: string; scopes: ApiScope[] }> {
+  ): Promise<CreatedApiKeyDto> {
     const principal = request.principal!;
     const held = new Set(principal.scopes);
     const requested = body.scopes.filter((scope) => held.has(scope));

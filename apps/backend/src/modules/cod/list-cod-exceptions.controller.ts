@@ -7,11 +7,12 @@
  */
 
 import { Controller, Get, Inject, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ListCodExceptionsService, type CodExceptionPage } from './list-cod-exceptions.service.ts';
+import { ListCodExceptionsService } from './list-cod-exceptions.service.ts';
+import { CodExceptionPageDto } from './cod-response.dto.ts';
 
 export class ListCodExceptionsQuery {
   @IsOptional()
@@ -34,10 +35,11 @@ export class ListCodExceptionsController {
   @Get('exceptions')
   @UseGuards(new ScopeGuard('cod:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'Unreviewed COD reconciliation exceptions, newest first' })
+  @ApiOkResponse({ type: CodExceptionPageDto })
   async list(
     @Query() query: ListCodExceptionsQuery,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CodExceptionPage> {
+  ): Promise<CodExceptionPageDto> {
     return this.exceptions.execute(request.principal!.merchantId!, query.limit, query.cursor);
   }
 }

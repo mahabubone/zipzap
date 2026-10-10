@@ -66,7 +66,12 @@ export function isRoleName(value: string): value is RoleName {
  * neither holds these. `hub:read`/`hub:scan` drive custody; `rider:sync` reads a rider's day. All
  * three would let a client drive or observe the network itself.
  */
-export const PLATFORM_SCOPES: readonly ApiScope[] = ['hub:read', 'hub:scan', 'rider:sync'];
+export const PLATFORM_SCOPES: readonly ApiScope[] = [
+  'hub:read',
+  'hub:scan',
+  'rider:sync',
+  'network:read',
+];
 
 /** Everything a merchant-facing role may hold: the vocabulary minus the platform's own. */
 export const MERCHANT_SCOPES: readonly ApiScope[] = API_SCOPES.filter(
@@ -100,6 +105,9 @@ export const ROLE_SCOPES: Readonly<Record<RoleName, readonly ApiScope[]>> = {
     'hub:read',
     'hub:scan',
     'rider:sync',
+    // The control tower is this role's screen. Without it the ops console's own two endpoints
+    // answer 403 to the people who run the network.
+    'network:read',
   ],
 
   /**

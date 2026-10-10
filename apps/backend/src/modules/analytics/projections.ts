@@ -115,8 +115,17 @@ async function bumpHubVolume(manager: EntityManager, hubCode: string, day: strin
   );
 }
 
+/**
+ * Money, per merchant per day.
+ *
+ * `merchantId` is part of the conflict target because a merchant's own COD is the number they
+ * come here for — the control tower sums these rows back up to the network figure (migration
+ * `0047`). An event with no merchant cannot be attributed to an account, so it is skipped rather
+ * than parked under a sentinel id that would look like a real merchant in someone's balance.
+ */
 async function accumulateCodSummary(
   manager: EntityManager,
+  merchantId: string,
   day: string,
   currency: string,
   expectedMinor: number,
@@ -125,14 +134,14 @@ async function accumulateCodSummary(
 ): Promise<void> {
   await manager.query(
     `INSERT INTO analytics.cod_summary
-       (day, currency, expected_minor, collected_minor, settled_minor)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (day, currency)
+       (merchant_id, day, currency, expected_minor, collected_minor, settled_minor)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (merchant_id, day, currency)
      DO UPDATE SET
        expected_minor  = analytics.cod_summary.expected_minor  + excluded.expected_minor,
        collected_minor = analytics.cod_summary.collected_minor + excluded.collected_minor,
        settled_minor   = analytics.cod_summary.settled_minor   + excluded.settled_minor`,
-    [day, currency, expectedMinor, collectedMinor, settledMinor],
+    [merchantId, day, currency, expectedMinor, collectedMinor, settledMinor],
   );
 }
 
@@ -191,9 +200,14 @@ export async function project(manager: EntityManager, input: ProjectionInput): P
 
     case 'CODCollected':
     case 'CODPartialCollection': {
+      // Both payloads carry merchantId — collect-cod stamps it off the COD record — so a
+      // collection with no merchant is a malformed event, not a network-wide one.
+      const merchantId = str(data.merchantId);
+      if (!merchantId) return;
       const currency = str(data.currency) || 'BDT';
       await accumulateCodSummary(
         manager,
+        merchantId,
         day,
         currency,
         int(data.expectedMinor),
@@ -204,8 +218,10 @@ export async function project(manager: EntityManager, input: ProjectionInput): P
     }
 
     case 'SettlementCompleted': {
+      const merchantId = str(data.merchantId);
+      if (!merchantId) return;
       const currency = str(data.currency) || 'BDT';
-      await accumulateCodSummary(manager, day, currency, 0, 0, int(data.netMinor));
+      await accumulateCodSummary(manager, merchantId, day, currency, 0, 0, int(data.netMinor));
       return;
     }
 

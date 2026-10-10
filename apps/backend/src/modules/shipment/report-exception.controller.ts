@@ -7,7 +7,7 @@
  */
 
 import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
@@ -18,8 +18,8 @@ import {
   EXCEPTION_REASONS,
   ReportExceptionService,
   type ExceptionReason,
-  type ReportedException,
 } from './report-exception.service.ts';
+import { ReportedExceptionDto } from './shipment-response.dto.ts';
 
 export class ReportExceptionDto {
   @IsIn([...EXCEPTION_REASONS])
@@ -43,11 +43,12 @@ export class ReportExceptionController {
   @Post(':id/exception')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Report a LOST or DAMAGED exception for one of your shipments' })
+  @ApiOkResponse({ type: ReportedExceptionDto })
   async report(
     @Param('id') id: string,
     @Body() body: ReportExceptionDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<ReportedException> {
+  ): Promise<ReportedExceptionDto> {
     const merchantId = request.principal!.merchantId!;
     const rows = await this.shipments.query(
       `SELECT id FROM shipment.shipments WHERE id = $1 AND merchant_id = $2`,

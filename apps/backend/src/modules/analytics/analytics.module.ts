@@ -9,11 +9,18 @@
 
 import { Module } from '@nestjs/common';
 import { forModule } from '../../database/module-connection.ts';
+import { IdentityModule } from '../identity/identity.module.ts';
 import { AnalyticsConsumer } from './analytics.consumer.ts';
+import { MerchantAnalyticsController } from './merchant-analytics.controller.ts';
 import { ProjectionQueriesService } from './projection-queries.service.ts';
 
 @Module({
-  imports: [forModule('analytics', [])],
+  // IdentityModule is what makes `@UseGuards(ApiKeyGuard)` on the analytics controller
+  // resolvable: the guard injects AuthenticateApiKeyService, which identity exports.
+  // Without it the whole app fails to boot — a DI error the unit specs cannot see,
+  // because none of them build the module graph.
+  imports: [forModule('analytics', []), IdentityModule],
+  controllers: [MerchantAnalyticsController],
   providers: [AnalyticsConsumer, ProjectionQueriesService],
   exports: [AnalyticsConsumer, ProjectionQueriesService],
 })

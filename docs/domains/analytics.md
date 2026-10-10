@@ -22,14 +22,14 @@ disagree with the first.
 
 ## Projections
 
-| Table                      | Grain          | Fed by event types                                                             |
-| -------------------------- | -------------- | ------------------------------------------------------------------------------ |
-| `merchant_daily_shipments` | merchant × day | `ShipmentCreated` · `PickupParcelScanned` · `DeliveryCompleted`                |
-| `hub_daily_volume`         | hub code × day | `ShipmentScanned`                                                              |
-| `rider_daily_performance`  | rider × day    | `DeliveryCompleted` · `DeliveryAttempted`                                      |
-| `delivery_success_rate`    | day            | `DeliveryCompleted` · `DeliveryAttempted` (terminal: `retryScheduled = false`) |
-| `return_rate`              | day            | `DeliveryCompleted` · `ReturnCompleted`                                        |
-| `cod_summary`              | day × currency | `CODCollected` · `CODPartialCollection` · `SettlementCompleted`                |
+| Table                      | Grain                     | Fed by event types                                                             |
+| -------------------------- | ------------------------- | ------------------------------------------------------------------------------ |
+| `merchant_daily_shipments` | merchant × day            | `ShipmentCreated` · `PickupParcelScanned` · `DeliveryCompleted`                |
+| `hub_daily_volume`         | hub code × day            | `ShipmentScanned`                                                              |
+| `rider_daily_performance`  | rider × day               | `DeliveryCompleted` · `DeliveryAttempted`                                      |
+| `delivery_success_rate`    | day                       | `DeliveryCompleted` · `DeliveryAttempted` (terminal: `retryScheduled = false`) |
+| `return_rate`              | day                       | `DeliveryCompleted` · `ReturnCompleted`                                        |
+| `cod_summary`              | merchant × day × currency | `CODCollected` · `CODPartialCollection` · `SettlementCompleted`                |
 
 Days are **Asia/Dhaka** buckets (`analytics/rules/day.ts`), never UTC — a Bangladesh
 business day is the axis every KPI below is plotted on. The two rate tables store
@@ -40,7 +40,10 @@ minor units with `currency` in the same row.
 Two event payloads carry fields precisely so analytics never reads a transactional
 table (rule 2): `DeliveryAttempted.riderId` (the only event with failure counts)
 and `SettlementCompleted.currency` (money without a currency would break AGENTS.md
-rule 4).
+rule 4). All three COD events (`CODCollected`, `CODPartialCollection`,
+`SettlementCompleted`) carry `merchantId` so the projection can attribute money to
+the owning account; an event with no merchant is skipped rather than written to a
+network-wide row.
 
 Single-tenant events are consumed through the fifth NATS consumer, `analytics`
 (subscription parity is pinned in `subscriptions.spec.ts`).
@@ -80,6 +83,13 @@ exception rate         = exceptions / total shipments
 **Served by** `ProjectionQueriesService` (`projection-queries.service.ts`) — the read model
 behind `GET /v1/control-tower/report`. Rates with a zero denominator come back `null`, not
 `0`: a window with no traffic has no rate.
+
+**Merchant series** `GET /v1/analytics/merchant` (scope `cod:read`) — your own daily series:
+parcels created / picked up / delivered plus COD expected / collected / settled per day, one
+point per day. Deliberately not included: delivery success rate and return rate. Those
+projections are network-wide because their failure counts come from `DeliveryAttempted`,
+which carries no `merchantId` — a chart that drew them per merchant would be drawing a number
+this data cannot support (migration `0047`).
 
 **Not yet projected** (the report defers them): duration metrics (avg delivery time, pickup
 SLA, transit), first-attempt rate, settlement time — they need timestamps the projections do

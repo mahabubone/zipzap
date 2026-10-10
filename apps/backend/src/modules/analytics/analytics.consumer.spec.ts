@@ -94,6 +94,7 @@ describe('AnalyticsConsumer', () => {
   it('COD events accumulate expected and collected into one currency row', async () => {
     await consumer.handle(
       message('CODPartialCollection', {
+        merchantId: 'm-1',
         currency: 'BDT',
         expectedMinor: 125050,
         collectedMinor: 125000,
@@ -101,13 +102,26 @@ describe('AnalyticsConsumer', () => {
     );
     const cod = tableWrites('cod_summary');
     expect(cod).toHaveLength(1);
-    expect(cod[0]!.params).toEqual(['2026-03-05', 'BDT', 125050, 125000, 0]);
+    // merchantId leads: cod_summary is keyed merchant x day x currency (migration 0047), so the
+    // row belongs to an account and the control tower's total is a sum over these rows.
+    expect(cod[0]!.params).toEqual(['m-1', '2026-03-05', 'BDT', 125050, 125000, 0]);
+    expect(cod[0]!.sql).toContain('ON CONFLICT (merchant_id, day, currency)');
   });
 
   it('SettlementCompleted accumulates settled_minor with its currency', async () => {
-    await consumer.handle(message('SettlementCompleted', { currency: 'BDT', netMinor: 900000 }));
+    await consumer.handle(
+      message('SettlementCompleted', { merchantId: 'm-1', currency: 'BDT', netMinor: 900000 }),
+    );
     const cod = tableWrites('cod_summary');
-    expect(cod[0]!.params).toEqual(['2026-03-05', 'BDT', 0, 0, 900000]);
+    expect(cod[0]!.params).toEqual(['m-1', '2026-03-05', 'BDT', 0, 0, 900000]);
+  });
+
+  it('a COD event with no merchant writes nothing — unattributable money is not network money', async () => {
+    await consumer.handle(
+      message('CODCollected', { currency: 'BDT', expectedMinor: 5000, collectedMinor: 5000 }),
+    );
+    await consumer.handle(message('SettlementCompleted', { currency: 'BDT', netMinor: 5000 }));
+    expect(tableWrites('cod_summary')).toHaveLength(0);
   });
 
   it('ShipmentScanned with a hubCode counts volume; without one it skips', async () => {
