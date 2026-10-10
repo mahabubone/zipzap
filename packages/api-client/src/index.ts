@@ -635,6 +635,41 @@ export class ZipZapClient {
     };
   }
 
+  /**
+   * POST /v1/auth/token — sign in and receive the bearer token.
+   *
+   * For native and server-to-server clients only. `/v1/auth/login` sets an HttpOnly cookie and
+   * deliberately leaves the token out of the response body, because a browser console's script can
+   * read bodies — so an XSS would get the credential the cookie was there to protect. This endpoint
+   * is the other half of the same session: same service call, same audit, same cost, token in the
+   * body because a client with no browser has nowhere else to put it.
+   */
+  async loginToken(
+    email: string,
+    password: string,
+    merchantId?: string,
+  ): Promise<{
+    token: string;
+    tokenType: 'Bearer';
+    expiresInSeconds: number;
+    expiresAt: string;
+    merchantId: string;
+    merchantIds: ReadonlyArray<string>;
+  }> {
+    const { data } = await this.request('/v1/auth/token', {
+      method: 'POST',
+      body: { email, password, ...(merchantId ? { merchantId } : {}) },
+    });
+    return data as {
+      token: string;
+      tokenType: 'Bearer';
+      expiresInSeconds: number;
+      expiresAt: string;
+      merchantId: string;
+      merchantIds: ReadonlyArray<string>;
+    };
+  }
+
   /** GET /v1/me — what the server thinks this principal is. */
   async getMe(): Promise<Principal> {
     const { data } = await this.request<Principal>('/v1/me', { method: 'GET' });

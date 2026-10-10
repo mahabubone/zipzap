@@ -29,9 +29,16 @@ export function AuthScreen({ onSignIn }: { onSignIn: (s: RiderSession) => void }
     setBusy(true);
     setError(null);
     try {
+      // `/auth/token`, NOT `/auth/login`. A native app cannot hold a cookie, and `/auth/login`
+      // now deliberately omits the token from its body because a browser console's script could
+      // read it there. The token flow exists for exactly this caller.
       const probe = new ZipZapClient({ baseUrl });
-      const session = await probe.login(email.trim(), password);
-      onSignIn({ riderId: riderId.trim(), token: session.token });
+      const session = await probe.loginToken(email.trim(), password);
+      onSignIn({
+        riderId: riderId.trim(),
+        token: session.token,
+        expiresAt: session.expiresAt,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {

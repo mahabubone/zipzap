@@ -19,6 +19,11 @@ import { ZipZapClient } from '@zipzap/api-client';
 export interface RiderSession {
   riderId: string;
   token?: string;
+  /**
+   * ISO 8601 expiry of the token. Persisted so a cold start can refuse a dead session rather than
+   * sending it and getting a 401 the rider cannot explain.
+   */
+  expiresAt?: string;
   apiKey?: string;
 }
 

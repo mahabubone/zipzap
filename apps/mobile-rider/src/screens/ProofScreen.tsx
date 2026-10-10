@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Badge, Button, Card, Field, Muted, Title } from '../components/ui.tsx';
 import { colors, radius, space } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
+import { JobMissing } from '../navigation.tsx';
 import type { JobRow } from './JobsScreen.tsx';
 
 /**
@@ -34,14 +35,14 @@ interface Captured {
 export function ProofScreen({
   riderClient,
   job,
-  onBack,
   onQueued,
 }: {
   riderClient: RiderClient;
-  job: JobRow;
-  onBack: () => void;
+  /** Null when the route's `{ jobId }` no longer resolves. See `JobDetailScreen`. */
+  job: JobRow | null;
   onQueued: (pending: number) => void;
 }) {
+  if (job === null) return <JobMissing />;
   const [code, setCode] = useState('');
   const [issued, setIssued] = useState<{ code: string; expiresAt: string } | null>(null);
   const [photo, setPhoto] = useState<Captured | null>(null);
@@ -141,8 +142,6 @@ export function ProofScreen({
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Button label="‹ All jobs" onPress={onBack} tone="ghost" />
-
       <Card>
         <Title>Proof of delivery</Title>
         <Muted>{job.title}</Muted>

@@ -1,152 +1,226 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type QueueStorage } from './src/offline/command-queue.ts';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  AppState,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  focusManager,
+  onlineManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
+import NetInfo from '@react-native-community/netinfo';
+import {
+  clearSession,
+  queueStorage,
+  readSession,
+  writeSession,
+  type StoredSession,
+} from './src/storage.ts';
 import { RiderClient, type RiderSession } from './src/rider-client.ts';
-import { TabBar, type Tab } from './src/components/TabBar.tsx';
+import { RiderNavigator } from './src/navigation.tsx';
 import { AuthScreen } from './src/screens/AuthScreen.tsx';
-import { JobsScreen, type JobRow } from './src/screens/JobsScreen.tsx';
-import { JobDetailScreen } from './src/screens/JobDetailScreen.tsx';
-import { ProofScreen } from './src/screens/ProofScreen.tsx';
-import { SyncScreen } from './src/screens/SyncScreen.tsx';
-import { ProfileScreen } from './src/screens/ProfileScreen.tsx';
-import { colors } from './src/theme.ts';
+import { useAutoSync } from './src/hooks/useAutoSync.ts';
+import { colors, space, typography } from './src/theme.ts';
 
 /**
- * The device's key-value store. In a production build this is AsyncStorage:
+ * The rider app's composition root.
  *
- *   import AsyncStorage from '@react-native-async-storage/async-storage';
+ * This file is wiring and nothing else: read the session, build the client, hand the graph its
+ * pieces. It decides nothing, and that is the point — every decision it depends on lives in
+ * `src/offline/command-queue.ts` or `src/hooks/useAutoSync.ts`, both of which are testable without a
+ * phone.
  *
- * The OfflineQueue takes a `QueueStorage`-shaped port (see
- * src/offline/command-queue.ts), so the same queue runs here, in the
- * `verify-queue.mjs` proof, and in any future persistence layer. Swapping the
- * implementation is a one-line change at the composition root below.
+ * The queue's storage is AsyncStorage through the `QueueStorage` port, so the queue stays
+ * framework-free and keeps running inside `verify-queue.mjs`. The session token is SecureStore, not
+ * this file: the root wires two stores, it holds neither.
  */
-class MemoryStorage implements QueueStorage {
-  private readonly store = new Map<string, string>();
 
-  async getItem(key: string): Promise<string | null> {
-    return this.store.get(key) ?? null;
-  }
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-  async setItem(key: string, value: string): Promise<void> {
-    this.store.set(key, value);
-  }
+/**
+ * TanStack Query's two managers, wired to React Native's own lifecycle events.
+ *
+ * Done once at boot rather than per-provider: `onlineManager` and `focusManager` are module-level
+ * singletons, so setting them twice would replace the listener rather than add one, and the second
+ * registration would silently win.
+ */
+function wireQueryToConnectivity(): void {
+  // Without this the client considers itself online forever, so `JobsScreen` retries into a dead
+  // basement and the rider gets a "could not load" that never clears.
+  //
+  // `setEventListener` returns void and replaces the previous listener, so this is wired once at
+  // boot rather than per-provider — a second registration would not stack, it would win.
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => {
+      setOnline(state.isConnected === true && state.isInternetReachable !== false);
+    }),
+  );
+
+  // A screen that is not focused must not refetch on a reconnect: the rider is looking at one
+  // screen, and three waking at once is battery the shift cannot spare.
+  const onChange = (state: string) => focusManager.setFocused(state === 'active');
+  AppState.addEventListener('change', onChange);
 }
-
-const storage = new MemoryStorage();
 
 export default function App() {
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: false, staleTime: 1000 * 60 * 5 },
+          queries: {
+            retry: 1,
+            staleTime: 1000 * 60 * 5,
+            // A refetch on reconnect is the point: the queue already holds the write safely, and
+            // the rider wants the server's answer as soon as it is available.
+            refetchOnReconnect: true,
+          },
         },
       }),
   );
-  const [booted, setBooted] = useState(false);
+  /**
+   * `undefined` = still reading storage, `null` = no stored session, otherwise there is one.
+   *
+   * Three states rather than two, because "still loading" and "not signed in" render different
+   * things and collapsing them sends a signed-in rider to the login form for the first frame.
+   */
+  const [stored, setStored] = useState<StoredSession | null | undefined>(undefined);
   const [client, setClient] = useState<RiderClient | null>(null);
-  const [tab, setTab] = useState<Tab>('jobs');
-  const [openJob, setOpenJob] = useState<JobRow | null>(null);
-  const [provingJob, setProvingJob] = useState<JobRow | null>(null);
   const [pending, setPending] = useState(0);
+  /** A storage failure is a rendering problem, not an auth one: the rider did nothing wrong. */
+  const [bootError, setBootError] = useState<string | null>(null);
 
+  // Once, at boot: the query managers are module-level singletons.
   useEffect(() => {
-    // A real build reads the saved session from SecureStore. Until then there is
-    // no session, so the app always boots to the auth screen.
-    setBooted(true);
+    wireQueryToConnectivity();
   }, []);
 
-  if (!booted) {
+  useEffect(() => {
+    (async () => {
+      try {
+        const session = await readSession();
+        setStored(session);
+        if (session !== null) setClient(await buildClient(session, setPending));
+      } catch (error) {
+        setBootError(error instanceof Error ? error.message : String(error));
+      }
+    })();
+  }, []);
+
+  const signIn = useCallback(async (riderSession: RiderSession) => {
+    const meta: StoredSession['meta'] = {
+      riderId: riderSession.riderId,
+      credentialKind: riderSession.apiKey === undefined ? 'bearer' : 'apikey',
+      expiresAt: riderSession.expiresAt ?? null,
+    };
+    const session: StoredSession = {
+      meta,
+      token: riderSession.token ?? null,
+      expired: false,
+    };
+    await writeSession(meta, session.token);
+    setStored(session);
+    setClient(await buildClient(session, setPending));
+  }, []);
+
+  const signOut = useCallback(async () => {
+    // Clears the token first: a sign-out that fails part-way must not leave the rider holding a
+    // credential the app believes is gone.
+    await clearSession();
+    setStored(null);
+    setClient(null);
+    setPending(0);
+  }, []);
+
+  // Auto-sync needs a signed session to sync for; before then there is nothing to flush.
+  const autoSync = useAutoSync(client, setPending);
+
+  if (stored === undefined) {
+    return <Boot />;
+  }
+
+  if (bootError !== null) {
+    // "Continue" rather than "Retry": storage does not become readable by trying again, and a rider
+    // must be able to continue signed out instead of being trapped on a spinner.
     return (
-      <View style={styles.boot}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <Broken
+        message={bootError}
+        onContinue={() => {
+          setBootError(null);
+          setStored(null);
+        }}
+      />
     );
   }
 
-  const signIn = (session: RiderSession) => {
-    const next = new RiderClient(
-      storage,
-      session,
-      process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
-    );
-    setClient(next);
-    setTab('jobs');
-    setOpenJob(null);
-    setProvingJob(null);
-    next.queue.pending().then((rows) => setPending(rows.length));
-  };
-
-  const signOut = () => {
-    setClient(null);
-    setTab('jobs');
-    setOpenJob(null);
-    setProvingJob(null);
-    setPending(0);
-  };
+  if (client === null) {
+    return <AuthScreen onSignIn={signIn} />;
+  }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
-      <SafeAreaView style={styles.container}>
-        {!client ? (
-          <AuthScreen onSignIn={signIn} />
-        ) : (
-          <View style={styles.shell}>
-            <View style={styles.body}>
-              {tab === 'jobs' ? (
-                provingJob ? (
-                  <ProofScreen
-                    riderClient={client}
-                    job={provingJob}
-                    onBack={() => setProvingJob(null)}
-                    onQueued={setPending}
-                  />
-                ) : openJob ? (
-                  <JobDetailScreen
-                    riderClient={client}
-                    job={openJob}
-                    onBack={() => setOpenJob(null)}
-                    onQueued={setPending}
-                    onCaptureProof={() => setProvingJob(openJob)}
-                  />
-                ) : (
-                  <JobsScreen riderClient={client} onOpenJob={setOpenJob} />
-                )
-              ) : tab === 'sync' ? (
-                <SyncScreen riderClient={client} onSynced={setPending} />
-              ) : (
-                <ProfileScreen riderClient={client} onSignOut={signOut} />
-              )}
-            </View>
-            <TabBar
-              tab={tab}
-              pending={pending}
-              onTab={(next) => {
-                setTab(next);
-                if (next !== 'jobs') {
-                  setOpenJob(null);
-                  setProvingJob(null);
-                }
-              }}
-            />
-          </View>
-        )}
-      </SafeAreaView>
-    </QueryClientProvider>
+    /* SafeAreaProvider must sit above the navigator, not inside a screen: the insets it publishes
+       are what the tab bar and the stack header read to avoid drawing under the notch and the
+       gesture bar. The old hand-rolled SafeAreaView wrapped the whole tree instead, which got the
+       top inset right and the bottom one wrong. */
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <RiderNavigator
+          riderClient={client}
+          pending={pending}
+          onPendingChange={setPending}
+          onSignOut={signOut}
+          autoSync={autoSync}
+        />
+      </QueryClientProvider>
+    </SafeAreaProvider>
+  );
+}
+
+async function buildClient(
+  stored: StoredSession,
+  onRestored: (pending: number) => void,
+): Promise<RiderClient> {
+  const session: RiderSession = {
+    riderId: stored.meta.riderId,
+    ...(stored.token !== null ? { token: stored.token } : {}),
+  };
+  const client = new RiderClient(queueStorage, session, API_URL);
+  // Restore the badge before anything renders from it, so a rider who opens the app after a shift
+  // sees the count they left rather than a zero that is only right until the next query.
+  void client.queue
+    .pending()
+    .then((rows) => onRestored(rows.length))
+    .catch(() => undefined);
+  return client;
+}
+
+function Boot() {
+  return (
+    <View style={styles.boot}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+}
+
+function Broken({ message, onContinue }: { message: string; onContinue: () => void }) {
+  // A TouchableOpacity rather than the app's Button, which lives in src/components and pulls the
+  // palette in behind it — a boot-failure screen has no business being styled like a screen.
+  return (
+    <View style={styles.boot}>
+      <Text style={[typography.body, styles.brokenText]}>{message}</Text>
+      <TouchableOpacity onPress={onContinue} accessibilityRole="button">
+        <Text style={typography.label}>Continue</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  boot: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-  },
-  shell: { flex: 1 },
-  body: { flex: 1 },
+  boot: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
+  brokenText: { color: colors.danger, textAlign: 'center', marginBottom: space.md },
 });

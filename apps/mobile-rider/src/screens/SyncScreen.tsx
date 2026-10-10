@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from '../hooks/useFocusEffect.ts';
+import { useFocusEffect } from '@react-navigation/native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Button, Card, Muted, Title } from '../components/ui.tsx';
 import { colors, space } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
+import type { AutoSync } from '../hooks/useAutoSync.ts';
 import type { Settled } from '../offline/command-queue.ts';
 
 /**
@@ -17,9 +18,11 @@ import type { Settled } from '../offline/command-queue.ts';
 export function SyncScreen({
   riderClient,
   onSynced,
+  autoSync,
 }: {
   riderClient: RiderClient;
   onSynced: (pending: number) => void;
+  autoSync: AutoSync;
 }) {
   const [pending, setPending] = useState<
     Array<{ deviceSequence: number; commandType: string; believed: string }>
@@ -42,22 +45,40 @@ export function SyncScreen({
     setCapWarning(await riderClient.queue.capWarning());
   }, [riderClient]);
 
-  useFocusEffect(refresh);
+  // React Navigation's own focus hook, not the app's shim. The shim existed because there was no
+  // navigator to fire a focus event; now there is, and the shim's `useIsFocused` is the very thing
+  // this wraps.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh]),
+  );
 
+  /**
+   * Sync now, bypassing the auto-sync's connectivity gate.
+   *
+   * Deliberately not `autoSync.syncNow()` alone: the rider pressing a button wants the queue state
+   * as well as the flush, and a flush that succeeded without refreshing the list would show
+   * "Pending (3)" with nothing pending.
+   */
   const syncNow = async () => {
     if (busy) return;
     setBusy(true);
     setMessage(null);
+    // Captured before the flush: it is the count the rider pressed the button with, and reporting it
+    // afterwards would say "synced 0" for a queue that was empty when they tapped.
+    const before = pending.length;
     try {
-      const result = await riderClient.sync();
+      await autoSync.syncNow();
       setMessage(
-        result.sent === 0
+        before === 0
           ? 'Nothing to sync — the queue is already empty.'
-          : `Synced ${result.sent} command${result.sent === 1 ? '' : 's'}.`,
+          : `Synced ${before} command${before === 1 ? '' : 's'}.`,
       );
       await refresh();
-      onSynced(result.queueRemaining);
     } catch (err) {
+      // The queue is untouched on a failure, so the rider can walk to where there is signal. Rule 3
+      // of the queue: refusing is safe, losing a scan is not.
       setMessage(err instanceof Error ? err.message : 'Sync failed — the queue is untouched.');
     } finally {
       setBusy(false);
@@ -67,6 +88,56 @@ export function SyncScreen({
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Title>Sync</Title>
+
+      {/* Connectivity first: the rider's question on opening this screen is "will it sync", and
+          answering it after the queue state means they look at a list they cannot act on. */}
+      <Card>
+        {autoSync.offline ? (
+          <>
+            <Badge label="OFFLINE" tone="warning" />
+            <View style={styles.gap} />
+            <Muted>
+              Nothing is leaving this device until signal returns. Everything you scan is queued and
+              safe — it will flush itself when you are back online.
+            </Muted>
+          </>
+        ) : (
+          <>
+            <Badge
+              label={autoSync.syncing ? 'SYNCING' : 'ONLINE'}
+              tone={autoSync.syncing ? 'info' : 'success'}
+            />
+            <View style={styles.gap} />
+            <Muted>
+              {autoSync.syncing
+                ? 'Flushing the queue now.'
+                : 'Connected. New scans flush themselves as soon as signal returns.'}
+            </Muted>
+          </>
+        )}
+
+        {/* Retry visibility, only once it is actually retrying: a rider does not need to know about
+            attempt 1, but they do need to know when the app has given up and is waiting for them. */}
+        {autoSync.attempts > 0 ? (
+          <>
+            <View style={styles.gap} />
+            <Muted>
+              {autoSync.attempts >= 8
+                ? 'Sync tried 8 times and stopped. Tap Sync now when you have signal.'
+                : `Retrying (attempt ${autoSync.attempts} of 8).`}
+            </Muted>
+          </>
+        ) : null}
+      </Card>
+
+      {autoSync.lastError !== null ? (
+        <Card>
+          <Badge label="NEEDS A LOOK" tone="danger" />
+          <View style={styles.gap} />
+          <Muted>{autoSync.lastError}</Muted>
+        </Card>
+      ) : null}
+
       {capWarning ? (
         <Card>
           <Badge label="QUEUE NEARLY FULL" tone="warning" />

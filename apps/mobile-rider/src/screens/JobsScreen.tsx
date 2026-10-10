@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { JOBS_QUERY_KEY } from '../navigation.tsx';
 import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Badge, Card, Muted, Title } from '../components/ui.tsx';
 import { colors, space } from '../theme.ts';
@@ -23,11 +24,11 @@ export function JobsScreen({
   onOpenJob: (job: JobRow) => void;
 }) {
   const query = useQuery({
-    queryKey: ['rider-jobs', riderClient.riderId],
+    queryKey: [JOBS_QUERY_KEY],
     queryFn: () => riderClient.client.riderJobs(riderClient.riderId, 100),
   });
 
-  const jobs = toRows(query.data);
+  const jobs = toJobRows(query.data as RiderJobs | undefined);
 
   return (
     <View style={styles.screen}>
@@ -71,7 +72,13 @@ export function JobsScreen({
   );
 }
 
-/** One row in the merged feed. `kind` decides which actions the job screen offers. */
+/**
+ * One row in the merged feed. `kind` decides which actions the job screen offers.
+ *
+ * Exported because the job and proof screens resolve their route param back into this row — see
+ * `useJobFromRoute` in navigation.tsx. The alternative, passing the row as a navigation param, would
+ * copy a projection into navigation state where it goes stale silently.
+ */
 export interface JobRow {
   readonly key: string;
   readonly kind: 'pickup' | 'delivery';
@@ -83,27 +90,32 @@ export interface JobRow {
   readonly createdAt: string;
 }
 
-function toRows(
-  data:
-    | {
-        pickups: Array<{
-          id: string;
-          shipmentIds: string[];
-          status: string;
-          totalWeightGrams: number;
-          createdAt: string;
-        }>;
-        deliveries: Array<{
-          id: string;
-          shipmentId: string;
-          status: string;
-          attemptsMade: number;
-          lastFailureReason: string | null;
-          createdAt: string;
-        }>;
-      }
-    | undefined,
-): JobRow[] {
+/**
+ * The jobs query's cached value, as the raw server response.
+ *
+ * Exported so the navigation layer can re-read this query and resolve a route's `{ jobId }` back
+ * into a row, rather than carrying rows through navigation params.
+ */
+export interface RiderJobs {
+  readonly pickups: ReadonlyArray<{
+    id: string;
+    shipmentIds: readonly string[];
+    status: string;
+    totalWeightGrams: number;
+    createdAt: string;
+  }>;
+  readonly deliveries: ReadonlyArray<{
+    id: string;
+    shipmentId: string;
+    status: string;
+    attemptsMade: number;
+    lastFailureReason: string | null;
+    createdAt: string;
+  }>;
+}
+
+/** Projects the query into rows. Exported so the job screens do not re-implement the mapping. */
+export function toJobRows(data: RiderJobs | undefined): JobRow[] {
   if (!data || !Array.isArray(data.pickups) || !Array.isArray(data.deliveries)) return [];
   const pickups: JobRow[] = data.pickups.map((p) => ({
     key: `pickup-${p.id}`,

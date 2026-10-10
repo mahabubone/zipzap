@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Badge, Button, Card, Muted, Title } from '../components/ui.tsx';
 import { colors, space } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
+import type { AutoSync } from '../hooks/useAutoSync.ts';
 
 /**
  * Who the server thinks this device is. `getMe` is the check against a
@@ -13,9 +14,11 @@ import type { RiderClient } from '../rider-client.ts';
 export function ProfileScreen({
   riderClient,
   onSignOut,
+  autoSync,
 }: {
   riderClient: RiderClient;
   onSignOut: () => void;
+  autoSync: AutoSync;
 }) {
   const me = useQuery({
     queryKey: ['me'],

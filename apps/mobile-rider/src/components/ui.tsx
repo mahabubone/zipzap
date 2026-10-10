@@ -93,27 +93,24 @@ export function Badge({
   tone = 'neutral',
 }: {
   label: string;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+  tone?: 'neutral' | 'success' | 'info' | 'warning' | 'danger';
 }) {
-  const bg =
+  // A badge's two colours as one table rather than two ternary chains, so a new tone is one row.
+  // The old form had `bg` and `fg` decided separately, which is how a tone ends up with a
+  // background and no matching text.
+  const palette =
     tone === 'success'
-      ? colors.successBg
-      : tone === 'warning'
-        ? colors.warningBg
-        : tone === 'danger'
-          ? colors.dangerBg
-          : colors.neutralBg;
-  const fg =
-    tone === 'success'
-      ? colors.success
-      : tone === 'warning'
-        ? colors.warning
-        : tone === 'danger'
-          ? colors.danger
-          : colors.textMuted;
+      ? { bg: colors.successBg, fg: colors.success }
+      : tone === 'info'
+        ? { bg: colors.neutralBg, fg: colors.text }
+        : tone === 'warning'
+          ? { bg: colors.warningBg, fg: colors.warning }
+          : tone === 'danger'
+            ? { bg: colors.dangerBg, fg: colors.danger }
+            : { bg: colors.neutralBg, fg: colors.textMuted };
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Text style={[styles.badgeLabel, { color: fg }]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: palette.bg }]}>
+      <Text style={[styles.badgeLabel, { color: palette.fg }]}>{label}</Text>
     </View>
   );
 }

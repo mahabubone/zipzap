@@ -119,8 +119,15 @@ await page.route('**/v1/**', async (route) => {
   const url = route.request().url();
   const json = (body) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-  if (url.endsWith('/v1/auth/login') && route.request().method() === 'POST') {
-    return json({ token: 'shot-token', expiresAt: `${DAY}T18:00:00.000Z`, tokenType: 'Bearer', merchantId: 'm-1', merchantIds: ['m-1'] });
+  if (url.endsWith('/v1/auth/token') && route.request().method() === 'POST') {
+    return json({
+      token: 'shot-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 43200,
+      expiresAt: `${DAY}T18:00:00.000Z`,
+      merchantId: 'm-1',
+      merchantIds: ['m-1'],
+    });
   }
   if (url.includes('/v1/riders/') && url.includes('/jobs')) return json(JOBS);
   if (url.includes('/proof/code') && route.request().method() === 'POST') {
@@ -193,7 +200,9 @@ await page.getByRole('button', { name: 'Queue pickup scan' }).click();
 await page.waitForTimeout(600);
 await shoot('job-pickup-queued');
 
-await page.getByRole('button', { name: '‹ All jobs' }).click();
+// No manual back button: React Navigation's stack header renders one. Clicking it is the
+// same interaction a rider makes, which is the point of using a real navigator.
+await page.getByRole('button', { name: 'Jobs' }).first().click();
 await settle();
 // The delivery with one prior attempt → reason chips + COD form.
 await page.getByText(/Delivery 77777777/).click();
