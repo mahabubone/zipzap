@@ -7,7 +7,8 @@ import { NotificationConsumer } from './notification.consumer.ts';
  * What these prove: unmapped types are ignored; events without shipment identity
  * are ignored, never fatal; unknown shipments are ignored; the same outbox event
  * redelivered converges on the existing message row (duplicate); malformed
- * payloads never throw.
+ * payloads never throw; and a merchant who opted out of an event gets no message
+ * for it — with no row left behind in their history.
  */
 
 function message(type: string, data: Record<string, unknown>, id = 'evt-8') {
@@ -34,16 +35,23 @@ describe('NotificationConsumer fan-out', () => {
   const findMessageByDedupe = vi.fn();
   const insertMessage = vi.fn();
   const findRecipient = vi.fn();
+  const findMerchantId = vi.fn();
+  const findPreferences = vi.fn();
 
   beforeEach(() => {
     added.length = 0;
     findMessageByDedupe.mockReset();
     insertMessage.mockReset();
     findRecipient.mockReset();
+    findMerchantId.mockReset();
+    findPreferences.mockReset();
+    // Default-on: an account that has never touched its preferences is an account that gets told.
+    findMerchantId.mockResolvedValue('m-1');
+    findPreferences.mockResolvedValue([]);
     const notificationsDs = {
       transaction: (fn: (manager: unknown) => Promise<unknown>) => fn({}),
     };
-    const repository = { findMessageByDedupe, insertMessage };
+    const repository = { findMessageByDedupe, insertMessage, findPreferences };
     const queue = {
       add: vi.fn(async (name: string, data: never, opts: never) => {
         added.push({
@@ -53,7 +61,7 @@ describe('NotificationConsumer fan-out', () => {
         });
       }),
     };
-    const lookup = { findRecipient };
+    const lookup = { findRecipient, findMerchantId };
     consumer = new NotificationConsumer(
       notificationsDs as never,
       repository as never,
@@ -118,5 +126,47 @@ describe('NotificationConsumer fan-out', () => {
     });
     expect(outcome).toBe('processed');
     expect(added).toHaveLength(1);
+  });
+
+  it('sends nothing at all for an event the merchant has opted out of', async () => {
+    findRecipient.mockResolvedValue({ name: 'R', phone: '+8801712345678' });
+    findMessageByDedupe.mockResolvedValue(null);
+    findPreferences.mockResolvedValue([{ eventType: 'DeliveryCompleted', enabled: false }]);
+
+    const outcome = await consumer.handle(message('DeliveryCompleted', { shipmentId: 's-1' }));
+
+    expect(outcome).toBe('ignored');
+    expect(added).toHaveLength(0);
+    // The message row matters as much as the send: a muted event that still wrote history would
+    // show a merchant messages they told us not to send.
+    expect(insertMessage).not.toHaveBeenCalled();
+  });
+
+  it('opts out of one event without muting the others', async () => {
+    findRecipient.mockResolvedValue({ name: 'R', phone: '+8801715678' });
+    findMessageByDedupe.mockResolvedValue(null);
+    insertMessage.mockImplementation(async (_m: unknown, e: { id: string }) => ({ id: e.id }));
+    findPreferences.mockResolvedValue([{ eventType: 'DeliveryCompleted', enabled: false }]);
+
+    expect(await consumer.handle(message('DeliveryCompleted', { shipmentId: 's-1' }))).toBe(
+      'ignored',
+    );
+    expect(
+      await consumer.handle(message('DeliveryOutForDelivery', { shipmentId: 's-1' }, 'evt-10')),
+    ).toBe('processed');
+    expect(added).toHaveLength(1);
+  });
+
+  it('does not notify when the parcel has no owner to have expressed a preference', async () => {
+    findRecipient.mockResolvedValue({ name: 'R', phone: '+8801712345678' });
+    findMessageByDedupe.mockResolvedValue(null);
+    findMerchantId.mockResolvedValue(null);
+
+    const outcome = await consumer.handle(message('DeliveryCompleted', { shipmentId: 's-1' }));
+
+    // Sending on a failed lookup is the wrong default: the message is irreversible and the
+    // preference that would have stopped it may well exist on the other side.
+    expect(outcome).toBe('ignored');
+    expect(added).toHaveLength(0);
   });
 });

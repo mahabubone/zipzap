@@ -40,7 +40,7 @@ Legend: ●●● strong ●●○ present ●○○ thin ○○○ absent · **
 | Settlement ledger                 |       ●●○        |            ●●●            |        ●●●        |             ●●● append-only              |
 | Self-serve payout request         |       ●●○        |            ●○○            |        ●●●        |             ●●● backend only             |
 | Staff roles & permissions         |  ○○○ unverified  |            ●●●            | ●○○ account-level |                   ○○○                    |
-| Notification preferences          |       ●●○        |       ●●○ SMS+email       |        ○○○        |                   ○○○                    |
+| Notification preferences          |       ●●○        |       ●●○ SMS+email       |        ○○○        |          ●●○ 3 events, enforced          |
 | Push notifications                |       ●●●        | ○○○ capability, unexposed |        ○○○        |                   ○○○                    |
 | OpenAPI spec                      |       ○○○        |  ○○○ docs exist, no spec  |     ○○○ none      |              ●●● generated               |
 | Sandbox                           |       ○○○        |         ●●● live          |        ○○○        |              ●○○ fakes only              |

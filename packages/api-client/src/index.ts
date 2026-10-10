@@ -1210,6 +1210,50 @@ export class ZipZapClient {
     return data;
   }
 
+  /* ---------------------------------------------------------------- notification preferences */
+
+  /**
+   * GET /v1/notification-preferences — which parcel events this merchant's customers hear about.
+   *
+   * The server answers for every event, not only the stored ones, so the screen can show a toggle
+   * per event and mark the ones still on their default.
+   */
+  async notificationPreferences(): Promise<
+    Array<{
+      eventType: string;
+      templateName: string;
+      enabled: boolean;
+      isDefault: boolean;
+    }>
+  > {
+    const { data } = await this.request<
+      Array<{
+        eventType: string;
+        templateName: string;
+        enabled: boolean;
+        isDefault: boolean;
+      }>
+    >('/v1/notification-preferences', { method: 'GET' });
+    return data;
+  }
+
+  /** PUT /v1/notification-preferences — opt one event out, or back in. */
+  async setNotificationPreference(
+    eventType: string,
+    enabled: boolean,
+  ): Promise<{ eventType: string; templateName: string; enabled: boolean; isDefault: boolean }> {
+    const { data } = await this.request<{
+      eventType: string;
+      templateName: string;
+      enabled: boolean;
+      isDefault: boolean;
+    }>('/v1/notification-preferences', {
+      method: 'PUT',
+      body: { eventType, enabled },
+    });
+    return data;
+  }
+
   /* ---------------------------------------------------------------- developer & webhooks
    *
    * Developer portal & webhook management for merchants.

@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppCodRouteImport } from './routes/app/cod'
 import { Route as AppMoneyRouteImport } from './routes/app/money'
+import { Route as AppNotificationsRouteImport } from './routes/app/notifications'
 import { Route as AppPricingRouteImport } from './routes/app/pricing'
 import { Route as AppSettlementsRouteImport } from './routes/app/settlements'
 import { Route as AppShipmentsRouteImport } from './routes/app/shipments'
@@ -54,6 +55,11 @@ const AppCodRoute = AppCodRouteImport.update({
 const AppMoneyRoute = AppMoneyRouteImport.update({
   id: '/money',
   path: '/money',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPricingRoute = AppPricingRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/webhooks': typeof AppWebhooksRoute
   '/app': typeof AppIndexRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
   '/app/pricing': typeof AppPricingRoute
   '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/app/cod'
     | '/app/money'
+    | '/app/notifications'
     | '/app/pricing'
     | '/app/settlements'
     | '/app/shipments'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/app/cod'
     | '/app/money'
+    | '/app/notifications'
     | '/app/pricing'
     | '/app/webhooks'
     | '/app'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/app/cod'
     | '/app/money'
+    | '/app/notifications'
     | '/app/pricing'
     | '/app/settlements'
     | '/app/shipments'
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/money'
       fullPath: '/app/money'
       preLoaderRoute: typeof AppMoneyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/notifications': {
+      id: '/app/notifications'
+      path: '/notifications'
+      fullPath: '/app/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/pricing': {
@@ -371,6 +390,7 @@ const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
 interface AppRouteChildren {
   AppCodRoute: typeof AppCodRoute
   AppMoneyRoute: typeof AppMoneyRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
   AppPricingRoute: typeof AppPricingRoute
   AppSettlementsRoute: typeof AppSettlementsRouteWithChildren
   AppShipmentsRoute: typeof AppShipmentsRouteWithChildren
@@ -381,6 +401,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppCodRoute: AppCodRoute,
   AppMoneyRoute: AppMoneyRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
   AppPricingRoute: AppPricingRoute,
   AppSettlementsRoute: AppSettlementsRouteWithChildren,
   AppShipmentsRoute: AppShipmentsRouteWithChildren,

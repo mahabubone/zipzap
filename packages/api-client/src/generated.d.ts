@@ -1155,6 +1155,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which parcel notifications your customers receive
+         * @description Every event that can notify, answered either way. Absent means on: a merchant is opted out of an event by writing a row, never by leaving one out.
+         */
+        get: operations["NotificationPreferencesController_list"];
+        /**
+         * Opt one event out, or back in
+         * @description Setting enabled=true removes the row rather than storing "on", so absence stays the single way to say "default".
+         */
+        put: operations["NotificationPreferencesController_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hubs/scans": {
         parameters: {
             query?: never;
@@ -1294,7 +1318,7 @@ export interface components {
             events: string[];
         };
         CreateApiKeyDto: {
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "keys:manage")[];
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage")[];
         };
         CreateShipmentDto: {
             senderName: string;
@@ -1449,6 +1473,11 @@ export interface components {
             /** Format: uuid */
             approverId: string;
             note: string;
+        };
+        SetNotificationPreferenceDto: {
+            /** @enum {string} */
+            eventType: "ShipmentCreated" | "DeliveryOutForDelivery" | "DeliveryCompleted";
+            enabled: boolean;
         };
         HubScanDto: {
             /** Format: uuid */
@@ -2953,6 +2982,44 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationPreferencesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationPreferencesController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNotificationPreferenceDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

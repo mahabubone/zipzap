@@ -2038,6 +2038,46 @@
         ]
       }
     },
+    "/v1/notification-preferences": {
+      "get": {
+        "description": "Every event that can notify, answered either way. Absent means on: a merchant is opted out of an event by writing a row, never by leaving one out.",
+        "operationId": "NotificationPreferencesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Which parcel notifications your customers receive",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "put": {
+        "description": "Setting enabled=true removes the row rather than storing \"on\", so absence stays the single way to say \"default\".",
+        "operationId": "NotificationPreferencesController_set",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNotificationPreferenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Opt one event out, or back in",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/v1/hubs/scans": {
       "post": {
         "operationId": "HubScanController_scan",
@@ -2293,6 +2333,7 @@
                 "settlements:read",
                 "settlements:approve",
                 "webhooks:manage",
+                "notifications:manage",
                 "keys:manage"
               ]
             }
@@ -2854,6 +2895,26 @@
         "required": [
           "approverId",
           "note"
+        ]
+      },
+      "SetNotificationPreferenceDto": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "ShipmentCreated",
+              "DeliveryOutForDelivery",
+              "DeliveryCompleted"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eventType",
+          "enabled"
         ]
       },
       "HubScanDto": {

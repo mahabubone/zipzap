@@ -32,6 +32,10 @@ export const API_SCOPES = [
   'settlements:read',
   'settlements:approve',
   'webhooks:manage',
+  // Which messages a merchant's customers get. Its own scope because it is a statement about
+  // consent and cost, not about a parcel: reusing `shipments:write` would hand an operator who
+  // creates shipments the power to silence every delivery notification the account sends.
+  'notifications:manage',
   'keys:manage',
 ] as const;
 

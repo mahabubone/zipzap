@@ -24,7 +24,7 @@ One schema per module. The schema _is_ the boundary.
 | `cod`          | cod          | COD records, collection attempts                                                    |
 | `finance`      | finance      | ledger accounts, entries, settlements                                               |
 | `returns`      | returns      | return requests, approvals                                                          |
-| `notification` | notification | templates, messages, deliveries                                                     |
+| `notification` | notification | templates, messages, deliveries, merchant_preferences                               |
 | `support`      | support      | tickets, messages, status history                                                   |
 | `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                              |
 | `analytics`    | analytics    | projections only                                                                    |
@@ -146,6 +146,25 @@ The plan used to be a **request body field** on both `POST /v1/pricing/quote` an
 `POST /v1/shipments`, which meant any caller could name `"growth"` and be quoted the 1000bps
 discount. It is a column now, read through `MERCHANT_PLAN_LOOKUP` (rule 2: pricing may not open
 `merchant`). The backfill is `standard` — 0bps — so no existing merchant's price changed.
+
+## A preference is a row, and its absence is the answer
+
+`notification.merchant_preferences` (migration `1759000000045`) is `(merchant_id, event_type,
+enabled, updated_at)` keyed on `(merchant_id, event_type)`. Two decisions in it are not the
+obvious ones:
+
+**Absent means send.** A merchant is opted out by _writing_ a row. There is no `is_default`
+column and no row for a merchant who has never touched the screen. Defaulting off would silently
+stop every merchant being told where their parcels are, and nothing anywhere would report it —
+a failure with no symptom. Re-enabling **deletes** the row rather than storing `enabled = true`,
+so absence stays the single way to say "default" and the table never accumulates rows that say
+nothing.
+
+**The event vocabulary is imported, not retyped.** The `CHECK (event_type IN (...))` list is
+built from `NOTIFIABLE_EVENTS` in `modules/notification/rules/preferences.ts` — the same array the
+consumer reads and the DTO validates against. Hand-maintaining a second copy in SQL is how a
+fourth event ends up configurable in the UI and rejected by the database, or sent for everyone
+with no way to opt out.
 
 ## Append-only tables
 

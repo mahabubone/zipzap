@@ -14,22 +14,16 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import type { DataSource } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import type { Queue } from 'bullmq';
 import { NotificationRepository } from './notification.repository.ts';
 import { SHIPMENT_LOOKUP, type ShipmentLookup } from '../shipment/shipment.lookup.ts';
 import { renderTemplate, SMS_TEMPLATES } from './sms-templates.ts';
 import { dedupeKey } from './rules/channel.ts';
+import { TEMPLATE_OF, isEnabled } from './rules/preferences.ts';
 
 export const NOTIFICATION_CONSUMER = 'notification';
 export const NOTIFICATION_QUEUE = 'notifications';
-
-/** Internal outbox type -> template name. Parcel events only, for this slice. */
-const TEMPLATE_OF: Record<string, string> = {
-  ShipmentCreated: 'shipment.created',
-  DeliveryOutForDelivery: 'shipment.out_for_delivery',
-  DeliveryCompleted: 'shipment.delivered',
-};
 
 interface NotificationEnvelope {
   readonly id: string;
@@ -50,6 +44,31 @@ export class NotificationConsumer {
     @InjectQueue(NOTIFICATION_QUEUE) private readonly queue: Queue,
     @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
   ) {}
+
+  /**
+   * Whether this merchant still wants this event, read inside the caller's transaction.
+   *
+   * The lookup is one extra indexed read per event, which is the cheap way to keep a preference
+   * decision in the same transaction as the message it governs: a merchant who opts out while a
+   * batch is in flight either loses that message or keeps it, and both are defensible — what is not
+   * defensible is the two halves committing separately and a message existing that no preference
+   * ever allowed.
+   */
+  private async allowed(
+    manager: EntityManager,
+    shipmentId: string,
+    eventType: string,
+  ): Promise<boolean> {
+    const merchantId = await this.shipments.findMerchantId(shipmentId);
+    if (!merchantId) {
+      // An event about a parcel with no owner has no preference to honour. Sending to a customer
+      // because a lookup failed is the wrong default; skipping is invisible and reversible.
+      this.logger.warn({ shipmentId, eventType }, 'no merchant for shipment; not notifying');
+      return false;
+    }
+    const rows = await this.repository.findPreferences(manager, merchantId);
+    return isEnabled(rows, eventType);
+  }
 
   async handle(message: {
     subject: string;
@@ -109,6 +128,16 @@ export class NotificationConsumer {
         recipient.phone,
       );
       if (existing) return 'duplicate';
+
+      // After the dedupe check, before anything is written. Order matters: a muted event should
+      // leave no message row, or the merchant's own history shows messages they asked not to get.
+      if (!(await this.allowed(manager, shipmentId, envelope.type))) {
+        this.logger.warn(
+          { shipmentId, eventType: envelope.type },
+          'merchant opted out of this notification',
+        );
+        return 'ignored';
+      }
 
       const saved = await this.repository.insertMessage(manager, {
         id: randomUUID(),
