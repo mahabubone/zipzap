@@ -6,6 +6,10 @@
     "types": ["node"],
     "noEmitOnError": true
   },
+  /* `src/generated.d.ts` is a generated artifact, not a hand-written declaration, so it is not
+     expected to be typechecked by this config — its shape is asserted against the backend by
+     apps/backend/src/openapi.spec.ts, and tsc does not emit .d.ts inputs to outDir anyway
+     (the build copies it). */
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

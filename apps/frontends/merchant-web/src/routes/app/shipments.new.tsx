@@ -34,8 +34,6 @@ const ZONES = [
   'mymensingh',
 ] as const;
 
-const PLANS = ['standard', 'express', 'economy'] as const;
-
 interface Form {
   senderName: string;
   senderPhone: string;
@@ -49,7 +47,6 @@ interface Form {
   zone: string;
   remoteArea: boolean;
   fragile: boolean;
-  merchantPlan: string;
 }
 
 const EMPTY: Form = {
@@ -65,7 +62,6 @@ const EMPTY: Form = {
   zone: 'dhaka-metro',
   remoteArea: false,
   fragile: false,
-  merchantPlan: 'standard',
 };
 
 /** A fresh key per submission attempt, so a retry after a timeout cannot duplicate a
@@ -121,7 +117,6 @@ function NewShipment() {
       zone: form.zone,
       remoteArea: form.remoteArea,
       fragile: form.fragile,
-      merchantPlan: form.merchantPlan,
     };
     // `cod` rather than `codMinor`: the memo must also re-run when the field becomes
     // unusable, and that is the `null` case, which `codMinor` flattens to 0.
@@ -157,7 +152,6 @@ function NewShipment() {
           zone: draft.zone,
           remoteArea: draft.remoteArea,
           fragile: draft.fragile,
-          merchantPlan: draft.merchantPlan,
         })
         .then((q) => live && setQuote(q))
         .catch(() => live && setQuote(null))
@@ -190,7 +184,6 @@ function NewShipment() {
           zone: draft.zone,
           remoteArea: draft.remoteArea,
           fragile: draft.fragile,
-          merchantPlan: draft.merchantPlan,
         },
         idempotencyKey.current,
       );
@@ -348,14 +341,6 @@ function NewShipment() {
                   value={form.zone}
                   onChange={(e) => set('zone', e.target.value)}
                   options={ZONES.map((z) => ({ value: z, label: z }))}
-                />
-              </FormField>
-              <FormField label="Plan" htmlFor="plan">
-                <Select
-                  id="plan"
-                  value={form.merchantPlan}
-                  onChange={(e) => set('merchantPlan', e.target.value)}
-                  options={PLANS.map((p) => ({ value: p, label: p }))}
                 />
               </FormField>
             </div>

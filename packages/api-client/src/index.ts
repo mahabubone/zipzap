@@ -1,10 +1,15 @@
 /**
  * @zipzap/api-client — typed HTTP client for the ZipZap v1 API.
  *
- * `generated.d.ts` is the generated half (openapi-typescript output, never
- * hand-edited). This file is the handwritten half: authentication headers,
- * the §87 error envelope as a thrown Error, cursor pagination helpers, and
- * per-endpoint functions that bind generated request/response types.
+ * `generated.d.ts` is the generated half (openapi-typescript output from
+ * apps/backend/openapi.json, never hand-edited). Every response type below is
+ * bound to a schema in it — nothing here reads a live response to write down a
+ * shape by hand.
+ *
+ * This file is the half that cannot be generated, because it is behaviour
+ * rather than description: authentication headers, the §87 error envelope as a
+ * thrown Error, cursor pagination flattening, and the two CSV endpoints that
+ * must be read as text rather than parsed as JSON.
  *
  * Idempotency-Key is mandatory on: shipment create, bulk import, COD collect,
  * delivery confirm, settlement approve, rider offline sync (rule 9). Those
@@ -59,418 +64,87 @@ type ListQuery =
     ? { limit?: string; cursor?: string }
     : NonNullable<ShipmentPaths['get']['parameters']['query']>;
 
-export interface HubSummary {
-  readonly id: string;
-  readonly code: string;
-  readonly name: string;
-  readonly kind: string;
-  readonly networkZone: string | null;
-  readonly lng: number | null;
-  readonly lat: number | null;
-  /** Parcels currently waiting at this hub. 0 for an empty hub, never null. */
-  readonly countAtHub: number;
-}
-
-/** One parcel waiting at a hub. */
-export interface ParcelPresence {
-  readonly shipmentId: string;
-  readonly trackingCode: string;
-  readonly hubCode: string;
-  readonly lastScan: string;
-  readonly scannedAt: string;
-  /** Null once arrived — there is no further hub gesture for this parcel. */
-  readonly nextScan: string | null;
-}
-
-export interface HubWorkList {
-  readonly hub: HubSummary;
-  readonly parcels: ParcelPresence[];
-}
-
-export type HubScanKind = 'INBOUND' | 'SORT' | 'OUTBOUND' | 'DEPARTED' | 'ARRIVED';
-
-export interface HubScanInput {
-  readonly shipmentId: string;
-  readonly scan: HubScanKind;
-  readonly hubCode?: string | null;
-}
-
-export interface HubScanResult {
-  readonly shipmentId: string;
-  readonly scan: HubScanKind;
-  readonly status: string;
-  readonly hubCode: string | null;
-}
-
-export type ManifestEdge = 'seal' | 'dispatch' | 'receive' | 'reconcile';
-
-/**
- * Named because a screen has to switch on it — the hub console keys its legal-edge buttons off the
- * current status. Inlining the union at the field would force every caller to redeclare it, and the
- * redeclaration is where a sixth status would be forgotten.
- */
-export type ManifestStatus = 'DRAFT' | 'SEALED' | 'DISPATCHED' | 'RECEIVED' | 'RECONCILED';
-
-export interface ManifestSummary {
-  readonly id: string;
-  readonly code: string;
-  readonly tripId: string;
-  readonly status: ManifestStatus;
-}
-
-export interface ManifestDetail extends ManifestSummary {
-  readonly itemCount: number;
-  readonly items: ReadonlyArray<{ readonly shipmentId: string; readonly arrived: boolean }>;
-  /** 0 before RECEIVED — nobody has looked yet, which is not the same as nothing missing. */
-  readonly missingCount: number;
-}
-
-/* ---------------------------------------------------------------- control tower
+/* ------------------------------------------------------------------ response types
  *
- * The live map. Hand-declared for the same reason as everything else in this file: the controller
- * returns an interface, not a decorated DTO, so `openapi-typescript` has no schema to emit. Read off a
- * live response from a running backend.
+ * Thin aliases onto `generated.d.ts`. They exist so a call site can write
+ * `ShipmentSummary` in a React component instead of
+ * `components['schemas']['ShipmentSummaryDto']`, and so the name carries intent —
+ * `Principal` and `ShipmentSummary` are different things the server happens to
+ * describe in the same vocabulary.
+ *
+ * Before 2026-10-10 these were 32 hand-declared interfaces read off live
+ * responses, because controllers returned TypeScript interfaces and the spec had
+ * no response schemas at all. They now alias generated schemas, so a controller
+ * change that breaks one of them is a compile error here rather than a runtime
+ * surprise in a console.
  */
 
-/** One hub on the map. `lng`/`lat` are non-null because the controller drops hubs it cannot place —
- *  a marker nudged to a frame edge looks like a real position, so unplaceable hubs are not sent. */
-export interface MapHub {
-  readonly id: string;
-  readonly code: string;
-  readonly name: string;
-  readonly kind: string;
-  readonly networkZone: string | null;
-  readonly lng: number;
-  readonly lat: number;
-  readonly parcelsWaiting: number;
-}
+type Schemas = components['schemas'];
 
-/** One rider on the map, with the age of the fix — an operator needs it to know whether to believe the dot. */
-export interface MapRider {
-  readonly id: string;
-  readonly displayName: string;
-  readonly status: string;
-  readonly lng: number;
-  readonly lat: number;
-  readonly staleSeconds: number;
-  readonly currentJobId: string | null;
-}
+export type HubSummary = Schemas['HubSummaryDto'];
+export type HubWorkList = Schemas['HubParcelsViewDto'];
+export type HubScanResult = Schemas['HubScanResultDto'];
+export type HubScanInput = Schemas['HubScanDto'];
+export type HubScanKind = Schemas['HubScanDto']['scan'];
+/** One parcel waiting at a hub, from the hub console's work list. */
+export type ParcelPresence = Schemas['ParcelPresenceDto'];
+export type ManifestDetail = Schemas['ManifestDetailDto'];
+export type MapHub = Schemas['MapHubDto'];
+export type MapRider = Schemas['MapRiderDto'];
+export type NetworkMap = Schemas['NetworkMapDto'];
+export type Principal = Schemas['ApiPrincipalResponseDto'];
+export type ShipmentSummary = Schemas['ShipmentSummaryDto'];
+export type TimelineEntry = Schemas['TimelineEntryDto'];
+export type ShipmentDetail = Schemas['ShipmentDetailDto'];
+export type CreatedShipment = Schemas['CreatedShipmentDto'];
+export type Quote = Schemas['QuoteResponseDto'];
+export type RateCard = Schemas['RateCardResponseDto'];
+export type BalanceLine = Schemas['BalanceLineDto'];
+export type MerchantBalance = Schemas['MerchantBalanceDto'];
+export type CodException = Schemas['CodExceptionDto'];
+export type StatementLine = Schemas['StatementLineDto'];
+export type SettlementStatement = Schemas['SettlementStatementDto'];
+export type Coverage = Schemas['CoverageCheckDto'];
+export type LiveCounts = Schemas['LiveCountsDto'];
+export type PublicTracking = Schemas['PublicTrackingViewDto'];
+export type BulkPreviewRow = Schemas['BulkPreviewRowDto'];
+export type BulkJob = Schemas['BulkJobViewDto'];
+export type BulkPreview = Schemas['BulkPreviewDto'];
+export type CancelledShipment = Schemas['CancelledShipmentDto'];
+export type HeldShipment = Schemas['HeldShipmentDto'];
+export type IssuedDeliveryCode = Schemas['IssuedDeliveryCodeDto'];
+export type SubmittedDeliveryProof = Schemas['SubmittedDeliveryProofDto'];
+export type RiderPosition = Schemas['RiderPositionDto'];
+export type RiderJobs = Schemas['RiderJobsDto'];
+export type RiderPullResult = Schemas['PullResultDto'];
+export type RiderReplayResult = Schemas['ReplayResultDto'];
+export type RiderAckResult = Schemas['AckResultDto'];
+export type WebhookEndpoint = Schemas['EndpointViewDto'];
+export type CreatedWebhookEndpoint = Schemas['CreatedEndpointDto'];
+export type WebhookDeliveryRow = Schemas['DeliveryLogRowDto'];
+export type CreatedApiKey = Schemas['CreatedApiKeyDto'];
+export type MerchantSeries = Schemas['MerchantSeriesDto'];
+export type MerchantDayPoint = Schemas['MerchantDayPointDto'];
+export type NotificationPreference = Schemas['NotificationPreferenceDto'];
+export type ManifestSummary = Schemas['ManifestViewDto'];
+export type ManifestEdge = 'seal' | 'dispatch' | 'receive' | 'reconcile';
+export type ManifestStatus = Schemas['ManifestViewDto']['status'];
+export type SettlementSummary = Schemas['SettlementSummaryDto'];
 
-export interface NetworkMap {
-  readonly hubs: readonly MapHub[];
-  readonly riders: readonly MapRider[];
-  /** Riders with no ping yet. Counted, never plotted. */
-  readonly ridersWithoutPosition: number;
-  readonly generatedAt: string;
-}
-
-export interface Page<T> {
-  readonly data: T[];
+/** A cursor-paginated page, as `CursorPaginationDto` describes it. */
+export type Page<T> = {
+  readonly data: readonly T[];
   readonly nextCursor: string | null;
   readonly hasMore: boolean;
-}
-
-/* ---------------------------------------------------------------- response shapes
- * Hand-declared, not generated: controllers return interfaces rather than
- * decorated DTOs, so `openapi-typescript` has no schema to emit for these (see
- * createShipment's note). Each one below was read off a live response from a
- * running backend — if you change a controller's return shape, change it here
- * and in the contract test together.
- */
-
-/** GET /v1/me — the authenticated principal.
- *
- *  `merchantId` is the ACTIVE business; `merchantIds` is every business this
- *  login may act inside (one per membership). A session token carries the
- *  second field and an API key has exactly one entry — a machine credential
- *  must never be able to reach a second tenant. */
-export interface Principal {
-  readonly kind: 'human' | 'machine';
-  readonly subjectId: string;
-  readonly merchantId: string | null;
-  readonly merchantIds: ReadonlyArray<string>;
-  readonly scopes: ReadonlyArray<string>;
-  readonly credentialId: string;
-  readonly rateLimitPerMin?: number | null;
-}
-
-/** One row of GET /v1/shipments */
-export interface ShipmentSummary {
-  readonly id: string;
-  readonly trackingCode: string;
-  readonly status: string;
-  readonly merchantReference: string | null;
-  readonly codAmountMinor: number;
-  readonly codCurrency: string;
-  /** Priced-against zone. Null for rows created before the column existed. */
-  readonly zone: string | null;
-  readonly createdAt: string;
-}
-
-/** One entry of the merchant timeline. Distinct from the PUBLIC tracker: that
- *  one reads `public_timeline`, which has no actor and no metadata, so it cannot
- *  leak them by a filter mistake. These fields are merchant-only by design. */
-export interface TimelineEntry {
-  readonly eventType: string;
-  readonly occurredAt: string;
-  readonly actorType: string;
-  readonly metadata: Readonly<Record<string, unknown>>;
-  /** Non-null when this row corrects an earlier one; corrections never edit. */
-  readonly correctsEventId: string | null;
-}
-
-/** GET /v1/shipments/:id */
-export interface ShipmentDetail extends ShipmentSummary {
-  readonly senderName: string;
-  readonly senderPhone: string;
-  readonly senderAddress: string;
-  readonly recipientName: string;
-  readonly recipientPhone: string;
-  readonly recipientAddress: string;
-  readonly parcelWeightGrams: number;
-  readonly parcelDescription: string;
-  readonly pricingVersion: number;
-  /**
-   * Oldest first. Scoped to the merchant — carries the actor and the hub/rider
-   * metadata that the public projection deliberately withholds.
-   */
-  readonly timeline: ReadonlyArray<TimelineEntry>;
-}
-
-/** POST /v1/shipments */
-export interface CreatedShipment {
-  readonly id: string;
-  readonly trackingCode: string;
-  readonly status: string;
-  readonly createdAt: string;
-  readonly replayed: boolean;
-}
-
-/** One priced line of POST /v1/pricing/quote. Money is integer minor units. */
-export interface QuoteLine {
-  readonly kind: string;
-  readonly label: string;
-  readonly amount: { readonly amountMinor: number; readonly currency: string };
-}
-
-/** POST /v1/pricing/quote — what the parcel will cost, before committing.
- *
- *  `version` is the frozen pricing version the quote was computed from. Send it
- *  back on create? No — the server prices at creation against the current
- *  version, and this is a preview. A quote is not a reservation, which is why
- *  the create screen must label it as an estimate. */
-export interface Quote {
-  readonly version: number;
-  readonly currency: string;
-  readonly lines: ReadonlyArray<QuoteLine>;
-  readonly total: { readonly amountMinor: number; readonly currency: string };
-}
-
-/** One row of GET /v1/settlements. The itemised version is `SettlementStatement`, by id. */
-export interface SettlementSummary {
-  readonly id: string;
-  readonly reference: string;
-  readonly status: string;
-  readonly frozenNetMinor: number;
-  readonly currency: string;
-  readonly createdAt: string;
-}
+};
 
 /**
- * GET /v1/pricing/rate-card — the card, as THIS merchant's rates.
- *
- * `plan` is resolved from the merchant record, not requested. It used to be a body field on
- * POST /quote, which meant a caller could name the plan with the best discount and be quoted it.
+ * POST /v1/shipments/:id/{hold,release,cancel,exception} — three of the four
+ * machine edges return a different envelope, so there is no single `ActionResult`
+ * type to alias. Named because a screen has to switch on it.
  */
-export interface RateCard {
-  readonly version: number;
-  readonly currency: string;
-  readonly plan: string;
-  readonly baseFeeMinor: number;
-  readonly perKgMinor: number;
-  readonly codFeeBps: number;
-  readonly remoteAreaFeeMinor: number;
-  readonly fragileFeeMinor: number;
-  readonly packagingFeesMinor: Readonly<Record<string, number>>;
-  readonly taxBps: number;
-  /** Zero is a real answer and is returned rather than omitted. */
-  readonly planDiscountBps: number;
-  /** Worked examples, so the coefficients above are readable without holding a parcel. */
-  readonly examples: ReadonlyArray<{ readonly label: string; readonly totalMinor: number }>;
-}
-
-/**
- * GET /v1/finance/balance — one derived number, with everything needed to argue with it.
- *
- * `balanceMinor` is THE figure. `lines` is why it is that figure, and `blocked` is why money is not
- * moving. A balance without a breakdown is a number nobody can question.
- */
-/** One grouped line of the breakdown. Several ledger rows roll up into one of these. */
-export interface BalanceLine {
-  readonly type: string;
-  readonly direction: 1 | -1;
-  readonly amountMinor: number;
-  readonly entries: number;
-}
-
-export interface MerchantBalance {
-  readonly merchantId: string;
-  readonly balanceMinor: number;
-  readonly currency: string;
-  /** The exact instant it was true. A balance without one is a rumour. */
-  readonly asOf: string;
-  readonly lines: ReadonlyArray<BalanceLine>;
-  readonly blocked: ReadonlyArray<{ readonly status: string; readonly count: number }>;
-  /** null when nothing is in the way. */
-  readonly blockedReason: string | null;
-  readonly nextSettlement: { readonly reference: string; readonly netMinor: number } | null;
-}
-
-/**
- * GET /v1/cod/exceptions — one line of the reconciliation work queue.
- *
- * `differenceMinor` is `collected - expected`, so positive means the rider took too much. Carried
- * pre-computed because every caller would otherwise subtract the same two numbers and some of them
- * would get the sign wrong.
- */
-export interface CodException {
-  readonly id: string;
-  readonly shipmentId: string;
-  readonly expectedMinor: number;
-  readonly collectedMinor: number | null;
-  readonly differenceMinor: number;
-  readonly currency: string;
-  readonly reviewNote: string | null;
-  readonly createdAt: string;
-}
-
-export interface CodExceptionPage {
-  readonly data: ReadonlyArray<CodException>;
-  readonly pagination: { readonly nextCursor: string | null; readonly hasMore: boolean };
-}
-
-/** One line of a settlement statement. `amountMinor` unsigned; `direction` carries the sign. */
-export interface StatementLine {
-  readonly entryId: string;
-  readonly type: string;
-  readonly direction: 1 | -1;
-  readonly amountMinor: number;
-  readonly memo: string | null;
-  readonly occurredAt: string;
-  readonly shipmentId: string | null;
-}
-
-/**
- * GET /v1/settlements/:id — the same statement GET .../statement.csv renders.
- *
- * One shape for both, produced by one function on the server. That is what makes the plan's exit
- * check ("its totals match what the screen showed") true rather than a coincidence.
- */
-export interface SettlementStatement {
-  readonly reference: string;
-  readonly status: string;
-  readonly currency: string;
-  readonly createdAt: string;
-  /** Frozen at approval. Exactly the sum of `lines`, or the server throws before responding. */
-  readonly netMinor: number;
-  readonly lines: ReadonlyArray<StatementLine>;
-}
-
-/** GET /v1/coverage — serviceability for one zone, before creating anything. */
-export interface Coverage {
-  readonly zone: string;
-  readonly serviceable: boolean;
-  /** null when serviceable; a sentence for a human when not. */
-  readonly reason: string | null;
-  readonly estimatedDays: number | null;
-  readonly pickupAvailable: boolean;
-  readonly deliveryAvailable: boolean;
-  readonly codAvailable: boolean;
-}
-
-/** POST /v1/shipments/:id/{hold,release,exception} — all three return this. */
-export interface ActionResult {
-  readonly shipmentId?: string;
-  readonly id?: string;
-  readonly trackingCode?: string;
-  readonly status: string;
-}
-
-/** GET /track/:trackingCode — public, no account. */
-export interface PublicTracking {
-  readonly trackingCode: string;
-  readonly status: string | null;
-  readonly timeline: ReadonlyArray<{
-    readonly sequence: number;
-    readonly event: string;
-    readonly occurredAt: string;
-  }>;
-}
-
-/** GET /v1/control-tower/live-counts — one snapshot of the whole network.
- *
- *  `outstandingAmountMinor` arrives as a decimal string: the controller
- *  serialises a bigint there, because a poisha amount past 2^53 would lose
- *  precision as a JSON number. Parse it only at the point of display. */
-export interface LiveCounts {
-  readonly timestamp: string;
-  readonly shipments: {
-    readonly total: number;
-    readonly todayNew: number;
-    readonly inTransit: number;
-    readonly atHub: number;
-    readonly sorting: number;
-    readonly outForDelivery: number;
-    readonly delivered: number;
-    readonly failed: number;
-    readonly returned: number;
-    readonly returning: number;
-    readonly cancelled: number;
-    readonly onHold: number;
-    readonly lostOrDamaged: number;
-    readonly exception: number;
-    readonly byStatus: Readonly<Record<string, number>>;
-  };
-  readonly pickups: {
-    readonly total: number;
-    readonly active: number;
-    readonly pending: number;
-    readonly completed: number;
-    readonly failed: number;
-    readonly expired: number;
-    readonly cancelled: number;
-    readonly byStatus: Readonly<Record<string, number>>;
-  };
-  readonly deliveries: {
-    readonly total: number;
-    readonly outForDelivery: number;
-    readonly attempted: number;
-    readonly attemptsRemaining: number;
-    readonly failed: number;
-    readonly delivered: number;
-    readonly byStatus: Readonly<Record<string, number>>;
-  };
-  readonly cod: {
-    readonly total: number;
-    readonly expected: number;
-    readonly outstanding: number;
-    /** Integer minor units, decimal-string encoded. */
-    readonly outstandingAmountMinor: string;
-    readonly byStatus: Readonly<Record<string, number>>;
-  };
-  readonly riders: {
-    readonly total: number;
-    readonly online: number;
-    readonly available: number;
-    readonly offline: number;
-    readonly suspended: number;
-    readonly byStatus: Readonly<Record<string, number>>;
-  };
-  readonly hub: {
-    readonly backlog: number;
-    readonly networkHubs: number;
-  };
-}
+export type ShipmentEdge =
+  Schemas['HeldShipmentDto'] | Schemas['CancelledShipmentDto'] | Schemas['ReportedExceptionDto'];
 
 function errorEnvelopeOf(body: unknown, status: number): ApiErrorEnvelope {
   if (typeof body === 'object' && body !== null && 'code' in body) {
@@ -487,46 +161,12 @@ function errorEnvelopeOf(body: unknown, status: number): ApiErrorEnvelope {
 }
 
 /* ------------------------------------------------------------ bulk import
- * Hand-declared, like the shipment shapes above: the controller returns
- * interfaces, so the OpenAPI spec carries no schema for them. `BulkJobStatus`
- * is spelled out rather than derived, because the console branches on it — a
- * status it does not recognise must be a visible unknown, not a silent
- * fall-through to "still running" that never ends.
+ * `BulkJobStatus` is spelled out rather than taken from the generated union,
+ * because the console branches on it — a status it does not recognise must be a
+ * visible unknown, not a silent fall-through to "still running" that never ends.
  */
 
-export type BulkJobStatus =
-  | 'PENDING'
-  | 'VALIDATING'
-  | 'PREVIEW'
-  | 'PROCESSING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'COMPLETED_WITH_ERRORS';
-
-/** One row as the PREVIEW shows it: before anything has been created. */
-export interface BulkPreviewRow {
-  readonly lineNumber: number;
-  readonly invoice: string;
-  readonly outcome: string;
-  readonly reason: string | null;
-}
-
-export interface BulkJob {
-  readonly id: string;
-  readonly merchantId: string;
-  readonly filename: string;
-  readonly status: BulkJobStatus;
-  readonly totalRows: number;
-  readonly processedRows: number;
-  readonly succeededRows: number;
-  readonly failedRows: number;
-  readonly skippedRows: number;
-}
-
-export interface BulkPreview {
-  readonly job: BulkJob;
-  readonly rows: ReadonlyArray<BulkPreviewRow>;
-}
+export type BulkJobStatus = Schemas['BulkJobViewDto']['status'];
 
 export class ZipZapClient {
   private readonly fetchImpl: typeof fetch;
@@ -583,11 +223,10 @@ export class ZipZapClient {
   /**
    * POST /v1/shipments — Idempotency-Key required by rule 9.
    *
-   * The request body is bound to the generated DTO type. The response is NOT
-   * bound: controllers return interfaces, not decorated DTOs, so the spec
-   * carries no response schema (all `content?: never`). Claiming a generated
-   * response type here would be a lie the compiler cannot catch — runtime
-   * shape is asserted in the contract test instead.
+   * Body and response are both bound to generated schemas. The response used to be
+   * a hand-written `CreatedShipment` because controllers returned interfaces and
+   * the spec had no response schema; a shape drift then showed up as a runtime
+   * surprise in a console rather than a compile error here.
    */
   async createShipment(
     body: components['schemas']['CreateShipmentDto'],
@@ -695,12 +334,21 @@ export class ZipZapClient {
   }
 
   /** GET /v1/cod/exceptions — the reconciliation work queue, newest first. */
-  async codExceptions(query?: ListQuery): Promise<CodExceptionPage> {
-    const { data } = await this.request<CodExceptionPage>('/v1/cod/exceptions', {
+  async codExceptions(query?: ListQuery): Promise<Page<CodException>> {
+    // `{data, pagination}` on the wire, flattened to `Page<T>` here — the same shape
+    // listShipments returns, so the two lists paginate identically in the console.
+    const { data } = await this.request<{
+      data: CodException[];
+      pagination: { readonly nextCursor: string | null; readonly hasMore: boolean };
+    }>('/v1/cod/exceptions', {
       method: 'GET',
       query,
     });
-    return data;
+    return {
+      data: data.data,
+      nextCursor: data.pagination.nextCursor,
+      hasMore: data.pagination.hasMore,
+    };
   }
 
   /* ---------------------------------------------------------------- hub console
@@ -790,20 +438,11 @@ export class ZipZapClient {
   async recordRiderPosition(
     riderId: string,
     position: { latitude: number; longitude: number; recordedAt: string; accuracyMeters?: number },
-  ): Promise<{
-    riderId: string;
-    latitude: number;
-    longitude: number;
-    recordedAt: string;
-    ageSeconds: number;
-  }> {
-    const { data } = await this.request<{
-      riderId: string;
-      latitude: number;
-      longitude: number;
-      recordedAt: string;
-      ageSeconds: number;
-    }>(`/v1/riders/${encodeURIComponent(riderId)}/position`, { method: 'POST', body: position });
+  ): Promise<RiderPosition> {
+    const { data } = await this.request<RiderPosition>(
+      `/v1/riders/${encodeURIComponent(riderId)}/position`,
+      { method: 'POST', body: position },
+    );
     return data;
   }
 
@@ -831,8 +470,8 @@ export class ZipZapClient {
    * POST /v1/shipments/:id/cancel — irreversible in practice (the parcel is
    * gone), so the caller must confirm with a human before calling this.
    */
-  async cancelShipment(id: string): Promise<ActionResult> {
-    const { data } = await this.request<ActionResult>(
+  async cancelShipment(id: string): Promise<CancelledShipment> {
+    const { data } = await this.request<CancelledShipment>(
       `/v1/shipments/${encodeURIComponent(id)}/cancel`,
       { method: 'POST' },
     );
@@ -840,8 +479,8 @@ export class ZipZapClient {
   }
 
   /** POST /v1/shipments/:id/hold — pauses movement, resumable by release. */
-  async holdShipment(id: string, reason?: string): Promise<ActionResult> {
-    const { data } = await this.request<ActionResult>(
+  async holdShipment(id: string, reason?: string): Promise<HeldShipment> {
+    const { data } = await this.request<HeldShipment>(
       `/v1/shipments/${encodeURIComponent(id)}/hold`,
       { method: 'POST', body: { reason: reason ?? null } },
     );
@@ -849,8 +488,8 @@ export class ZipZapClient {
   }
 
   /** POST /v1/shipments/:id/release — resumes a held shipment where it stopped. */
-  async releaseShipment(id: string): Promise<ActionResult> {
-    const { data } = await this.request<ActionResult>(
+  async releaseShipment(id: string): Promise<ShipmentEdge> {
+    const { data } = await this.request<ShipmentEdge>(
       `/v1/shipments/${encodeURIComponent(id)}/release`,
       { method: 'POST' },
     );
@@ -862,8 +501,8 @@ export class ZipZapClient {
     id: string,
     reason: 'LOST' | 'DAMAGED',
     note?: string,
-  ): Promise<ActionResult> {
-    const { data } = await this.request<ActionResult>(
+  ): Promise<ShipmentEdge> {
+    const { data } = await this.request<ShipmentEdge>(
       `/v1/shipments/${encodeURIComponent(id)}/exception`,
       { method: 'POST', body: { reason, note: note ?? null } },
     );
@@ -876,52 +515,14 @@ export class ZipZapClient {
    */
 
   /** GET /v1/riders/:riderId/jobs — one rider's pickups and delivery jobs. */
-  async riderJobs(
-    riderId: string,
-    limit?: number,
-  ): Promise<{
-    pickups: Array<{
-      id: string;
-      merchantId: string;
-      shipmentIds: string[];
-      riderId: string | null;
-      status: string;
-      totalWeightGrams: number;
-      createdAt: string;
-    }>;
-    deliveries: Array<{
-      id: string;
-      shipmentId: string;
-      riderId: string;
-      status: string;
-      attemptsMade: number;
-      lastFailureReason: string | null;
-      createdAt: string;
-    }>;
-  }> {
-    const { data } = await this.request<{
-      pickups: Array<{
-        id: string;
-        merchantId: string;
-        shipmentIds: string[];
-        riderId: string | null;
-        status: string;
-        totalWeightGrams: number;
-        createdAt: string;
-      }>;
-      deliveries: Array<{
-        id: string;
-        shipmentId: string;
-        riderId: string;
-        status: string;
-        attemptsMade: number;
-        lastFailureReason: string | null;
-        createdAt: string;
-      }>;
-    }>(`/v1/riders/${encodeURIComponent(riderId)}/jobs`, {
-      method: 'GET',
-      query: limit !== undefined ? { limit: String(limit) } : {},
-    });
+  async riderJobs(riderId: string, limit?: number): Promise<RiderJobs> {
+    const { data } = await this.request<RiderJobs>(
+      `/v1/riders/${encodeURIComponent(riderId)}/jobs`,
+      {
+        method: 'GET',
+        query: limit !== undefined ? { limit: String(limit) } : {},
+      },
+    );
     return data;
   }
 
@@ -1056,33 +657,14 @@ export class ZipZapClient {
   async pullRiderSync(
     riderId: string,
     options?: { sinceSeq?: string; limit?: string },
-  ): Promise<{
-    commands: Array<{
-      id: string;
-      commandType: string;
-      payload: Record<string, unknown>;
-      expectedState: Record<string, unknown> | null;
-      deviceSequence: number;
-      createdAt: string;
-    }>;
-    queueSize: number;
-    capWarning: boolean;
-  }> {
-    const { data } = await this.request<{
-      commands: Array<{
-        id: string;
-        commandType: string;
-        payload: Record<string, unknown>;
-        expectedState: Record<string, unknown> | null;
-        deviceSequence: number;
-        createdAt: string;
-      }>;
-      queueSize: number;
-      capWarning: boolean;
-    }>(`/v1/riders/${encodeURIComponent(riderId)}/sync`, {
-      method: 'GET',
-      query: options,
-    });
+  ): Promise<RiderPullResult> {
+    const { data } = await this.request<RiderPullResult>(
+      `/v1/riders/${encodeURIComponent(riderId)}/sync`,
+      {
+        method: 'GET',
+        query: options,
+      },
+    );
     return data;
   }
 
@@ -1091,14 +673,8 @@ export class ZipZapClient {
     riderId: string,
     commandId: string,
     idempotencyKey: string,
-  ): Promise<{
-    outcome: { kind: string; replayed: boolean };
-    createdAt: string;
-  }> {
-    const { data } = await this.request<{
-      outcome: { kind: string; replayed: boolean };
-      createdAt: string;
-    }>(
+  ): Promise<RiderAckResult> {
+    const { data } = await this.request<RiderAckResult>(
       `/v1/riders/${encodeURIComponent(riderId)}/sync/ack`,
       {
         method: 'POST',
@@ -1119,29 +695,14 @@ export class ZipZapClient {
       payload: Record<string, unknown>;
       expectedState?: Record<string, unknown>;
     }>,
-  ): Promise<{
-    results: Array<{
-      deviceSequence: number;
-      commandId: string;
-      kind: 'applied' | 'rejected' | 'duplicate';
-      reason: string | null;
-    }>;
-    queueSize: number;
-    capWarning: boolean;
-  }> {
-    const { data } = await this.request<{
-      results: Array<{
-        deviceSequence: number;
-        commandId: string;
-        kind: 'applied' | 'rejected' | 'duplicate';
-        reason: string | null;
-      }>;
-      queueSize: number;
-      capWarning: boolean;
-    }>(`/v1/riders/${encodeURIComponent(riderId)}/sync/replay`, {
-      method: 'POST',
-      body: { commands },
-    });
+  ): Promise<RiderReplayResult> {
+    const { data } = await this.request<RiderReplayResult>(
+      `/v1/riders/${encodeURIComponent(riderId)}/sync/replay`,
+      {
+        method: 'POST',
+        body: { commands },
+      },
+    );
     return data;
   }
 
@@ -1152,20 +713,11 @@ export class ZipZapClient {
    */
 
   /** POST /v1/deliveries/:id/proof/code — mint a code for the customer to read out. */
-  async issueDeliveryCode(jobId: string): Promise<{
-    jobId: string;
-    status: 'PENDING';
-    expiresAt: string;
-    attemptsRemaining: number;
-    code: string;
-  }> {
-    const { data } = await this.request<{
-      jobId: string;
-      status: 'PENDING';
-      expiresAt: string;
-      attemptsRemaining: number;
-      code: string;
-    }>(`/v1/deliveries/${encodeURIComponent(jobId)}/proof/code`, { method: 'POST' });
+  async issueDeliveryCode(jobId: string): Promise<IssuedDeliveryCode> {
+    const { data } = await this.request<IssuedDeliveryCode>(
+      `/v1/deliveries/${encodeURIComponent(jobId)}/proof/code`,
+      { method: 'POST' },
+    );
     return data;
   }
 
@@ -1185,28 +737,15 @@ export class ZipZapClient {
       longitude: number;
     },
     idempotencyKey: string,
-  ): Promise<{
-    jobId: string;
-    proofId: string;
-    status: 'VERIFIED';
-    photoSha256: string;
-    photoByteLength: number;
-    otpVerifiedAt: string;
-    replayed: boolean;
-  }> {
-    const { data } = await this.request<{
-      jobId: string;
-      proofId: string;
-      status: 'VERIFIED';
-      photoSha256: string;
-      photoByteLength: number;
-      otpVerifiedAt: string;
-      replayed: boolean;
-    }>(`/v1/deliveries/${encodeURIComponent(jobId)}/proof`, {
-      method: 'POST',
-      body,
-      headers: { 'Idempotency-Key': idempotencyKey },
-    });
+  ): Promise<SubmittedDeliveryProof> {
+    const { data } = await this.request<SubmittedDeliveryProof>(
+      `/v1/deliveries/${encodeURIComponent(jobId)}/proof`,
+      {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': idempotencyKey },
+      },
+    );
     return data;
   }
 
@@ -1218,22 +757,11 @@ export class ZipZapClient {
    * The server answers for every event, not only the stored ones, so the screen can show a toggle
    * per event and mark the ones still on their default.
    */
-  async notificationPreferences(): Promise<
-    Array<{
-      eventType: string;
-      templateName: string;
-      enabled: boolean;
-      isDefault: boolean;
-    }>
-  > {
-    const { data } = await this.request<
-      Array<{
-        eventType: string;
-        templateName: string;
-        enabled: boolean;
-        isDefault: boolean;
-      }>
-    >('/v1/notification-preferences', { method: 'GET' });
+  async notificationPreferences(): Promise<readonly NotificationPreference[]> {
+    const { data } = await this.request<readonly NotificationPreference[]>(
+      '/v1/notification-preferences',
+      { method: 'GET' },
+    );
     return data;
   }
 
@@ -1241,13 +769,8 @@ export class ZipZapClient {
   async setNotificationPreference(
     eventType: string,
     enabled: boolean,
-  ): Promise<{ eventType: string; templateName: string; enabled: boolean; isDefault: boolean }> {
-    const { data } = await this.request<{
-      eventType: string;
-      templateName: string;
-      enabled: boolean;
-      isDefault: boolean;
-    }>('/v1/notification-preferences', {
+  ): Promise<NotificationPreference> {
+    const { data } = await this.request<NotificationPreference>('/v1/notification-preferences', {
       method: 'PUT',
       body: { eventType, enabled },
     });
@@ -1260,52 +783,21 @@ export class ZipZapClient {
    */
 
   /** GET /v1/webhooks — list your registered webhook endpoints */
-  async listWebhooks(): Promise<
-    Array<{
-      id: string;
-      merchantId: string;
-      url: string;
-      events: string[];
-      status: 'ACTIVE' | 'PAUSED';
-      createdAt: string;
-    }>
-  > {
-    const { data } = await this.request<
-      Array<{
-        id: string;
-        merchantId: string;
-        url: string;
-        events: string[];
-        status: 'ACTIVE' | 'PAUSED';
-        createdAt: string;
-      }>
-    >('/v1/webhooks', { method: 'GET' });
+  async listWebhooks(): Promise<readonly WebhookEndpoint[]> {
+    const { data } = await this.request<readonly WebhookEndpoint[]>('/v1/webhooks', {
+      method: 'GET',
+    });
     return data;
   }
 
   /** POST /v1/webhooks — register a new webhook endpoint (returns secret once) */
-  async createWebhook(body: { url: string; events: string[] }): Promise<{
-    endpoint: {
-      id: string;
-      merchantId: string;
-      url: string;
-      events: string[];
-      status: 'ACTIVE' | 'PAUSED';
-      createdAt: string;
-    };
-    secret: string;
-  }> {
-    const { data } = await this.request<{
-      endpoint: {
-        id: string;
-        merchantId: string;
-        url: string;
-        events: string[];
-        status: 'ACTIVE' | 'PAUSED';
-        createdAt: string;
-      };
-      secret: string;
-    }>('/v1/webhooks', { method: 'POST', body });
+  async createWebhook(
+    body: components['schemas']['CreateWebhookDto'],
+  ): Promise<CreatedWebhookEndpoint> {
+    const { data } = await this.request<CreatedWebhookEndpoint>('/v1/webhooks', {
+      method: 'POST',
+      body,
+    });
     return data;
   }
 
@@ -1315,31 +807,11 @@ export class ZipZapClient {
     cursor?: string;
     limit?: number;
   }): Promise<{
-    data: Array<{
-      id: string;
-      endpointId: string;
-      eventType: string;
-      attempt: number;
-      statusCode: number | null;
-      error: string | null;
-      delivered: boolean;
-      terminal: boolean;
-      attemptedAt: string;
-    }>;
-    nextCursor: string | null;
+    readonly data: readonly WebhookDeliveryRow[];
+    readonly nextCursor: string | null;
   }> {
     const { data } = await this.request<{
-      data: Array<{
-        id: string;
-        endpointId: string;
-        eventType: string;
-        attempt: number;
-        statusCode: number | null;
-        error: string | null;
-        delivered: boolean;
-        terminal: boolean;
-        attemptedAt: string;
-      }>;
+      data: readonly WebhookDeliveryRow[];
       nextCursor: string | null;
     }>('/v1/webhooks/deliveries', {
       method: 'GET',
@@ -1353,37 +825,23 @@ export class ZipZapClient {
   }
 
   /** POST /v1/webhooks/deliveries/:deliveryId/replay — replay a failed delivery */
-  async replayWebhookDelivery(deliveryId: string): Promise<{
-    deliveryId: string;
-    endpointId: string;
-    wireEvent: string;
-  }> {
-    const { data } = await this.request<{
-      deliveryId: string;
-      endpointId: string;
-      wireEvent: string;
-    }>(`/v1/webhooks/deliveries/${encodeURIComponent(deliveryId)}/replay`, {
-      method: 'POST',
-      body: {},
-    });
+  async replayWebhookDelivery(deliveryId: string): Promise<{ readonly deliveryId: string }> {
+    const { data } = await this.request<{ readonly deliveryId: string }>(
+      `/v1/webhooks/deliveries/${encodeURIComponent(deliveryId)}/replay`,
+      {
+        method: 'POST',
+        body: {},
+      },
+    );
     return data;
   }
 
   /** POST /v1/api-keys — mint a new merchant API key (secret returned once) */
-  async createApiKey(body: { name: string; scopes: string[] }): Promise<{
-    id: string;
-    keyId: string;
-    secret: string;
-    name: string;
-    scopes: string[];
-  }> {
-    const { data } = await this.request<{
-      id: string;
-      keyId: string;
-      secret: string;
-      name: string;
-      scopes: string[];
-    }>('/v1/api-keys', { method: 'POST', body });
+  async createApiKey(body: { name: string; scopes: string[] }): Promise<CreatedApiKey> {
+    const { data } = await this.request<CreatedApiKey>('/v1/api-keys', {
+      method: 'POST',
+      body,
+    });
     return data;
   }
 
@@ -1397,34 +855,8 @@ export class ZipZapClient {
   async merchantAnalytics(options?: {
     from?: string; // yyyy-mm-dd inclusive
     to?: string; // yyyy-mm-dd inclusive
-  }): Promise<{
-    from: string;
-    to: string;
-    days: readonly {
-      readonly day: string;
-      readonly shipmentsCreated: number;
-      readonly pickedUp: number;
-      readonly delivered: number;
-      readonly currency: string | null;
-      readonly expectedMinor: string;
-      readonly collectedMinor: string;
-      readonly settledMinor: string;
-    }[];
-  }> {
-    const { data } = await this.request<{
-      from: string;
-      to: string;
-      days: readonly {
-        readonly day: string;
-        readonly shipmentsCreated: number;
-        readonly pickedUp: number;
-        readonly delivered: number;
-        readonly currency: string | null;
-        readonly expectedMinor: string;
-        readonly collectedMinor: string;
-        readonly settledMinor: string;
-      }[];
-    }>('/v1/analytics/merchant', {
+  }): Promise<MerchantSeries> {
+    const { data } = await this.request<MerchantSeries>('/v1/analytics/merchant', {
       method: 'GET',
       query: options,
     });

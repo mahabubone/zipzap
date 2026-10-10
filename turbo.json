@@ -36,6 +36,15 @@
       "dependsOn": ["^build", "@zipzap/api-client#generate"],
       "outputs": []
     },
+    /* The one package whose build must never be stale: `dist/` is what every app
+     * typechecks against, and `src/generated.d.ts` is rewritten by `generate`. Running the
+     * two in the wrong order gives consumers the previous spec's types while the artefact
+     * on disk says otherwise, which broke the hub console after the response DTOs landed —
+     * `ParcelPresenceDto` existed in `src/` but not yet in `dist/`, so `.map((parcel) => …)`
+     * inferred `any`. Self-contained on purpose: no task ordering in turbo can express it. */
+    "@zipzap/api-client#build": {
+      "dependsOn": ["^build", "@zipzap/backend#openapi:export"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

@@ -123,7 +123,10 @@ describe('openapi.json structure', () => {
           const response = operation.responses[code];
           expect(response, `${id} ${code} must have a response object`).toBeDefined();
           const content = response?.content ?? {};
-          expect(Object.keys(content).length, `${id} ${code} must declare a media type`).toBeGreaterThan(0);
+          expect(
+            Object.keys(content).length,
+            `${id} ${code} must declare a media type`,
+          ).toBeGreaterThan(0);
         }
       });
     }
@@ -214,9 +217,11 @@ describe('openapi.json structure', () => {
     const walkSchemas = (node: unknown, schema: string): void => {
       if (!node || typeof node !== 'object') return;
       if (!('properties' in (node as object))) return;
-      const properties = (node as {
-        properties: Record<string, { type?: string; additionalProperties?: { type?: string } }>;
-      }).properties;
+      const properties = (
+        node as {
+          properties: Record<string, { type?: string; additionalProperties?: { type?: string } }>;
+        }
+      ).properties;
       for (const [name, property] of Object.entries(properties)) {
         if (!name.endsWith('Minor') && !name.endsWith('MinorUnits')) continue;
         if (property.type === 'object') {
@@ -236,6 +241,40 @@ describe('openapi.json structure', () => {
     }
 
     it('types every minor-unit amount as integer or string', () => {
+      expect(bad).toEqual([]);
+    });
+  });
+
+  describe('arrays are not doubled', () => {
+    const bad: string[] = [];
+    const walkSchemas = (node: unknown, schema: string, seen = new Set<unknown>()): void => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      if ('properties' in (node as object)) {
+        const properties = (
+          node as {
+            properties: Record<string, { type?: string; items?: { type?: string } }>;
+          }
+        ).properties;
+        for (const [name, property] of Object.entries(properties)) {
+          if (property.type === 'array' && property.items?.type === 'array') {
+            bad.push(`${schema}.${name}: an array of arrays`);
+          }
+        }
+      }
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (value && typeof value === 'object') walkSchemas(value, schema, seen);
+      }
+    };
+    for (const [name, schema] of Object.entries(spec.components?.schemas ?? {})) {
+      walkSchemas(schema, name);
+    }
+
+    it('never emits a nested array property', () => {
+      // `@ApiProperty({ isArray: true })` with no `type` makes the CLI plugin emit
+      // `{ type: array, items: { type: string } }` nested inside another array, so the
+      // generated client sees `string[][]` for a `string[]` field and stops compiling in the
+      // consumer. It shipped once already, on `EndpointViewDto.events`.
       expect(bad).toEqual([]);
     });
   });

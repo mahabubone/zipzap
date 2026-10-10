@@ -15,8 +15,11 @@ export class CreatedApiKeyDto {
   @ApiProperty({ example: 'zz_live_abc123...', description: 'Raw secret, shown once at creation' })
   secret!: string;
 
+  /** `type` is required alongside `isArray`: without it the plugin emits a nested
+   *  `string[][]`, which is a lie a generated client then refuses to compile against. */
   @ApiProperty({
     example: ['shipments:read', 'shipments:write'],
+    type: 'string',
     isArray: true,
     description: 'Granted API scopes',
   })
@@ -35,6 +38,7 @@ export class EndpointViewDto {
 
   @ApiProperty({
     example: ['shipment.delivered', 'shipment.exception'],
+    type: 'string',
     isArray: true,
   })
   events!: string[];

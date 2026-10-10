@@ -1481,7 +1481,13 @@ export interface components {
             merchantId: string;
             /** @example https://example.com/webhook */
             url: string;
-            events: string[][];
+            /**
+             * @example [
+             *       "shipment.delivered",
+             *       "shipment.exception"
+             *     ]
+             */
+            events: string[];
             /**
              * @example ACTIVE
              * @enum {string}
@@ -1554,7 +1560,14 @@ export interface components {
              * @example zz_live_abc123...
              */
             secret: string;
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "network:read")[][];
+            /**
+             * @description Granted API scopes
+             * @example [
+             *       "shipments:read",
+             *       "shipments:write"
+             *     ]
+             */
+            scopes: string;
         };
         PublicTrackingEventDto: {
             /**

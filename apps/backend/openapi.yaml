@@ -5904,15 +5904,12 @@ components:
           type: string
           example: https://example.com/webhook
         events:
+          example:
+            - shipment.delivered
+            - shipment.exception
           type: array
           items:
-            required: true
-            example:
-              - shipment.delivered
-              - shipment.exception
-            type: array
-            items:
-              type: string
+            type: string
         status:
           enum:
             - ACTIVE
@@ -6079,37 +6076,34 @@ components:
           example: zz_live_abc123...
           description: Raw secret, shown once at creation
         scopes:
-          type: array
+          type: string
+          description: Granted API scopes
           items:
-            required: true
-            items:
-              type: string
-              enum:
-                - shipments:read
-                - shipments:write
-                - tracking:read
-                - hub:read
-                - hub:scan
-                - rider:sync
-                - pickup:create
-                - pickup:read
-                - delivery:create
-                - delivery:read
-                - delivery:complete
-                - returns:read
-                - returns:write
-                - cod:read
-                - settlements:read
-                - settlements:approve
-                - webhooks:manage
-                - notifications:manage
-                - keys:manage
-                - network:read
-            example:
+            type: string
+            enum:
               - shipments:read
               - shipments:write
-            description: Granted API scopes
-            type: array
+              - tracking:read
+              - hub:read
+              - hub:scan
+              - rider:sync
+              - pickup:create
+              - pickup:read
+              - delivery:create
+              - delivery:read
+              - delivery:complete
+              - returns:read
+              - returns:write
+              - cod:read
+              - settlements:read
+              - settlements:approve
+              - webhooks:manage
+              - notifications:manage
+              - keys:manage
+              - network:read
+          example:
+            - shipments:read
+            - shipments:write
       required:
         - keyId
         - secret
