@@ -626,8 +626,17 @@ Screens, per `docs/product/surfaces.md`: authentication · today's jobs · picku
 route · shipment detail · scan · delivery attempt · COD collection · **proof of delivery** ·
 exceptions · profile.
 
-Proof of delivery is not optional: the backend already requires OTP + photo + timestamp + GPS + rider
-identity for `DELIVERED`, and three competitors have no customer-facing POD at all.
+**Proof of delivery: this plan said the backend "already requires OTP + photo + timestamp + GPS", and
+it does not.** Reading the code rather than the plan is what caught it —
+`AdvanceDeliveryService.complete` takes `{ collectedMinor, idempotencyKey, actorId }` and nothing else,
+and there is no evidence capture anywhere under `apps/backend/src/modules/delivery/`. A rider marks a
+parcel delivered with one tap and one COD figure; the only record is a `DELIVERED` tracking event.
+
+That is a larger gap than a missing screen. POD is a backend feature first — an evidence record in
+the delivery schema, an endpoint that accepts it, a rule that `DELIVERED` is unreachable without one,
+and a migration — and only then a screen to capture it. It is also the one place all three
+competitors are visibly absent, so it stays worth doing. But it is a Stage 4 backend item recorded
+as done, not the screen this section implies.
 
 **Exit check** — this is ROADMAP Phase 5's gate, verbatim and unticked:
 
@@ -665,6 +674,36 @@ retried forever.
    behind it.** A replayed command is applied in the same transaction and never sits pending, so a
    `queueSize`-derived warning would have been dead code that never fired.
 
+### Proof of delivery — the correction, closed
+
+The correction above stands as written: the backend had no evidence capture, and `complete` accepted
+`{ collectedMinor, idempotencyKey, actorId }` and nothing else. That gap is now closed on both sides.
+
+`delivery.delivery_proofs` (migration `1759000000044`) holds one row per job in two states.
+`PENDING` is a live challenge — a salted SHA-256 of the code, its expiry, and five attempts.
+`VERIFIED` is the redemption, and it is frozen the instant it is written. Two endpoints:
+`POST /v1/deliveries/:id/proof/code` mints the code, `POST /v1/deliveries/:id/proof` redeems it with
+a photo and coordinates. `AdvanceDeliveryService.complete` now raises `PROOF_REQUIRED` without one.
+
+| Check                              | Proof                                                                                                                                                                                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence is required, not optional | Removing the guard in `complete` fails `advance-delivery.spec.ts` — checked by mutation, not by reading. A `VERIFIED` row missing any one of the OTP timestamp, digest, bytes, or coordinates is refused by a `CHECK`, so the incomplete proof cannot be stored at all. |
+| The code is not in the database    | `delivery-proof.spec.ts` asserts the issued plaintext appears nowhere in the row written. Digest and length, never the code.                                                                                                                                            |
+| The attempt budget is real         | A wrong code is rejected **and** the increment commits. Throwing inside the transaction — the obvious implementation — rolls the counter back with everything else, which makes every guess after the first free. The test asserts the increment survives the throw.    |
+| A verified proof is history        | 22 assertions against the real database: swapping the digest, moving the coordinates to null-island, refilling the budget, and deleting the row are all refused. See [verify-delivery-proofs.mjs](../../../apps/backend/scripts/verify-delivery-proofs.mjs).            |
+| The rider can do it at a door      | `ProofScreen` mints the code online (the server has to hash it before the customer can say it back) and queues everything after it. Two shots in [shots/mobile](../../../shots/mobile).                                                                                 |
+
+**Where the proof photo is stored, and why it is not object storage.** The bytes live in Postgres
+(`bytea`, 2 MB cap) rather than MinIO. At one row per delivery that is the smaller choice _and_ the
+more honest one: the photo a merchant is shown and the photo the rider submitted are the same row,
+with no second store to fall out of sync. `photo_sha256` already exists for the day that stops being
+true, and the migration names MinIO as the upgrade path.
+
+**The one thing POD is not yet.** The code comes back in the HTTP response instead of going out by
+SMS. It deliberately does not travel through the outbox: that table is append-only, so a plaintext
+OTP written there is an OTP that lives forever, which is exactly what the hash exists to prevent.
+The hand-off to the notification module belongs in a queue with a TTL.
+
 ### What landed after that note
 
 The device half now exists as an Expo app. `apps/mobile-rider` — auth, today's jobs (pickups and
@@ -674,13 +713,9 @@ write appends to the proven `OfflineQueue` and returns immediately; no screen wa
 Nine screenshots in [shots/mobile](../../../shots/mobile), captured by
 [shots.mjs](../../../apps/mobile-rider/scripts/shots.mjs) through `expo export --platform web`.
 
-**What is still missing on the device:** route and map, proof of delivery (photo/signature/OTP), the
-notification feed, and exceptions as their own screen. The backend already requires OTP + photo +
-timestamp + GPS for `DELIVERED`, so POD is the one screen that blocks Stage 4's real completion —
-the offline guarantee is proven, the capture of _why_ it was delivered is not built.
-
-Also unbuilt: AsyncStorage/SecureStore persistence (the in-memory store behind the `QueueStorage`
-port is a one-line swap) and a real navigation library.
+**What is still missing on the device:** route and map, the notification feed, and exceptions as
+their own screen. Also unbuilt: AsyncStorage/SecureStore persistence (the in-memory store behind the
+`QueueStorage` port is a one-line swap) and a real navigation library.
 
 ---
 
@@ -839,19 +874,71 @@ Excluded by decision: sandbox credentials on request, store plugins, SDKs in oth
 ## Stage 7 — Parity sweep
 
 Walk [_index.md](_index.md) §1 row by row. Anything left at ○○ or ●○○ gets either a build or a
-**written reason** in that file. A scorecard that flatters us is worse than no scorecard.
+**written reason** in that file. A scorecard that flatters us is worse than no scorecard — and so is
+one that undersells us, because the next person reads it to decide what to build.
 
-Known remaining after the stages above:
+### The sweep found the scorecard wrong in both directions
 
-| Row                                         | State after Stage 7      | Note                                                                                                 |
-| ------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Notification preferences                    | build                    | The backend sends; there is no screen to configure it. SMS and email exist, push does not            |
-| Analytics depth                             | build                    | Projections and a rebuild CLI ship; charts and money labelling do not                                |
-| Bulk formats                                | build                    | XLSX in remains deferred by `ROADMAP.md`. Decide it here, with a trigger                             |
-| Merchant apps                               | **skip, written reason** | Web-first. The three competitors' apps are Cordova, 3.6★ and new — this is not where the effort goes |
-| Desktop                                     | **skip, written reason** | Electron over the ops console. Phase 6 rung 8's own reasoning                                        |
-| Risk scoring                                | build                    | The data exists; the score does not                                                                  |
-| Live map, POD image, ETA on public tracking | build                    | Stage 5 and Stage 6                                                                                  |
+Five rows moved, and the more useful finding is the three that moved **up** without anything being
+built this stage. They had screens the table said did not exist.
+
+| Row                       | Was               | Now | What was actually there                                                                                                                                              |
+| ------------------------- | ----------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create-shipment in the UI | ○○○               | ●●○ | [shipments.new.tsx](../../../apps/frontends/merchant-web/src/routes/app/shipments.new.tsx) calls `createShipment`; a single form, not a wizard                       |
+| Exception work queues     | ○○○               | ●○○ | [cod.tsx](../../../apps/frontends/merchant-web/src/routes/app/cod.tsx) is a titled reconciliation queue showing the money disagreement per row — but it is read-only |
+| Merchant web panel        | ●○○               | ●●○ | 12 routes under [routes/app](../../../apps/frontends/merchant-web/src/routes/app): shipments (list/new/detail/bulk), cod, money, pricing, settlements ×3, webhooks   |
+| Proof of delivery         | ○○○               | ●●○ | [Stage 4 POD](#proof-of-delivery--the-correction-closed). All three competitors sit at ○○○ on this row                                                               |
+| Rider app                 | ○○○ _server only_ | ●●○ | [ProofScreen](../../../apps/mobile-rider/src/screens/ProofScreen.tsx) and five sibling screens, offline-first with a proven queue                                    |
+
+### One claim in this plan was false, not merely optimistic
+
+This stage's own table said _"Projections and a rebuild CLI ship; charts and money labelling do
+not."_ The second half is right and the first implies the backend is counters-only. It is not:
+`analytics.cod_summary` has carried `expected_minor` and a currency since migration `0029`, next to
+`delivery_success_rate` and `return_rate`. Six projections, three of them money or rate. The gap is
+one library and a screen, not a data model — which changes the estimate by an order of magnitude and
+is the single most useful thing this sweep produced.
+
+### Every remaining row, with what the code actually says
+
+Read, not inferred. Two of the four searches the sweep needed were run by an agent that could not
+open a file, so those rows are marked for the reader to spot-check rather than asserted.
+
+| Row                       | State    | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Notification preferences  | ○○○      | **Confirmed absent.** No preference lookup in [notification.consumer.ts](../../../apps/backend/src/modules/notification/notification.consumer.ts), no such column in [notification.entity.ts](../../../apps/backend/src/modules/notification/notification.entity.ts), no controller in the module at all, and migration `0016` is the only one. The system sends every parcel event unconditionally.                                                                                                 |
+| Fraud / risk scoring      | ○○○      | **Confirmed absent.** A grep for `risk\|fraud\|suspicious\|anomaly\|blacklist` over `apps/backend/src` returns **zero** hits outside rate limiting. No module, no migration, no file named after one.                                                                                                                                                                                                                                                                                                |
+| ETA on public tracking    | ○○○      | **Confirmed absent.** [PublicTrackingView](../../../apps/backend/src/modules/tracking/public-tracking.controller.ts) is `{ trackingCode, status, timeline[] }` — past events only, no forward-looking field. Note all three competitors are ○○○ here too, so this is the cheapest row on the board to lead on.                                                                                                                                                                                       |
+| Bulk formats (XLSX)       | deferred | **The decision this stage was asked to make, made.** [bulk.ts](../../../apps/backend/src/modules/shipment/rules/bulk.ts): _"XLSX is out of scope for this slice: CSV in, CSV out; the doc names XLSX as later."_ The reasoning above it is the reason to keep it: a hand-written parser is ~40 lines and the failure modes are ours to name. A dependency is the better trade at 10k rows, not at the first upload. Trigger to revisit: a merchant past ~5k rows/month, or RedX losing a deal on it. |
+| Analytics charts          | ●●○      | Backend is money-complete; [packages/ui](../../../packages/ui/src) has `KpiRow` and `StatCard` and **no chart component of any kind**. This is a library and a screen.                                                                                                                                                                                                                                                                                                                               |
+| Return reattempt tooling  | ●○ ○     | [returns](../../../apps/backend/src/modules/returns/) is complete server-side; no route file in any frontend. A pure UI gap.                                                                                                                                                                                                                                                                                                                                                                         |
+| Staff roles & permissions | ●○ ○     | `identity.users` + memberships ship with migrations `0034`/`0036`; no route in merchant-web. Another pure UI gap on a finished backend.                                                                                                                                                                                                                                                                                                                                                              |
+| Self-serve payout request | ●●●      | [settlements.index.tsx](../../../apps/frontends/merchant-web/src/routes/app/settlements.index.tsx) and `settlements.$id.tsx` exist. Whether the merchant _initiates_ rather than only reviews was not verified — flagged, not claimed.                                                                                                                                                                                                                                                               |
+| Merchant apps             | **skip** | Unchanged. Web-first, and the reason is already written: the competitors' own apps are Cordova, 3.6★, and brand new.                                                                                                                                                                                                                                                                                                                                                                                 |
+| Desktop                   | **skip** | Unchanged. Electron over the ops console; Phase 6 rung 8's own reasoning stands.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+### What this stage did not do, and why that is the right size
+
+Three builds are named "build" above and none of them is started. The honest reason is that each is a
+schema-plus-endpoint-plus-screen slice of the same size as the two stages that preceded this one, and
+doing three of them inside a sweep would make all three shallow — which is how a scorecard ends up
+flattering itself again.
+
+The recommended next build, in order: **notification preferences**, because it is the only remaining
+row where a competitor is ahead of us on a compliance surface rather than a convenience one, and
+because sending every parcel SMS unconditionally is the kind of thing that is expensive to fix after
+a regulator asks. Then **analytics charts**, which is a library and a screen against a backend that
+already has the numbers. Then **ETA on public tracking**, which is the only row where all three
+competitors are absent and we could lead outright.
+
+------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Notification preferences | build | The backend sends; there is no screen to configure it. SMS and email exist, push does not |
+| Analytics depth | build | Projections and a rebuild CLI ship; charts and money labelling do not |
+| Bulk formats | build | XLSX in remains deferred by `ROADMAP.md`. Decide it here, with a trigger |
+| Merchant apps | **skip, written reason** | Web-first. The three competitors' apps are Cordova, 3.6★ and new — this is not where the effort goes |
+| Desktop | **skip, written reason** | Electron over the ops console. Phase 6 rung 8's own reasoning |
+| Risk scoring | build | The data exists; the score does not |
+| Live map, POD image, ETA on public tracking | build | Stage 5 and Stage 6 |
 
 ---
 

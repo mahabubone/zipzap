@@ -1,0 +1,103 @@
+/**
+ * POST /v1/deliveries/:id/proof/code and /proof — issue a recipient code, then redeem it.
+ *
+ * Two endpoints because they are two moments. `code` happens when the rider asks the customer to
+ * confirm; `proof` happens after the customer has said the digits. Collapsing them would re-send a
+ * code on every retry, and the customer would get five messages for one parcel.
+ *
+ * Redemption takes an Idempotency-Key because it is evidence: a rider whose confirmation response
+ * is lost on a bad connection must be able to send it again without the server recording two
+ * proofs — or, worse, spending the attempt budget twice for one guess.
+ */
+
+import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsIn, IsLatitude, IsLongitude, IsString, Matches, MaxLength } from 'class-validator';
+import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import {
+  DeliveryProofService,
+  type IssuedCode,
+  type SubmittedProof,
+} from './delivery-proof.service.ts';
+import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ALLOWED_PHOTO_TYPES, OTP_LENGTH } from './rules/proof.ts';
+
+export class SubmitProofDto {
+  /** Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request. */
+  @IsString()
+  @Matches(new RegExp(`^\\d{${OTP_LENGTH}}$`), { message: `code must be ${OTP_LENGTH} digits` })
+  code!: string;
+
+  /** Raw base64, no data: prefix — the client encodes the bytes and sends them. */
+  @IsString()
+  @MaxLength(4_000_000)
+  photoBase64!: string;
+
+  @IsIn([...ALLOWED_PHOTO_TYPES])
+  photoContentType!: (typeof ALLOWED_PHOTO_TYPES)[number];
+
+  /** Where the parcel was handed over. Checked against Bangladesh, not trusted as a number. */
+  @IsLatitude()
+  latitude!: number;
+
+  @IsLongitude()
+  longitude!: number;
+}
+
+@ApiTags('deliveries')
+@Controller('v1/deliveries')
+@UseGuards(ApiKeyGuard)
+export class DeliveryProofController {
+  constructor(@Inject(DeliveryProofService) private readonly proofs: DeliveryProofService) {}
+
+  @Post(':id/proof/code')
+  @UseGuards(new ScopeGuard('delivery:complete'))
+  @ApiOperation({
+    summary: 'Issue a delivery code for the recipient to read out',
+    description:
+      'Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is ' +
+      'valid for ten minutes or five attempts, whichever comes first.',
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
+  async issueCode(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<IssuedCode & { attemptsRemaining: number }> {
+    return this.proofs.issueCode({
+      jobId: id,
+      actorId: request.principal?.subjectId ?? null,
+    });
+  }
+
+  @Post(':id/proof')
+  @UseGuards(new ScopeGuard('delivery:complete'))
+  @ApiOperation({
+    summary: 'Redeem a delivery code with a photo and a location',
+    description:
+      'Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete ' +
+      'refuses to mark a parcel delivered until this has succeeded.',
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  async submit(
+    @Param('id') id: string,
+    @Body() body: SubmitProofDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SubmittedProof & { replayed: boolean }> {
+    if (!idempotencyKey || idempotencyKey.trim().length === 0) {
+      // A guess is evidence too: replaying a submission must not spend a second attempt.
+      throw new DuplicateRequestError('Idempotency-Key header is required.');
+    }
+    const { result, replayed } = await this.proofs.submit({
+      jobId: id,
+      code: body.code,
+      photoBase64: body.photoBase64,
+      photoContentType: body.photoContentType,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      idempotencyKey: idempotencyKey.trim(),
+      actorId: request.principal?.subjectId ?? null,
+    });
+    return { ...result, replayed };
+  }
+}

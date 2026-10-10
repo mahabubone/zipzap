@@ -123,6 +123,26 @@ await page.route('**/v1/**', async (route) => {
     return json({ token: 'shot-token', expiresAt: `${DAY}T18:00:00.000Z`, tokenType: 'Bearer', merchantId: 'm-1', merchantIds: ['m-1'] });
   }
   if (url.includes('/v1/riders/') && url.includes('/jobs')) return json(JOBS);
+  if (url.includes('/proof/code') && route.request().method() === 'POST') {
+    return json({
+      jobId: '66666666-6666-4666-8666-666666666666',
+      status: 'PENDING',
+      expiresAt: `${DAY}T09:24:00.000Z`,
+      attemptsRemaining: 5,
+      code: '4813',
+    });
+  }
+  if (url.includes('/proof') && route.request().method() === 'POST') {
+    return json({
+      jobId: '66666666-6666-4666-8666-666666666666',
+      proofId: '99999999-9999-4999-8999-999999999999',
+      status: 'VERIFIED',
+      photoSha256: 'f'.repeat(64),
+      photoByteLength: 184320,
+      otpVerifiedAt: `${DAY}T09:20:00.000Z`,
+      replayed: false,
+    });
+  }
   if (url.endsWith('/v1/me')) {
     return json({ kind: 'human', subjectId: 'rider-7', merchantId: null, merchantIds: [], scopes: ['rider:sync', 'delivery:complete'], credentialId: 'cred-1', rateLimitPerMin: null });
   }
@@ -186,7 +206,21 @@ await page.getByRole('button', { name: 'Queue failed attempt' }).click();
 await page.waitForTimeout(600);
 await shoot('job-attempt-queued');
 
-// Sync tab: two pending rows with believed-state, then flush and show rulings.
+// Proof of delivery: the code the customer reads out, then the photo, then the queue.
+// Already on the delivery job from the attempt above, so the door opens from here.
+await page.getByRole('button', { name: 'Capture proof of delivery' }).click();
+await settle();
+await shoot('proof-empty');
+
+await page.getByRole('button', { name: 'Send code to customer' }).click();
+await page.waitForTimeout(600);
+await page.getByPlaceholder('4 digits').fill('4813');
+await settle();
+await shoot('proof-code');
+
+// The image picker is a native dialog a screenshot cannot open, so the shot stops one
+// step short on purpose: the code is read out, the photo is still missing, and the queue
+// button stays disabled until both are present. That disabled state is the thing worth seeing.
 await page.getByRole('button', { name: /Sync/ }).click();
 await settle();
 await shoot('sync-pending');

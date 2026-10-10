@@ -84,3 +84,19 @@ export async function claim(
 
   return { decision: decide(toStored(existing), requestHash), complete: async () => undefined };
 }
+
+/**
+ * Drop a claim that produced no result.
+ *
+ * Only for a request that was rejected rather than executed — a wrong one-time code, say. The row
+ * exists to stop a *successful* operation running twice; a claim whose transaction commits without
+ * ever calling `complete` is a tombstone that answers every retry with DUPLICATE_REQUEST, which is
+ * a lie about work that never happened. Deleting is safe here precisely because nothing was applied:
+ * `system.idempotency_keys` holds no history worth keeping.
+ */
+export async function release(manager: EntityManager, scope: IdempotencyScope): Promise<void> {
+  await manager.query(
+    `DELETE FROM system.idempotency_keys WHERE scope = $1 AND idempotency_key = $2`,
+    [scopeKey(scope), scope.key],
+  );
+}

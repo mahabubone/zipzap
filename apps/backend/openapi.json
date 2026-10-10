@@ -1592,6 +1592,82 @@
         ]
       }
     },
+    "/v1/deliveries/{id}/proof/code": {
+      "post": {
+        "description": "Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is valid for ten minutes or five attempts, whichever comes first.",
+        "operationId": "DeliveryProofController_issueCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Issue a delivery code for the recipient to read out",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
+    "/v1/deliveries/{id}/proof": {
+      "post": {
+        "description": "Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete refuses to mark a parcel delivered until this has succeeded.",
+        "operationId": "DeliveryProofController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitProofDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Redeem a delivery code with a photo and a location",
+        "tags": [
+          "deliveries"
+        ]
+      }
+    },
     "/v1/settlements": {
       "post": {
         "operationId": "CreateSettlementController_create",
@@ -2688,6 +2764,42 @@
         },
         "required": [
           "collectedMinor"
+        ]
+      },
+      "SubmitProofDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request."
+          },
+          "photoBase64": {
+            "type": "string",
+            "description": "Raw base64, no data: prefix — the client encodes the bytes and sends them.",
+            "maxLength": 4000000
+          },
+          "photoContentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Where the parcel was handed over. Checked against Bangladesh, not trusted as a number."
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "photoBase64",
+          "photoContentType",
+          "latitude",
+          "longitude"
         ]
       },
       "ApproveSettlementDto": {

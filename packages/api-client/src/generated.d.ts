@@ -926,6 +926,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deliveries/{id}/proof/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a delivery code for the recipient to read out
+         * @description Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is valid for ten minutes or five attempts, whichever comes first.
+         */
+        post: operations["DeliveryProofController_issueCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deliveries/{id}/proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem a delivery code with a photo and a location
+         * @description Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete refuses to mark a parcel delivered until this has succeeded.
+         */
+        post: operations["DeliveryProofController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settlements": {
         parameters: {
             query?: never;
@@ -1383,6 +1423,17 @@ export interface components {
         CompleteDeliveryDto: {
             /** @description Integer minor units collected at the door. A decimal here is a bug, not a convenience. */
             collectedMinor: number;
+        };
+        SubmitProofDto: {
+            /** @description Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request. */
+            code: string;
+            /** @description Raw base64, no data: prefix — the client encodes the bytes and sends them. */
+            photoBase64: string;
+            /** @enum {string} */
+            photoContentType: "image/jpeg" | "image/png" | "image/webp";
+            /** @description Where the parcel was handed over. Checked against Bangladesh, not trusted as a number. */
+            latitude: number;
+            longitude: number;
         };
         ApproveSettlementDto: {
             /** Format: uuid */
@@ -2585,6 +2636,52 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CompleteDeliveryDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DeliveryProofController_issueCode: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DeliveryProofController_submit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitProofDto"];
             };
         };
         responses: {

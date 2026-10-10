@@ -149,8 +149,13 @@ discount. It is a column now, read through `MERCHANT_PLAN_LOOKUP` (rule 2: prici
 
 ## Append-only tables
 
-`tracking.events`, `finance.ledger_entries`, `audit.events`, and webhook delivery logs are never
-updated or deleted. Not by application code, not by a backfill, not by hand.
+`tracking.events`, `finance.ledger_entries`, `audit.events`, webhook delivery logs, and a
+`VERIFIED` row in `delivery.delivery_proofs` are never updated or deleted. Not by application
+code, not by a backfill, not by hand.
+
+`delivery.delivery_proofs` is the one table that is append-only _from a point_: a `PENDING` row is
+live challenge state and takes counter writes, and the trigger freezes it the moment it becomes
+`VERIFIED`. See [../domains/delivery.md](../domains/delivery.md#proof-of-delivery).
 
 Correct a mistake by writing a new row that references the original. That is what makes the
 history defensible in a dispute over a COD collection six weeks ago.

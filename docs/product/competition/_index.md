@@ -27,13 +27,13 @@ Legend: ●●● strong ●●○ present ●○○ thin ○○○ absent · **
 
 | Capability                        |     CarryBee     |           RedX            |     Steadfast     |                  ZipZap                  |
 | --------------------------------- | :--------------: | :-----------------------: | :---------------: | :--------------------------------------: |
-| Merchant web panel                |       ●●●        |            ●●●            |        ●●○        |                   ●○○                    |
+| Merchant web panel                |       ●●●        |            ●●●            |        ●●○        |              ●●○ 12 routes               |
 | Public tracking (no login)        |       ●●●        |            ●●○            |        ●●●        |                   ●●○                    |
 | Map / ETA on public tracking      |       ○○○        |            ○○○            |        ○○○        |                   ○○○                    |
-| Proof of delivery to end customer |       ○○○        |            ○○○            |        ○○○        |                   ○○○                    |
+| Proof of delivery to end customer |       ○○○        |            ○○○            |        ○○○        |       ●●○ OTP+photo+GPS, required        |
 | Bulk import                       |     ●●○ CSV      |         ●●○ XLSX          |   ●●○ 500/file    | ●●● CSV, preview checkpoint, 10k in ~96s |
-| Create-shipment in the UI         |       ●●●        |            ●●●            |        ●●○        |                   ○○○                    |
-| Exception work queues             |       ●●●        |            ●●○            |        ●●○        |                   ○○○                    |
+| Create-shipment in the UI         |       ●●●        |            ●●●            |        ●●○        |              ●●○ form ships              |
+| Exception work queues             |       ●●●        |            ●●○            |        ●●○        |         ●○○ COD queue, read-only         |
 | Fraud / risk scoring              |       ●●○        |            ●○○            |        ●●●        |                   ○○○                    |
 | Return reattempt tooling          |       ●●●        |            ●●●            |        ●●○        |             ●○○ backend only             |
 | COD reconciliation                |       ●○○        |            ●●○            |        ●○○        |       ●●● records + reviewer note        |
@@ -50,11 +50,20 @@ Legend: ●●● strong ●●○ present ●○○ thin ○○○ absent · **
 | Merchant-configurable pricing     |       ○○○        |     ●●○ per shop/area     |  ○○○ negotiated   |           ●●● pricing versions           |
 | Public live rate calculator       |       ●●○        |            ●●●            |        ●●●        |                   ○○○                    |
 | Mobile apps quality               | ●●○ Cordova, new |      ●●○ 3.6★ / 500K      |   ●●● 4.2★ / 1M   |                 ○○○ none                 |
-| Rider app                         |       ●●○        |      ○○○ none found       |   ○○○ internal    |             ○○○ server only              |
+| Rider app                         |       ●●○        |      ○○○ none found       |   ○○○ internal    |         ●●○ Expo, offline-first          |
 | Multi-business / multi-shop       |       ●●●        |            ●●●            |        ●○○        |                   ○○○                    |
 
 **Read the ZipZap column honestly.** The right half of that table is a specification, not a product.
 Everything ●●● under "backend only" is code with no screen attached.
+
+**The Stage 7 sweep moved five rows, and not all of them up.** Three were _understated_ — a
+scorecard that flatters us is bad, but one that undersells us is simply wrong, and an operator
+reading this file to decide what to build next would have built the wrong things. Create-shipment,
+the exception queue and the merchant panel all had screens the table said did not exist. Two moved
+up because Stage 4 finished the rider app and Stage 6 finished proof of delivery. One claim in the
+plan was flatly false: analytics was described as counters only, and `analytics.cod_summary` has
+carried `expected_minor` since migration 0029. Per-row evidence:
+[plan.md](plan.md#stage-7--parity-sweep).
 
 ---
 

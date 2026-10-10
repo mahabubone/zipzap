@@ -51,6 +51,11 @@ import type { PendingCommandRow } from './command-queue.repository.ts';
         // rejected with the reason, not applied over a state the rider never observed.
         'zipzap.rider.delivery': (manager: EntityManager, command: PendingCommandRow) =>
           shipment.validate(manager, command),
+        // A proof is a claim about a parcel, so it answers to the same question: is the parcel
+        // still in the state the rider saw when the phone went dark? A photograph taken at a door
+        // for a parcel that has since been returned elsewhere is evidence of the wrong thing.
+        'zipzap.rider.proof': (manager: EntityManager, command: PendingCommandRow) =>
+          shipment.validate(manager, command),
       }),
     },
   ],

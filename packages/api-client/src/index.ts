@@ -1145,6 +1145,71 @@ export class ZipZapClient {
     return data;
   }
 
+  /* ---------------------------------------------------------------- proof of delivery
+   *
+   * The recipient's confirmation, the photo, and where it happened. Two calls because they are
+   * two moments: a code is minted at the door and read out seconds later.
+   */
+
+  /** POST /v1/deliveries/:id/proof/code — mint a code for the customer to read out. */
+  async issueDeliveryCode(jobId: string): Promise<{
+    jobId: string;
+    status: 'PENDING';
+    expiresAt: string;
+    attemptsRemaining: number;
+    code: string;
+  }> {
+    const { data } = await this.request<{
+      jobId: string;
+      status: 'PENDING';
+      expiresAt: string;
+      attemptsRemaining: number;
+      code: string;
+    }>(`/v1/deliveries/${encodeURIComponent(jobId)}/proof/code`, { method: 'POST' });
+    return data;
+  }
+
+  /**
+   * POST /v1/deliveries/:id/proof — redeem the code with a photo and a location.
+   *
+   * `idempotencyKey` is mandatory server-side: a lost response on a bad connection must not record
+   * two proofs, and must not spend a second attempt for what was one guess.
+   */
+  async submitDeliveryProof(
+    jobId: string,
+    body: {
+      code: string;
+      photoBase64: string;
+      photoContentType: string;
+      latitude: number;
+      longitude: number;
+    },
+    idempotencyKey: string,
+  ): Promise<{
+    jobId: string;
+    proofId: string;
+    status: 'VERIFIED';
+    photoSha256: string;
+    photoByteLength: number;
+    otpVerifiedAt: string;
+    replayed: boolean;
+  }> {
+    const { data } = await this.request<{
+      jobId: string;
+      proofId: string;
+      status: 'VERIFIED';
+      photoSha256: string;
+      photoByteLength: number;
+      otpVerifiedAt: string;
+      replayed: boolean;
+    }>(`/v1/deliveries/${encodeURIComponent(jobId)}/proof`, {
+      method: 'POST',
+      body,
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+    return data;
+  }
+
   /* ---------------------------------------------------------------- developer & webhooks
    *
    * Developer portal & webhook management for merchants.

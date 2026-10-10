@@ -251,6 +251,110 @@ export class DependencyUnavailableError extends DomainError {
  */
 export type DomainErrorClass = new (...args: any[]) => DomainError;
 
+/**
+ * Proof of delivery. Five failure modes because the rider needs five different instructions —
+ * "wait for a new code" and "stop guessing" are not the same message, and a single boolean would
+ * collapse them into a shrug.
+ *
+ * These live here rather than in `delivery/rules/proof.ts` because `DOMAIN_ERROR_SPECS` is what turns
+ * a domain error into a §87 envelope, and a class missing from that map answers 500 — an
+ * infrastructure fault for what is a rider being told the truth about a doorstep.
+ */
+export class ProofCodeExpiredError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_EXPIRED',
+    status: 410,
+    title: 'Delivery code expired',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofCodeAttemptsExhaustedError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_ATTEMPTS_EXHAUSTED',
+    status: 429,
+    title: 'Too many wrong codes',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofCodeInvalidError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_INVALID',
+    status: 422,
+    title: 'Wrong delivery code',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofPhotoMissingError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_PHOTO_REQUIRED',
+    status: 422,
+    title: 'Photo required',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofPhotoTooLargeError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_PHOTO_TOO_LARGE',
+    status: 413,
+    title: 'Photo too large',
+  } satisfies DomainErrorSpec;
+  constructor(
+    readonly bytes: number,
+    readonly max: number,
+  ) {
+    super(`Delivery photo is ${bytes} bytes; the limit is ${max}.`);
+  }
+}
+
+export class ProofLocationImplausibleError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_LOCATION_IMPLAUSIBLE',
+    status: 422,
+    title: 'Implausible location',
+  } satisfies DomainErrorSpec;
+}
+
+/** Raised by `complete` when a rider tries to mark a parcel delivered with no evidence behind it. */
+export class ProofRequiredError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_REQUIRED',
+    status: 409,
+    title: 'Proof of delivery required',
+  } satisfies DomainErrorSpec;
+}
+
+/**
+ * A redemption arrived for a job that was never sent a code.
+ *
+ * Distinct from `ProofCodeExpiredError` on purpose: "expired" tells the rider to ask for a new code,
+ * this tells them to ask for one *at all* — and it is the answer to a bug in the caller, not a
+ * customer-facing dead end.
+ */
+export class ProofCodeNotIssuedError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_NOT_ISSUED',
+    status: 409,
+    title: 'No delivery code issued',
+  } satisfies DomainErrorSpec;
+}
+
+/**
+ * There is no proof to capture here: the job is not at a door, or it was already proved.
+ *
+ * One error for both because the rider's next move is the same in each case — nothing. Splitting
+ * them would only tell a caller which of two non-actions it was about to take.
+ */
+export class ProofNotAvailableError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_NOT_AVAILABLE',
+    status: 409,
+    title: 'Proof not available',
+  } satisfies DomainErrorSpec;
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> = new Map<
   DomainErrorClass,
   DomainErrorSpec
@@ -277,6 +381,15 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [CommandQueueFullError, new CommandQueueFullError(0, 0).spec],
   [RateLimitedError, new RateLimitedError(60).spec],
   [DependencyUnavailableError, new DependencyUnavailableError().spec],
+  [ProofCodeExpiredError, new ProofCodeExpiredError().spec],
+  [ProofCodeAttemptsExhaustedError, new ProofCodeAttemptsExhaustedError().spec],
+  [ProofCodeInvalidError, new ProofCodeInvalidError().spec],
+  [ProofPhotoMissingError, new ProofPhotoMissingError().spec],
+  [ProofPhotoTooLargeError, new ProofPhotoTooLargeError(1, 2).spec],
+  [ProofLocationImplausibleError, new ProofLocationImplausibleError().spec],
+  [ProofRequiredError, new ProofRequiredError().spec],
+  [ProofCodeNotIssuedError, new ProofCodeNotIssuedError().spec],
+  [ProofNotAvailableError, new ProofNotAvailableError('x').spec],
 ]);
 
 export function isDomainError(value: unknown): value is DomainError {

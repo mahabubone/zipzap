@@ -13,6 +13,12 @@ import type { JobRow } from './JobsScreen.tsx';
  * later, exactly once, and the Sync tab reports the server's ruling. An
  * action that waited for the network first would lose the rider's whole
  * screen to a spinner in exactly the dead zones this app exists for.
+ *
+ * "Queue delivery" is a doorway, not a button: the server will not mark a
+ * parcel delivered without a proof behind it, so the tap opens the proof
+ * screen instead of queueing something the sync would reject. Making the
+ * rider discover that from a rejection on the Sync tab, ten minutes later,
+ * on a bad connection, is the failure this routing exists to prevent.
  */
 
 /** Closed failure vocabulary, matching the server's FAILURE_REASONS. */
@@ -33,11 +39,13 @@ export function JobDetailScreen({
   job,
   onBack,
   onQueued,
+  onCaptureProof,
 }: {
   riderClient: RiderClient;
   job: JobRow;
   onBack: () => void;
   onQueued: (pending: number) => void;
+  onCaptureProof: () => void;
 }) {
   const [scan, setScan] = useState('');
   const [reason, setReason] = useState<string | null>(null);
@@ -175,6 +183,10 @@ export function JobDetailScreen({
           </Card>
           <Card>
             <Text style={styles.cardTitle}>Complete with COD</Text>
+            <Muted>
+              A parcel cannot be marked delivered without proof: the customer reading out a code, a
+              photo, and where it happened.
+            </Muted>
             <Field
               label="Cash collected (poisha)"
               value={cash}
@@ -182,10 +194,13 @@ export function JobDetailScreen({
               placeholder="125050 — blank means prepaid"
               keyboardType="numeric"
             />
+            <Button label="Capture proof of delivery" onPress={onCaptureProof} disabled={busy} />
+            <View style={styles.gap} />
             <Button
               label={busy ? 'Queueing…' : 'Queue delivery'}
               onPress={queueComplete}
               disabled={busy}
+              tone="ghost"
             />
           </Card>
         </>

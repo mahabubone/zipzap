@@ -7,6 +7,7 @@ import { TabBar, type Tab } from './src/components/TabBar.tsx';
 import { AuthScreen } from './src/screens/AuthScreen.tsx';
 import { JobsScreen, type JobRow } from './src/screens/JobsScreen.tsx';
 import { JobDetailScreen } from './src/screens/JobDetailScreen.tsx';
+import { ProofScreen } from './src/screens/ProofScreen.tsx';
 import { SyncScreen } from './src/screens/SyncScreen.tsx';
 import { ProfileScreen } from './src/screens/ProfileScreen.tsx';
 import { colors } from './src/theme.ts';
@@ -48,6 +49,7 @@ export default function App() {
   const [client, setClient] = useState<RiderClient | null>(null);
   const [tab, setTab] = useState<Tab>('jobs');
   const [openJob, setOpenJob] = useState<JobRow | null>(null);
+  const [provingJob, setProvingJob] = useState<JobRow | null>(null);
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function App() {
     setClient(next);
     setTab('jobs');
     setOpenJob(null);
+    setProvingJob(null);
     next.queue.pending().then((rows) => setPending(rows.length));
   };
 
@@ -80,6 +83,7 @@ export default function App() {
     setClient(null);
     setTab('jobs');
     setOpenJob(null);
+    setProvingJob(null);
     setPending(0);
   };
 
@@ -93,12 +97,20 @@ export default function App() {
           <View style={styles.shell}>
             <View style={styles.body}>
               {tab === 'jobs' ? (
-                openJob ? (
+                provingJob ? (
+                  <ProofScreen
+                    riderClient={client}
+                    job={provingJob}
+                    onBack={() => setProvingJob(null)}
+                    onQueued={setPending}
+                  />
+                ) : openJob ? (
                   <JobDetailScreen
                     riderClient={client}
                     job={openJob}
                     onBack={() => setOpenJob(null)}
                     onQueued={setPending}
+                    onCaptureProof={() => setProvingJob(openJob)}
                   />
                 ) : (
                   <JobsScreen riderClient={client} onOpenJob={setOpenJob} />
@@ -114,7 +126,10 @@ export default function App() {
               pending={pending}
               onTab={(next) => {
                 setTab(next);
-                if (next !== 'jobs') setOpenJob(null);
+                if (next !== 'jobs') {
+                  setOpenJob(null);
+                  setProvingJob(null);
+                }
               }}
             />
           </View>

@@ -91,6 +91,44 @@ export class RiderClient {
   }
 
   /**
+   * Ask the server to mint a delivery code for the customer to read out.
+   *
+   * The one proof step that cannot be offline: the server has to hash the code and store it
+   * before the customer can say it back. Everything after this — the photograph, the coordinates,
+   * the customer's four digits — queues like any other command, so a rider who loses signal
+   * walking away from the door keeps the proof.
+   */
+  async requestDeliveryCode(jobId: string) {
+    return this.client.issueDeliveryCode(jobId);
+  }
+
+  /**
+   * Queue a proof of delivery: the code the customer read out, a photo, and where it happened.
+   *
+   * `photo` is the raw bytes and `contentType` its real type. Both travel in the command because
+   * the server must fingerprint exactly what the rider captured — a device that downsized the
+   * image on the way into the queue is still proving the handover, and the digest is taken over
+   * the bytes that survive.
+   */
+  async recordProof(
+    jobId: string,
+    proof: {
+      code: string;
+      photoBase64: string;
+      photoContentType: string;
+      latitude: number;
+      longitude: number;
+    },
+    shipmentId: string,
+  ) {
+    return this.queue.append({
+      commandType: 'zipzap.rider.proof',
+      payload: { jobId, ...proof },
+      expectedState: { shipmentId, shipmentStatus: 'OUT_FOR_DELIVERY' },
+    });
+  }
+
+  /**
    * Flush the offline queue to the server.
    *
    * Replays in creation order, reconciles rulings, keeps rejected reasons.
