@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { hasScope, type ApiPrincipal } from './rules/api-principal.ts';
 import { PermissionDeniedError } from '../../common/domain-error.ts';
 import { AuthenticateApiKeyService } from './authenticate-api-key.service.ts';
+import { readSessionCookie } from './session-cookie.ts';
 import type { ApiScope } from '../../common/scopes.ts';
 
 export interface AuthenticatedRequest extends Request {
@@ -25,7 +26,10 @@ export class ApiKeyGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    request.principal = await this.authenticate.authenticate(request.headers.authorization);
+    request.principal = await this.authenticate.authenticate(
+      request.headers.authorization,
+      readSessionCookie(request),
+    );
     return true;
   }
 }

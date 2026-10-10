@@ -29,6 +29,7 @@ import { canAcceptShipments } from './rules/merchant.ts';
 import type { MerchantStatus } from './rules/merchant.ts';
 import { UserService } from '../identity/user.service.ts';
 import { resolveActiveMerchant, roleForMerchant } from '../identity/rules/users.ts';
+import { SESSION_ABSOLUTE_TTL_HOURS, SESSION_IDLE_TTL_HOURS } from '../identity/session-cookie.ts';
 import type { FoundUser } from '../identity/user.service.ts';
 
 export interface SessionRow {
@@ -38,6 +39,8 @@ export interface SessionRow {
   readonly userId: string;
   readonly merchantStatus: MerchantStatus;
   readonly rateLimitPerMin: number | null;
+  readonly createdAt: Date;
+  readonly expiresAt: Date;
 }
 
 export interface IssuedSession {
@@ -59,8 +62,6 @@ export interface LoginAttempt {
   readonly userAgent?: string | null;
   readonly requestId?: string | null;
 }
-
-const SESSION_TTL_HOURS = 12;
 
 @Injectable()
 export class MerchantAuthService {
@@ -103,7 +104,7 @@ export class MerchantAuthService {
     }
 
     const token = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + SESSION_IDLE_TTL_HOURS * 60 * 60 * 1000);
     const sessionId = randomUUID();
 
     // No `role` column: migration 0036 dropped it, because the membership's role is the source of
@@ -172,13 +173,43 @@ export class MerchantAuthService {
     };
   }
 
+  /**
+   * Slides the session forward, within the ceiling.
+   *
+   * Idle expiry protects an unattended machine; absolute expiry is what guarantees a stolen
+   * session eventually stops working even if the thief keeps it warm. So renewal extends by the
+   * idle window but never past `created_at + absolute`, and it is skipped entirely once more than
+   * half the window remains — a write on every request would put a database row update in the
+   * hot path of all 83 operations to save a handful that are close enough to expiry to matter.
+   *
+   * Called only when `authenticateToken` reported the threshold was crossed, so the common case
+   * is zero writes.
+   */
+  private async renewSessionIfDue(row: SessionRow, nowMs: number): Promise<Date | null> {
+    const idleMs = SESSION_IDLE_TTL_HOURS * 60 * 60 * 1000;
+    const remaining = row.expiresAt.getTime() - nowMs;
+    if (remaining > idleMs / 2) return null;
+
+    const next = Math.min(
+      nowMs + idleMs,
+      row.createdAt.getTime() + SESSION_ABSOLUTE_TTL_HOURS * 60 * 60 * 1000,
+    );
+    await this.merchant.query(
+      `UPDATE merchant.sessions
+          SET expires_at = $2
+        WHERE id = $1 AND revoked_at IS NULL AND expires_at < $2`,
+      [row.id, new Date(next)],
+    );
+    return new Date(next);
+  }
+
   async authenticateToken(token: string): Promise<SessionRow | null> {
     const rows = await this.merchant.query(
-      `SELECT s.id, s.merchant_id, s.user_id, s.revoked_at, s.expires_at,
-              m.status, m.rate_limit_per_min
-         FROM merchant.sessions s
-         JOIN merchant.merchants m ON m.id = s.merchant_id
-        WHERE s.token_hash = $1`,
+      `SELECT s.id, s.merchant_id, s.user_id, s.revoked_at, s.expires_at, s.created_at,
+               m.status, m.rate_limit_per_min
+          FROM merchant.sessions s
+          JOIN merchant.merchants m ON m.id = s.merchant_id
+         WHERE s.token_hash = $1`,
       [sha256(token)],
     );
     const row = rows[0] as
@@ -187,23 +218,69 @@ export class MerchantAuthService {
           merchant_id: string;
           user_id: string;
           revoked_at: Date | null;
-          expires_at: Date;
+          expires_at: Date | string;
+          created_at: Date | string;
           status: MerchantStatus;
           rate_limit_per_min: number | null;
         }
       | undefined;
     if (!row) return null;
     if (row.revoked_at !== null) return null;
-    if (new Date(row.expires_at).getTime() < Date.now()) return null;
     if (!canAcceptShipments(row.status)) return null;
 
-    return {
+    const nowMs = Date.now();
+    const session: SessionRow = {
       id: row.id,
       merchantId: row.merchant_id,
       userId: row.user_id,
       merchantStatus: row.status,
       rateLimitPerMin: row.rate_limit_per_min,
+      createdAt: new Date(row.created_at),
+      expiresAt: new Date(row.expires_at),
     };
+    if (session.expiresAt.getTime() < nowMs) return null;
+
+    await this.renewSessionIfDue(session, nowMs);
+    return session;
+  }
+
+  /**
+   * Revokes every session this user holds, so a privilege change takes effect everywhere at once.
+   *
+   * `docs/api/auth.md` has promised rotation on privilege change since it was written; nothing
+   * called it. Role and membership are re-derived per request rather than copied onto the session
+   * (migration 0036 dropped `sessions.role` for exactly that reason), so a changed role is already
+   * honoured on the next request. What is NOT honoured without this is a *revoked membership* — a
+   * hard revoke that left live sessions behind.
+   *
+   * Scoped by the session rows themselves, so a merchant revoking one person cannot touch another
+   * tenant's sessions for the same user.
+   */
+  async revokeSessionsForUser(
+    userId: string,
+    context?: { merchantId?: string | null; ip?: string | null; requestId?: string | null },
+  ): Promise<number> {
+    const result = await this.merchant.query(
+      `UPDATE merchant.sessions SET revoked_at = now()
+        WHERE user_id = $1 AND revoked_at IS NULL
+        RETURNING id`,
+      [userId],
+    );
+    const revoked = result as Array<{ id: string }>;
+    if (revoked.length === 0) return 0;
+
+    await this.audit.record({
+      actorType: 'human',
+      actorId: userId,
+      merchantId: context?.merchantId ?? null,
+      action: 'auth.session.revoked_all',
+      targetType: 'session',
+      targetId: userId,
+      requestId: context?.requestId ?? null,
+      ip: context?.ip ?? null,
+      metadata: { count: revoked.length, reason: context ? 'privilege_change' : 'manual' },
+    });
+    return revoked.length;
   }
 
   /**

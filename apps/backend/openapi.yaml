@@ -138,9 +138,10 @@ paths:
   /v1/auth/login:
     post:
       description: >-
-        Returns a bearer session token, shown exactly once. A browser console sends it back as
-        `Bearer` on the Authorization header; the ZipZap consoles instead let the server set it as
-        an HttpOnly cookie. Whatever the transport, it is stored hashed, so it cannot be recovered.
+        Issues a session as an `HttpOnly; Secure; SameSite=Lax` cookie, and returns the expiry and
+        the businesses it may act inside. The token itself is not in the response body — script can
+        read that. A native or machine client that needs the raw token calls `POST /v1/auth/token`
+        instead, which returns it and sets no cookie.
       operationId: LoginController_login
       parameters: []
       requestBody:
@@ -151,11 +152,11 @@ paths:
               $ref: '#/components/schemas/LoginDto'
       responses:
         '201':
-          description: ''
+          description: Session issued. The token is in the Set-Cookie header, not in this body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IssuedSessionResponseDto'
+                $ref: '#/components/schemas/AuthSessionResponseDto'
         '400':
           description: Validation failed. Nothing was written.
           content:
@@ -198,19 +199,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
-      summary: Sign in with email and password
-      tags:
+      summary: Sign in with email and password (browser flow)
+      tags: &ref_1
         - auth
+  /v1/auth/token:
+    post:
+      description: >-
+        For native and server-side clients that cannot hold a cookie. Returns the token in the body,
+        sets no cookie, and is rate limited exactly as `/auth/login` is.
+      operationId: LoginController_token
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '201':
+          description: Session issued. The token is in this body — store it securely.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponseDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: Sign in and receive the bearer token (machine flow)
+      tags: *ref_1
   /v1/auth/logout:
     post:
       description: >-
-        Revokes this session only, not every session the person holds. An API key principal has no
-        session, so calling it with one revokes nothing and still returns 204.
+        Revokes the session identified by the presented credential — `Authorization: Bearer` or the
+        `zipzap_session` cookie — and clears the cookie if one was sent. An API key principal has no
+        session, so it revokes nothing and still returns 204. Indistinguishable by design.
       operationId: LogoutController_logout
       parameters: []
       responses:
         '204':
-          description: The session is revoked, or there was none to revoke. Indistinguishable by design.
+          description: The session is revoked, or there was none to revoke.
         '400':
           description: Validation failed. Nothing was written.
           content:
@@ -312,7 +378,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: List your webhook endpoints
-      tags: &ref_1
+      tags: &ref_2
         - webhooks
       x-required-scopes:
         - webhooks:manage
@@ -378,7 +444,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Register a webhook endpoint; secret returned once
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -443,7 +509,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rotate the signing secret; new secret returned once
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -508,7 +574,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pause delivery to an endpoint
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -573,7 +639,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Resume delivery to an endpoint
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -651,7 +717,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every webhook delivery attempt for your endpoints, newest first
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -716,7 +782,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Replay a terminal delivery with a fresh delivery id
-      tags: *ref_1
+      tags: *ref_2
       x-required-scopes:
         - webhooks:manage
       security:
@@ -819,7 +885,7 @@ paths:
         '429':
           description: Rate limited. Honour `Retry-After`.
       summary: Live timeline events for one tracking code (SSE)
-      tags: &ref_2
+      tags: &ref_3
         - tracking
       x-rate-limit:
         - tier: public
@@ -883,7 +949,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Public tracking by unguessable token (26 chars, 130 bits) — not enumerable
-      tags: *ref_2
+      tags: *ref_3
       x-rate-limit:
         - tier: public
           failClosed: false
@@ -946,7 +1012,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Public shipment tracking by tracking code
-      tags: *ref_2
+      tags: *ref_3
       x-rate-limit:
         - tier: public
           failClosed: false
@@ -1187,7 +1253,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Get one of your shipments
-      tags: &ref_3
+      tags: &ref_4
         - shipments
       x-required-scopes:
         - shipments:read
@@ -1256,7 +1322,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Cancel a shipment that has not shipped yet
-      tags: *ref_3
+      tags: *ref_4
       x-required-scopes:
         - shipments:write
       security:
@@ -1277,7 +1343,9 @@ paths:
               $ref: '#/components/schemas/UploadBulkDto'
       responses:
         '202':
-          description: ''
+          description: >-
+            202 is the honest status: the rows are validated and queued, not created. Nothing exists
+            in the shipment table until `accept` is called.
           content:
             application/json:
               schema:
@@ -1325,7 +1393,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Upload CSV, get the human preview checkpoint
-      tags: &ref_4
+      tags: &ref_5
         - shipments
       x-required-scopes:
         - shipments:write
@@ -1344,7 +1412,7 @@ paths:
               $ref: '#/components/schemas/AcceptBulkDto'
       responses:
         '202':
-          description: ''
+          description: The job is now PROCESSING. Poll it; there is no push.
           content:
             application/json:
               schema:
@@ -1392,7 +1460,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Accept the preview — enqueue chunked processing
-      tags: *ref_4
+      tags: *ref_5
       x-required-scopes:
         - shipments:write
       security:
@@ -1459,7 +1527,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Poll job progress
-      tags: *ref_4
+      tags: *ref_5
       x-required-scopes:
         - shipments:write
       security:
@@ -1527,7 +1595,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Download the row-level result CSV
-      tags: *ref_4
+      tags: *ref_5
       x-required-scopes:
         - shipments:write
       security:
@@ -1673,7 +1741,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Put one of your shipments on hold (pauses movement)
-      tags: &ref_5
+      tags: &ref_6
         - shipments
       x-required-scopes:
         - shipments:write
@@ -1742,7 +1810,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Release a held shipment back to its interrupted state
-      tags: *ref_5
+      tags: *ref_6
       x-required-scopes:
         - shipments:write
       security:
@@ -1811,7 +1879,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Quote a shipment price
-      tags: &ref_6
+      tags: &ref_7
         - pricing
       security:
         - ApiKey: []
@@ -1870,7 +1938,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Your rate card, with worked examples
-      tags: *ref_6
+      tags: *ref_7
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -2216,7 +2284,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Serviceability check for one zone
-      tags: &ref_7
+      tags: &ref_8
         - coverage
       security:
         - ApiKey: []
@@ -2275,7 +2343,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every zone you can ship to
-      tags: *ref_7
+      tags: *ref_8
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -2338,7 +2406,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Manifests, newest first, optionally by status
-      tags: &ref_8
+      tags: &ref_9
         - manifests
       x-required-scopes:
         - hub:read
@@ -2404,7 +2472,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Schedule a trip, or create a DRAFT manifest on an existing one
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -2470,7 +2538,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: One manifest and the parcels on it
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:read
       security:
@@ -2536,7 +2604,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Schedule one run of a seeded route
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -2602,7 +2670,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: DRAFT → SEALED. A sealed manifest is evidence of what left.
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -2668,7 +2736,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: SEALED → DISPATCHED
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -2734,7 +2802,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: DISPATCHED → RECEIVED
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -2800,7 +2868,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: RECEIVED → RECONCILED, refused while any parcel has not arrived
-      tags: *ref_8
+      tags: *ref_9
       x-required-scopes:
         - hub:scan
       security:
@@ -3164,7 +3232,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pull pending commands for an offline rider
-      tags: &ref_9
+      tags: &ref_10
         - riders
       x-required-scopes:
         - rider:sync
@@ -3237,7 +3305,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: A device pushing its own offline commands back, in device order, exactly once each
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - rider:sync
       security:
@@ -3314,7 +3382,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Acknowledge one queued command
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - rider:sync
       security:
@@ -3456,7 +3524,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider's current load factor
-      tags: &ref_10
+      tags: &ref_11
         - riders
       security:
         - ApiKey: []
@@ -3515,7 +3583,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pool-wide rider utilisation KPI
-      tags: *ref_10
+      tags: *ref_11
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -3727,7 +3795,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider accepts a delivery job
-      tags: &ref_11
+      tags: &ref_12
         - deliveries
       x-required-scopes:
         - delivery:complete
@@ -3793,7 +3861,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider heads out for delivery
-      tags: *ref_11
+      tags: *ref_12
       x-required-scopes:
         - delivery:complete
       security:
@@ -3869,7 +3937,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Confirm delivery and collect COD
-      tags: *ref_11
+      tags: *ref_12
       x-required-scopes:
         - delivery:complete
       security:
@@ -3942,7 +4010,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Issue a delivery code for the recipient to read out
-      tags: &ref_12
+      tags: &ref_13
         - deliveries
       x-required-scopes:
         - delivery:complete
@@ -4022,7 +4090,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Redeem a delivery code with a photo and a location
-      tags: *ref_12
+      tags: *ref_13
       x-required-scopes:
         - delivery:complete
       security:
@@ -4303,7 +4371,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Initiate the provider payout for an approved settlement
-      tags: &ref_13
+      tags: &ref_14
         - settlements
       x-required-scopes:
         - settlements:approve
@@ -4374,7 +4442,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Confirm the provider payout and settle
-      tags: *ref_13
+      tags: *ref_14
       x-required-scopes:
         - settlements:approve
       security:
@@ -4501,7 +4569,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: One settlement, itemised
-      tags: &ref_14
+      tags: &ref_15
         - settlements
       x-required-scopes:
         - settlements:read
@@ -4570,7 +4638,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Download the itemised statement
-      tags: *ref_14
+      tags: *ref_15
       x-required-scopes:
         - settlements:read
       security:
@@ -4641,7 +4709,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Request a return against the original shipment
-      tags: &ref_15
+      tags: &ref_16
         - returns
       x-required-scopes:
         - returns:write
@@ -4787,7 +4855,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Approve a return — the merchant decision
-      tags: *ref_15
+      tags: *ref_16
       x-required-scopes:
         - returns:write
       security:
@@ -4859,7 +4927,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Reject a return — the merchant decision
-      tags: *ref_15
+      tags: *ref_16
       x-required-scopes:
         - returns:write
       security:
@@ -4925,7 +4993,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Walk one transit leg toward the merchant
-      tags: *ref_15
+      tags: *ref_16
       x-required-scopes:
         - returns:write
       security:
@@ -4990,7 +5058,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Which parcel notifications your customers receive
-      tags: &ref_16
+      tags: &ref_17
         - notifications
       x-required-scopes:
         - notifications:manage
@@ -5059,7 +5127,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Opt one event out, or back in
-      tags: *ref_16
+      tags: *ref_17
       x-required-scopes:
         - notifications:manage
       security:
@@ -5191,7 +5259,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every hub and how many parcels are waiting at it
-      tags: &ref_17
+      tags: &ref_18
         - hubs
       x-required-scopes:
         - hub:read
@@ -5263,7 +5331,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Parcels waiting at one hub, and the scan each needs next
-      tags: *ref_17
+      tags: *ref_18
       x-required-scopes:
         - hub:read
       security:
@@ -5878,31 +5946,53 @@ components:
       required:
         - email
         - password
-    IssuedSessionResponseDto:
+    AuthSessionResponseDto:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          example: '2026-10-10T19:58:00.000Z'
+          description: 'Absolute expiry, as an ISO 8601 instant. Sliding: activity extends it, up to 7 days.'
+        merchantId:
+          type: string
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+          description: The ACTIVE business this session acts inside — always one of `merchantIds`.
+        merchantIds:
+          example:
+            - b2c3d4e5-f6a7-8901-bcde-f12345678901
+          description: Every business the signed-in person belongs to.
+          type: array
+          items:
+            type: string
+      required:
+        - expiresAt
+        - merchantId
+        - merchantIds
+    AuthTokenResponseDto:
       type: object
       properties:
         token:
           type: string
           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.…
-          description: >-
-            The raw session token. Returned exactly once, at issue. It is stored hashed, so it
-            cannot be recovered — losing it means signing in again.
+          description: The raw session token. Returned exactly once; store it securely.
         tokenType:
           enum:
             - Bearer
           type: string
           example: Bearer
           description: The Authorization scheme this token goes with.
+        expiresInSeconds:
+          type: number
+          example: 43200
+          description: 'Seconds until expiry. The session is sliding: extend by this much on each use.'
         expiresAt:
           type: string
           example: '2026-10-10T19:58:00.000Z'
-          description: >-
-            Absolute expiry, as an ISO 8601 instant. Not slid by activity: re-authenticate before
-            this.
+          description: Absolute expiry, as an ISO 8601 instant.
         merchantId:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
-          description: The business this session acts inside — a selection within merchantIds.
+          description: The ACTIVE business this token acts inside.
         merchantIds:
           example:
             - b2c3d4e5-f6a7-8901-bcde-f12345678901
@@ -5913,6 +6003,7 @@ components:
       required:
         - token
         - tokenType
+        - expiresInSeconds
         - expiresAt
         - merchantId
         - merchantIds
@@ -7035,7 +7126,7 @@ components:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
         status:
-          enum: &ref_18
+          enum: &ref_19
             - DRAFT
             - SEALED
             - DISPATCHED
@@ -7087,7 +7178,7 @@ components:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
         status:
-          enum: *ref_18
+          enum: *ref_19
           type: string
           example: SEALED
           description: Current state. Moves only through the validated transitions.

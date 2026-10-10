@@ -50,7 +50,12 @@ export class BulkImportController {
   @Post('upload')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Upload CSV, get the human preview checkpoint' })
-  @ApiAcceptedResponse({ type: BulkPreviewDto })
+  @ApiAcceptedResponse({
+    type: BulkPreviewDto,
+    description:
+      '202 is the honest status: the rows are validated and queued, not created. Nothing exists ' +
+      'in the shipment table until `accept` is called.',
+  })
   @ApiErrors()
   async upload(
     @Body() body: UploadBulkDto,
@@ -62,7 +67,10 @@ export class BulkImportController {
   @Post('accept')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Accept the preview — enqueue chunked processing' })
-  @ApiAcceptedResponse({ type: BulkJobViewDto })
+  @ApiAcceptedResponse({
+    type: BulkJobViewDto,
+    description: 'The job is now PROCESSING. Poll it; there is no push.',
+  })
   @ApiErrors()
   async accept(
     @Body() body: AcceptBulkDto,

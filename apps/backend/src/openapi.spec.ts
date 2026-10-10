@@ -80,8 +80,11 @@ const operations: Array<{ path: string; method: string; operation: Operation }> 
     .map(([method, operation]) => ({ path, method, operation: operation as Operation })),
 );
 
-/** Operations that legitimately carry no success body. */
+/** Operations that legitimately carry no success body: 204 has none, by definition. */
 const BODYLESS = new Set(['LogoutController_logout']);
+
+/** Status codes that a body may arrive on. Bulk import uses 202 — queued, not done. */
+const SUCCESS_STATUSES = ['200', '201', '202'];
 
 /** Operations that cannot produce the standard error set, and say why. */
 const ERROR_EXEMPT = new Map<string, string>([
@@ -116,7 +119,7 @@ describe('openapi.json structure', () => {
       if (BODYLESS.has(id)) continue;
       it(`${id}`, () => {
         const codes = Object.keys(operation.responses).filter((code) =>
-          ['200', '201', '202', '204'].includes(code),
+          SUCCESS_STATUSES.includes(code),
         );
         expect(codes.length, `${id} must declare a success status`).toBeGreaterThan(0);
         for (const code of codes) {
@@ -279,6 +282,55 @@ describe('openapi.json structure', () => {
     });
   });
 
+  describe('the cookie contract is visible in the spec', () => {
+    const operationOf = (operationId: string): Operation => {
+      const found = operations.find(({ operation }) => operation.operationId === operationId);
+      if (!found) throw new Error(`no operation with id ${operationId}`);
+      return found.operation;
+    };
+
+    /** The schema an operation returns, as a record so its properties can be read. */
+    const responseProperties = (operationId: string): Record<string, unknown> => {
+      const operation = operationOf(operationId);
+      const successCode = SUCCESS_STATUSES.find((code) => operation.responses[code]?.content);
+      const content = successCode ? operation.responses[successCode]?.content : undefined;
+      const media = content?.['application/json'] as { schema?: { $ref?: string } } | undefined;
+      const ref = media?.schema?.$ref?.split('/').pop();
+      if (!ref) throw new Error(`${operationId} returns no $ref schema`);
+      const schema = spec.components?.schemas?.[ref] as
+        { properties?: Record<string, unknown> } | undefined;
+      return schema?.properties ?? {};
+    };
+
+    it('declares the session cookie as a security scheme', () => {
+      // Without this, a client generated from the spec has no way to know the cookie exists, and
+      // a receiver cannot discover what to set. `ApiKey` alone describes the bearer world only.
+      expect(declaredSchemes).toContain('SessionCookie');
+      const scheme = spec.components?.securitySchemes?.SessionCookie as
+        { name?: string; in?: string } | undefined;
+      expect(scheme?.name).toBe('zipzap_session');
+      expect(scheme?.in).toBe('cookie');
+    });
+
+    it('does NOT put a token in the body of the browser login endpoint', () => {
+      // This is the whole point of the cookie. Returning the token in the body as well as the
+      // header would hand script the credential `HttpOnly` just took away.
+      expect(Object.keys(responseProperties('LoginController_login'))).not.toContain('token');
+    });
+
+    it('DOES put a token in the body of the machine login endpoint', () => {
+      // `/auth/token` exists for exactly the clients that cannot hold a cookie. It must say so.
+      expect(Object.keys(responseProperties('LoginController_token'))).toContain('token');
+    });
+
+    it('documents the logout cookie-clearing side effect', () => {
+      const operation = operationOf('LogoutController_logout');
+      // A 204 with no body can still set headers, and a client that reads only the body would
+      // never learn the cookie was cleared.
+      expect(operation.responses['204']?.description?.length ?? 0).toBeGreaterThan(20);
+    });
+  });
+
   describe('tags are documented, and none are invented', () => {
     it('describes every tag the controllers use', () => {
       const used = new Set<string>();
@@ -298,7 +350,11 @@ describe('openapi.json structure', () => {
   });
 
   describe('the webhook wire contract is in the spec', () => {
-    const tag = (spec.tags ?? []).find((entry) => entry.name === 'webhooks');
+    // `TagObject` from @nestjs/swagger declares only `name` and `description`, and the `x-`
+    // extensions this builds deliberately live outside that type — which is the point of an
+    // extension. Indexing it as a record is how they get read back.
+    const tag = (spec.tags ?? []).find((entry) => entry.name === 'webhooks') as
+      Record<string, unknown> | undefined;
 
     it('attaches the event catalogue to the webhook tag', () => {
       // Nothing in an operation schema can describe a request this API sends OUT, so without this

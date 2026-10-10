@@ -86,10 +86,43 @@ async function bootstrap(): Promise<void> {
   });
 
   app.enableShutdownHooks();
-  // Browsers need CORS; the API is also called server-to-server where CORS is
-  // irrelevant. WEB_ORIGIN pins the allowed origins in production; true
-  // reflects any origin for local dev only.
-  app.enableCors({ origin: process.env.WEB_ORIGIN ? process.env.WEB_ORIGIN.split(',') : true });
+
+  // CORS, now that the consoles speak same-origin.
+  //
+  // This used to be `origin: true` — reflect whatever the caller sent — which is an allowlist of
+  // one, maintained by the attacker. Combined with no credentials support it was not exploitable
+  // for reading, but it let any site send a preflighted request the server would answer, and it
+  // is the kind of default that becomes a breach the day someone adds `credentials: true`.
+  //
+  // The web apps now proxy /api to this server, so the browser sends no cross-origin request at
+  // all and CORS has nothing to do for them. What it covers is the remaining case: a caller that
+  // is not behind one of our proxies (a server integration, or a developer with curl) and any
+  // future deployment where a console is served from a different origin.
+  //
+  // `credentials: true` is NOT set, deliberately. The session cookie is first-party and same-origin
+  // now; allowing credentials on a cross-origin response would require `SameSite=None`, which
+  // re-opens both the CSRF surface and the third-party-cookie deprecation path.
+  const webOrigin = process.env.WEB_ORIGIN;
+  const allowedOrigins = webOrigin
+    ? webOrigin
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    : [];
+  app.enableCors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'If-Match'],
+    exposedHeaders: ['Retry-After', 'X-Request-Id'],
+    maxAge: 600,
+  });
+  if (allowedOrigins.length === 0) {
+    new Logger('main').warn(
+      'WEB_ORIGIN is not set: cross-origin browser requests will be rejected. ' +
+        'Same-origin requests through a console proxy are unaffected.',
+    );
+  }
+
   await app.listen(port);
   new Logger('main').log(`api listening on :${port}`);
 }

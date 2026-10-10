@@ -216,4 +216,76 @@ describe('AuthenticateApiKeyService', () => {
     expect((revoked as Error).message).toBe((unknown as Error).message);
     expect(credentials.touchLastUsed).not.toHaveBeenCalled();
   });
+
+  /* ---------------------------------------------------------------- cookie auth
+   * A browser cannot set an Authorization header on a same-origin navigation, so once the
+   * token stopped living in `sessionStorage` the cookie became the only way a console could
+   * authenticate at all. The bearer path is unchanged; this is the second door onto the same
+   * principal, and these tests pin what it does and does not let through. */
+
+  describe('a session cookie', () => {
+    beforeEach(() => {
+      sessions.authenticateToken.mockResolvedValue(session({ role: 'MERCHANT_OPERATOR' }));
+      users.findById.mockResolvedValue(
+        user({ memberships: [{ merchantId: 'm-active', role: 'MERCHANT_OPERATOR' }] }),
+      );
+    });
+
+    it('resolves the SAME principal as the bearer header carrying that token', async () => {
+      const fromCookie = await auth.authenticate(undefined, 'tok');
+      const fromHeader = await auth.authenticate('Bearer tok');
+
+      // Not "a similar principal": the identical one. Two doors onto one session must not produce
+      // two different notions of who the caller is, or scope decisions diverge per transport.
+      expect(fromCookie).toEqual(fromHeader);
+      expect(sessions.authenticateToken).toHaveBeenCalledWith('tok');
+    });
+
+    it('is used when there is no Authorization header at all', async () => {
+      const principal = await auth.authenticate(undefined, 'tok');
+      expect(principal.kind).toBe('human');
+      expect(principal.merchantId).toBe('m-active');
+    });
+
+    it('is turned away when a bogus header accompanies a live cookie', async () => {
+      sessions.authenticateToken.mockResolvedValue(null);
+
+      await expect(auth.authenticate('Basic dXNlcjpwYXNz', 'tok')).rejects.toThrow(
+        AuthenticationRequiredError,
+      );
+      // Not merely "it returned 401": the cookie must never have been considered.
+      expect(sessions.authenticateToken).not.toHaveBeenCalled();
+    });
+
+    it('is NOT used when the header carries a Bearer token, valid or not', async () => {
+      // The header is an explicit statement of which credential the caller means. Falling back to
+      // the cookie on a BAD bearer token would let an attacker replay their own browser session
+      // by sending a deliberately malformed one.
+      sessions.authenticateToken.mockResolvedValue(null);
+
+      await expect(auth.authenticate('Bearer wrong', 'tok')).rejects.toThrow(
+        AuthenticationRequiredError,
+      );
+      expect(sessions.authenticateToken).toHaveBeenCalledWith('wrong');
+      expect(sessions.authenticateToken).not.toHaveBeenCalledWith('tok');
+    });
+
+    it('is passed straight through, so a bad cookie fails exactly like a bad token', async () => {
+      sessions.authenticateToken.mockResolvedValue(null);
+      await expect(auth.authenticate(undefined, 'bad-cookie')).rejects.toThrow(
+        AuthenticationRequiredError,
+      );
+    });
+
+    it('does not turn a machine credential into a human one', async () => {
+      // An ApiKey header still wins the machine path. Restoring a cookie in that position would
+      // let a holder of one key pair borrow whatever session their browser was holding.
+      credentials.findByKeyId.mockResolvedValue(credential());
+
+      const principal = await auth.authenticate(`ApiKey kid.${SECRET}`, 'tok');
+
+      expect(principal.kind).toBe('machine');
+      expect(sessions.authenticateToken).not.toHaveBeenCalled();
+    });
+  });
 });

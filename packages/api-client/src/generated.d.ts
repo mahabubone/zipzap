@@ -71,10 +71,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Sign in with email and password
-         * @description Returns a bearer session token, shown exactly once. A browser console sends it back as `Bearer` on the Authorization header; the ZipZap consoles instead let the server set it as an HttpOnly cookie. Whatever the transport, it is stored hashed, so it cannot be recovered.
+         * Sign in with email and password (browser flow)
+         * @description Issues a session as an `HttpOnly; Secure; SameSite=Lax` cookie, and returns the expiry and the businesses it may act inside. The token itself is not in the response body — script can read that. A native or machine client that needs the raw token calls `POST /v1/auth/token` instead, which returns it and sets no cookie.
          */
         post: operations["LoginController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in and receive the bearer token (machine flow)
+         * @description For native and server-side clients that cannot hold a cookie. Returns the token in the body, sets no cookie, and is rate limited exactly as `/auth/login` is.
+         */
+        post: operations["LoginController_token"];
         delete?: never;
         options?: never;
         head?: never;
@@ -92,7 +112,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke the current session
-         * @description Revokes this session only, not every session the person holds. An API key principal has no session, so calling it with one revokes nothing and still returns 204.
+         * @description Revokes the session identified by the presented credential — `Authorization: Bearer` or the `zipzap_session` cookie — and clears the cookie if one was sent. An API key principal has no session, so it revokes nothing and still returns 204. Indistinguishable by design.
          */
         post: operations["LogoutController_logout"];
         delete?: never;
@@ -1444,9 +1464,28 @@ export interface components {
             email: string;
             password: string;
         };
-        IssuedSessionResponseDto: {
+        AuthSessionResponseDto: {
             /**
-             * @description The raw session token. Returned exactly once, at issue. It is stored hashed, so it cannot be recovered — losing it means signing in again.
+             * @description Absolute expiry, as an ISO 8601 instant. Sliding: activity extends it, up to 7 days.
+             * @example 2026-10-10T19:58:00.000Z
+             */
+            expiresAt: string;
+            /**
+             * @description The ACTIVE business this session acts inside — always one of `merchantIds`.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string;
+            /**
+             * @description Every business the signed-in person belongs to.
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            merchantIds: string[];
+        };
+        AuthTokenResponseDto: {
+            /**
+             * @description The raw session token. Returned exactly once; store it securely.
              * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.…
              */
             token: string;
@@ -1457,12 +1496,17 @@ export interface components {
              */
             tokenType: "Bearer";
             /**
-             * @description Absolute expiry, as an ISO 8601 instant. Not slid by activity: re-authenticate before this.
+             * @description Seconds until expiry. The session is sliding: extend by this much on each use.
+             * @example 43200
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Absolute expiry, as an ISO 8601 instant.
              * @example 2026-10-10T19:58:00.000Z
              */
             expiresAt: string;
             /**
-             * @description The business this session acts inside — a selection within merchantIds.
+             * @description The ACTIVE business this token acts inside.
              * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
              */
             merchantId: string;
@@ -3610,12 +3654,100 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Session issued. The token is in the Set-Cookie header, not in this body. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IssuedSessionResponseDto"];
+                    "application/json": components["schemas"]["AuthSessionResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    LoginController_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginDto"];
+            };
+        };
+        responses: {
+            /** @description Session issued. The token is in this body — store it securely. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokenResponseDto"];
                 };
             };
             /** @description Validation failed. Nothing was written. */
@@ -3692,7 +3824,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The session is revoked, or there was none to revoke. Indistinguishable by design. */
+            /** @description The session is revoked, or there was none to revoke. */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -5008,6 +5140,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description 202 is the honest status: the rows are validated and queued, not created. Nothing exists in the shipment table until `accept` is called. */
             202: {
                 headers: {
                     [name: string]: unknown;
@@ -5094,6 +5227,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description The job is now PROCESSING. Poll it; there is no push. */
             202: {
                 headers: {
                     [name: string]: unknown;

@@ -219,7 +219,7 @@
     },
     "/v1/auth/login": {
       "post": {
-        "description": "Returns a bearer session token, shown exactly once. A browser console sends it back as `Bearer` on the Authorization header; the ZipZap consoles instead let the server set it as an HttpOnly cookie. Whatever the transport, it is stored hashed, so it cannot be recovered.",
+        "description": "Issues a session as an `HttpOnly; Secure; SameSite=Lax` cookie, and returns the expiry and the businesses it may act inside. The token itself is not in the response body — script can read that. A native or machine client that needs the raw token calls `POST /v1/auth/token` instead, which returns it and sets no cookie.",
         "operationId": "LoginController_login",
         "parameters": [],
         "requestBody": {
@@ -234,11 +234,11 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Session issued. The token is in the Set-Cookie header, not in this body.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IssuedSessionResponseDto"
+                  "$ref": "#/components/schemas/AuthSessionResponseDto"
                 }
               }
             }
@@ -314,7 +314,110 @@
             }
           }
         },
-        "summary": "Sign in with email and password",
+        "summary": "Sign in with email and password (browser flow)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/token": {
+      "post": {
+        "description": "For native and server-side clients that cannot hold a cookie. Returns the token in the body, sets no cookie, and is rate limited exactly as `/auth/login` is.",
+        "operationId": "LoginController_token",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session issued. The token is in this body — store it securely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign in and receive the bearer token (machine flow)",
         "tags": [
           "auth"
         ]
@@ -322,12 +425,12 @@
     },
     "/v1/auth/logout": {
       "post": {
-        "description": "Revokes this session only, not every session the person holds. An API key principal has no session, so calling it with one revokes nothing and still returns 204.",
+        "description": "Revokes the session identified by the presented credential — `Authorization: Bearer` or the `zipzap_session` cookie — and clears the cookie if one was sent. An API key principal has no session, so it revokes nothing and still returns 204. Indistinguishable by design.",
         "operationId": "LogoutController_logout",
         "parameters": [],
         "responses": {
           "204": {
-            "description": "The session is revoked, or there was none to revoke. Indistinguishable by design."
+            "description": "The session is revoked, or there was none to revoke."
           },
           "400": {
             "description": "Validation failed. Nothing was written.",
@@ -2128,7 +2231,7 @@
         },
         "responses": {
           "202": {
-            "description": "",
+            "description": "202 is the honest status: the rows are validated and queued, not created. Nothing exists in the shipment table until `accept` is called.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2241,7 +2344,7 @@
         },
         "responses": {
           "202": {
-            "description": "",
+            "description": "The job is now PROCESSING. Poll it; there is no push.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9785,13 +9888,43 @@
           "password"
         ]
       },
-      "IssuedSessionResponseDto": {
+      "AuthSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "type": "string",
+            "example": "2026-10-10T19:58:00.000Z",
+            "description": "Absolute expiry, as an ISO 8601 instant. Sliding: activity extends it, up to 7 days."
+          },
+          "merchantId": {
+            "type": "string",
+            "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            "description": "The ACTIVE business this session acts inside — always one of `merchantIds`."
+          },
+          "merchantIds": {
+            "example": [
+              "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            ],
+            "description": "Every business the signed-in person belongs to.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "expiresAt",
+          "merchantId",
+          "merchantIds"
+        ]
+      },
+      "AuthTokenResponseDto": {
         "type": "object",
         "properties": {
           "token": {
             "type": "string",
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.…",
-            "description": "The raw session token. Returned exactly once, at issue. It is stored hashed, so it cannot be recovered — losing it means signing in again."
+            "description": "The raw session token. Returned exactly once; store it securely."
           },
           "tokenType": {
             "enum": [
@@ -9801,15 +9934,20 @@
             "example": "Bearer",
             "description": "The Authorization scheme this token goes with."
           },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 43200,
+            "description": "Seconds until expiry. The session is sliding: extend by this much on each use."
+          },
           "expiresAt": {
             "type": "string",
             "example": "2026-10-10T19:58:00.000Z",
-            "description": "Absolute expiry, as an ISO 8601 instant. Not slid by activity: re-authenticate before this."
+            "description": "Absolute expiry, as an ISO 8601 instant."
           },
           "merchantId": {
             "type": "string",
             "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-            "description": "The business this session acts inside — a selection within merchantIds."
+            "description": "The ACTIVE business this token acts inside."
           },
           "merchantIds": {
             "example": [
@@ -9825,6 +9963,7 @@
         "required": [
           "token",
           "tokenType",
+          "expiresInSeconds",
           "expiresAt",
           "merchantId",
           "merchantIds"
