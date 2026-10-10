@@ -58,6 +58,48 @@ export const TAG_DESCRIPTIONS: Record<string, string> = {
 const SCHEME_API_KEY = 'ApiKey';
 const SCHEME_SESSION_COOKIE = 'SessionCookie';
 
+/**
+ * The outbound webhook event catalogue, as the wire spells it.
+ *
+ * These are a *public* contract with their own naming and their own stability guarantees, which is
+ * why they are not simply the internal event names: `ShipmentDelivered` leaves the building as
+ * `shipment.delivered`. A receiver hard-codes these strings, so an addition is additive only.
+ *
+ * Surfaced as `x-webhook-events` on the tag so the spec is self-contained for a receiver building an
+ * integration — without it, the catalogue lives only in prose in `docs/api/webhooks.md` and a client
+ * generated from this document has no way to know what can arrive.
+ */
+export const WEBHOOK_EVENTS = [
+  'shipment.created',
+  'shipment.picked_up',
+  'shipment.in_transit',
+  'shipment.out_for_delivery',
+  'shipment.delivered',
+  'shipment.delivery_failed',
+  'shipment.return_initiated',
+  'shipment.returned',
+  'cod.collected',
+  'settlement.created',
+  'settlement.completed',
+] as const;
+
+/**
+ * The headers a receiver must verify, and the delivery contract they carry.
+ *
+ * Also an `x-` extension on the tag. `@ApiParam`/`@ApiHeader` describe requests *into* this API;
+ * webhooks are requests *out of* it, so nothing in the operation schema can express them.
+ */
+const WEBHOOK_HEADERS = {
+  'ZipZap-Signature':
+    't=<unix-seconds>,v1=<hmac-sha256 hex>. HMAC-SHA256 over `{timestamp}.{raw_body}` with the ' +
+    'endpoint signing secret. Compare in constant time, against the bytes exactly as they arrived ' +
+    '— before parsing, and before re-serialising, since field order and number formatting are both ' +
+    'part of the signed string.',
+  'ZipZap-Delivery': 'Delivery id. Deduplicate on it.',
+  'ZipZap-Event': 'The event type, from the `x-webhook-events` catalogue.',
+  'ZipZap-Attempt': '1-based attempt number. Drives the retry ladder below.',
+} as const;
+
 /** The rate-limit facts a route is subject to, read off its guard. */
 interface RateLimitFacts {
   readonly tier: string;
@@ -277,7 +319,19 @@ export function buildDocument(app: INestApplication): OpenAPIObject {
   );
 
   for (const [name, description] of Object.entries(TAG_DESCRIPTIONS)) {
-    (document.tags ??= []).push({ name, description } as TagObject);
+    const tag: Record<string, unknown> = { name, description };
+    // The webhook tag carries the wire contract too: nothing in an operation schema can describe a
+    // request we send out, and a receiver building an integration from this document alone must not
+    // have to guess the header names or the event vocabulary.
+    if (name === 'webhooks') {
+      tag['x-webhook-events'] = [...WEBHOOK_EVENTS];
+      tag['x-webhook-headers'] = WEBHOOK_HEADERS;
+      tag['x-webhook-retries'] =
+        '1m → 5m → 15m → 1h → 6h → 24h, then terminal. Timeout, connection refused, 5xx and 429 ' +
+        '(honouring Retry-After) all retry; any other 4xx does not, because the payload will not ' +
+        'become valid by being sent again.';
+    }
+    (document.tags ??= []).push(tag as unknown as TagObject);
   }
   // Sorted, or the file churns on every regeneration: the controller discovery order is not
   // stable across builds.

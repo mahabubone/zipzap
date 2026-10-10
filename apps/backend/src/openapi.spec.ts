@@ -297,6 +297,32 @@ describe('openapi.json structure', () => {
     });
   });
 
+  describe('the webhook wire contract is in the spec', () => {
+    const tag = (spec.tags ?? []).find((entry) => entry.name === 'webhooks');
+
+    it('attaches the event catalogue to the webhook tag', () => {
+      // Nothing in an operation schema can describe a request this API sends OUT, so without this
+      // extension the catalogue exists only in prose and a receiver building from the generated
+      // contract has no way to know what can arrive.
+      expect(tag?.['x-webhook-events']).toContain('shipment.delivered');
+      expect(tag?.['x-webhook-events']).toContain('cod.collected');
+      expect((tag?.['x-webhook-events'] as string[])?.length).toBeGreaterThanOrEqual(11);
+    });
+
+    it('names the headers a receiver must verify', () => {
+      expect(Object.keys(tag?.['x-webhook-headers'] ?? {})).toEqual([
+        'ZipZap-Signature',
+        'ZipZap-Delivery',
+        'ZipZap-Event',
+        'ZipZap-Attempt',
+      ]);
+    });
+
+    it('states the retry ladder', () => {
+      expect(String(tag?.['x-webhook-retries'])).toContain('24h');
+    });
+  });
+
   describe('path parameters are declared', () => {
     for (const { path, operation } of operations) {
       const declared = operation.parameters

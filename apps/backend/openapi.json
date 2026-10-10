@@ -9561,7 +9561,27 @@
     },
     {
       "name": "webhooks",
-      "description": "Outbound webhook endpoints, delivery log and replay."
+      "description": "Outbound webhook endpoints, delivery log and replay.",
+      "x-webhook-events": [
+        "shipment.created",
+        "shipment.picked_up",
+        "shipment.in_transit",
+        "shipment.out_for_delivery",
+        "shipment.delivered",
+        "shipment.delivery_failed",
+        "shipment.return_initiated",
+        "shipment.returned",
+        "cod.collected",
+        "settlement.created",
+        "settlement.completed"
+      ],
+      "x-webhook-headers": {
+        "ZipZap-Signature": "t=<unix-seconds>,v1=<hmac-sha256 hex>. HMAC-SHA256 over `{timestamp}.{raw_body}` with the endpoint signing secret. Compare in constant time, against the bytes exactly as they arrived — before parsing, and before re-serialising, since field order and number formatting are both part of the signed string.",
+        "ZipZap-Delivery": "Delivery id. Deduplicate on it.",
+        "ZipZap-Event": "The event type, from the `x-webhook-events` catalogue.",
+        "ZipZap-Attempt": "1-based attempt number. Drives the retry ladder below."
+      },
+      "x-webhook-retries": "1m → 5m → 15m → 1h → 6h → 24h, then terminal. Timeout, connection refused, 5xx and 429 (honouring Retry-After) all retry; any other 4xx does not, because the payload will not become valid by being sent again."
     }
   ],
   "servers": [
