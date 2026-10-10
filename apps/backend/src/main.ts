@@ -10,10 +10,12 @@ import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
+import { dump } from 'js-yaml';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './common/exception.filter';
 import { requestIdMiddleware } from './common/request-id.middleware';
+import { buildDocument } from './openapi';
 import { config } from './config';
 import {
   registry,
@@ -61,17 +63,19 @@ async function bootstrap(): Promise<void> {
     new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }),
   );
 
+  // The contract is served always, not just in development: /docs-json and /docs-yaml are the
+  // machine-readable copy of the API that generated clients and CI are built from, and gate the
+  // interactive UI instead. Withholding the JSON in production made the committed spec and the
+  // live server describe different APIs, and there is no longer any way for them to diverge.
+  const document = buildDocument(app);
+  app.use('/docs-json', (_req: Request, res: Response) => {
+    res.type('application/json').send(JSON.stringify(document));
+  });
+  app.use('/docs-yaml', (_req: Request, res: Response) => {
+    res.type('application/yaml').send(dump(document, { lineWidth: 100, noRefs: false }));
+  });
+  // The interactive UI stays out of production: it is a debugger, not an interface.
   if (!isProduction) {
-    const document = SwaggerModule.createDocument(
-      app,
-      new DocumentBuilder()
-        .setTitle('ZipZap API')
-        .setDescription(
-          'Logistics operating system for e-commerce fulfillment and last-mile delivery.',
-        )
-        .setVersion('1.0')
-        .build(),
-    );
     SwaggerModule.setup('docs', app, document);
   }
 

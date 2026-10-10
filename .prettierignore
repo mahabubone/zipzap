@@ -8,6 +8,7 @@ infra/compose/**/data
 # Generated contract artefacts: the generators own their formatting, and a
 # prettier rewrite would churn every quote on each regeneration.
 apps/backend/openapi.json
+apps/backend/openapi.yaml
 packages/api-client/src/generated.d.ts
 apps/frontends/merchant-web/src/routeTree.gen.ts
 apps/frontends/customer-tracking/src/routeTree.gen.ts

@@ -1,0 +1,3811 @@
+openapi: 3.0.0
+paths:
+  /healthz:
+    get:
+      operationId: HealthController_healthz
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Liveness — the process is up
+      tags: &ref_0
+        - health
+  /readyz:
+    get:
+      operationId: HealthController_readyz
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Readiness — Postgres is reachable
+      tags: *ref_0
+  /v1/me:
+    get:
+      operationId: MeController_me
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: The authenticated principal
+      tags:
+        - identity
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/auth/login:
+    post:
+      operationId: LoginController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '201':
+          description: ''
+      summary: Log in with email + password, returns a bearer session token
+      tags:
+        - auth
+  /v1/auth/logout:
+    post:
+      operationId: LogoutController_logout
+      parameters: []
+      responses:
+        '204':
+          description: ''
+      security:
+        - bearer: []
+      summary: Revoke the current bearer session
+      tags:
+        - auth
+  /v1/webhooks:
+    get:
+      operationId: WebhookController_list
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EndpointViewDto'
+      summary: List your webhook endpoints
+      tags: &ref_1
+        - webhooks
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    post:
+      operationId: WebhookController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedEndpointDto'
+      summary: Register a webhook endpoint; secret returned once
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/webhooks/{id}/rotate:
+    post:
+      operationId: WebhookController_rotate
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotatedSecretDto'
+      summary: Rotate the signing secret; new secret returned once
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/webhooks/{id}/pause:
+    post:
+      operationId: WebhookController_pause
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointViewDto'
+      summary: Pause delivery to an endpoint
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/webhooks/{id}/resume:
+    post:
+      operationId: WebhookController_resume
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointViewDto'
+      summary: Resume delivery to an endpoint
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/webhooks/deliveries:
+    get:
+      operationId: WebhookController_deliveryLog
+      parameters:
+        - name: endpointId
+          required: false
+          in: query
+          schema:
+            format: uuid
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            format: uuid
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            type: number
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryLogPageDto'
+      summary: Every webhook delivery attempt for your endpoints, newest first
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/webhooks/deliveries/{deliveryId}/replay:
+    post:
+      operationId: WebhookController_replayDelivery
+      parameters:
+        - name: deliveryId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplayedDeliveryDto'
+      summary: Replay a terminal delivery with a fresh delivery id
+      tags: *ref_1
+      x-required-scopes:
+        - webhooks:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/api-keys:
+    post:
+      operationId: CreateApiKeyController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedApiKeyDto'
+      summary: Create a scoped API key (secret shown once)
+      tags:
+        - api-keys
+      x-required-scopes:
+        - keys:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /track/{trackingCode}/events:
+    get:
+      operationId: PublicTrackingController_events
+      parameters:
+        - name: trackingCode
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Live timeline events for one tracking code (SSE)
+      tags: &ref_2
+        - tracking
+      x-rate-limit:
+        - tier: public
+          failClosed: false
+  /track/token/{token}:
+    get:
+      operationId: PublicTrackingController_trackByToken
+      parameters:
+        - name: token
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Public tracking by unguessable token (26 chars, 130 bits) — not enumerable
+      tags: *ref_2
+      x-rate-limit:
+        - tier: public
+          failClosed: false
+  /track/{trackingCode}:
+    get:
+      operationId: PublicTrackingController_track
+      parameters:
+        - name: trackingCode
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Public shipment tracking by tracking code
+      tags: *ref_2
+      x-rate-limit:
+        - tier: public
+          failClosed: false
+  /v1/shipments:
+    post:
+      operationId: CreateShipmentController_create
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShipmentDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedShipmentDto'
+      summary: Create a shipment
+      tags:
+        - shipments
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+    get:
+      operationId: ListShipmentsController_listShipments
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: status
+          required: false
+          in: query
+          description: A shipment status, or several — `?status=CREATED,IN_TRANSIT`.
+          schema:
+            type: string
+        - name: zone
+          required: false
+          in: query
+          description: The zone a parcel was priced against, e.g. `dhaka-metro`.
+          schema:
+            type: string
+        - name: q
+          required: false
+          in: query
+          description: Tracking code or phone, partial.
+          schema:
+            type: string
+        - name: from
+          required: false
+          in: query
+          description: '`yyyy-mm-dd`, Asia/Dhaka, inclusive.'
+          schema:
+            type: string
+        - name: to
+          required: false
+          in: query
+          description: '`yyyy-mm-dd`, Asia/Dhaka, inclusive of the whole day.'
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentPageDto'
+      summary: List your shipments, newest first
+      tags:
+        - shipments
+      x-required-scopes:
+        - shipments:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/shipments/{id}:
+    get:
+      operationId: ShipmentDetailController_detail
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentDetailDto'
+      summary: Get one of your shipments
+      tags: &ref_3
+        - shipments
+      x-required-scopes:
+        - shipments:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/shipments/{id}/cancel:
+    post:
+      operationId: ShipmentDetailController_cancelShipment
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelledShipmentDto'
+      summary: Cancel a shipment that has not shipped yet
+      tags: *ref_3
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/shipments/bulk/upload:
+    post:
+      operationId: BulkImportController_upload
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadBulkDto'
+      responses:
+        '202':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkPreviewDto'
+      summary: Upload CSV, get the human preview checkpoint
+      tags: &ref_4
+        - shipments
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/shipments/bulk/accept:
+    post:
+      operationId: BulkImportController_accept
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptBulkDto'
+      responses:
+        '202':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkJobViewDto'
+      summary: Accept the preview — enqueue chunked processing
+      tags: *ref_4
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/shipments/bulk/{jobId}:
+    get:
+      operationId: BulkImportController_progress
+      parameters:
+        - name: jobId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkJobViewDto'
+      summary: Poll job progress
+      tags: *ref_4
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/shipments/bulk/{jobId}/result:
+    get:
+      operationId: BulkImportController_result
+      parameters:
+        - name: jobId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Download the row-level result CSV
+      tags: *ref_4
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/shipments/{id}/exception:
+    post:
+      operationId: ReportExceptionController_report
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportExceptionDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportedExceptionDto'
+      summary: Report a LOST or DAMAGED exception for one of your shipments
+      tags:
+        - shipments
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/shipments/{id}/hold:
+    post:
+      operationId: HoldReleaseController_hold
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeldShipmentDto'
+      summary: Put one of your shipments on hold (pauses movement)
+      tags: &ref_5
+        - shipments
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/shipments/{id}/release:
+    post:
+      operationId: HoldReleaseController_release
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeldShipmentDto'
+      summary: Release a held shipment back to its interrupted state
+      tags: *ref_5
+      x-required-scopes:
+        - shipments:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/pricing/quote:
+    post:
+      operationId: PricingController_quote
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteDto'
+      responses:
+        '201':
+          description: ''
+      summary: Quote a shipment price
+      tags: &ref_6
+        - pricing
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/pricing/rate-card:
+    get:
+      operationId: PricingController_rateCard
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Your rate card, with worked examples
+      tags: *ref_6
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/cod/collect:
+    post:
+      operationId: CollectCodController_collect
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectCodDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectedCodDto'
+      summary: Record a COD collection
+      tags:
+        - cod
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/cod/reconcile:
+    post:
+      operationId: ReconcileCodController_reconcile
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconcileCodDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciledCodDto'
+      summary: Resolve a COD mismatch after human review
+      tags:
+        - cod
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/cod:
+    get:
+      operationId: ListCodRecordsController_listCodRecords
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodRecordPageDto'
+      summary: List your COD records, newest first
+      tags:
+        - cod
+      x-required-scopes:
+        - cod:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/cod/exceptions:
+    get:
+      operationId: ListCodExceptionsController_list
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodExceptionPageDto'
+      summary: Unreviewed COD reconciliation exceptions, newest first
+      tags:
+        - cod
+      x-required-scopes:
+        - cod:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/coverage:
+    get:
+      operationId: CoverageController_coverage
+      parameters:
+        - name: zone
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Serviceability check for one zone
+      tags: &ref_7
+        - coverage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/zones:
+    get:
+      operationId: CoverageController_zones
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Every zone you can ship to
+      tags: *ref_7
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests:
+    get:
+      operationId: ManifestController_list
+      parameters:
+        - name: status
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Manifests, newest first, optionally by status
+      tags: &ref_8
+        - manifests
+      x-required-scopes:
+        - hub:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    post:
+      operationId: ManifestController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManifestDto'
+      responses:
+        '201':
+          description: ''
+      summary: Schedule a trip, or create a DRAFT manifest on an existing one
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/{id}:
+    get:
+      operationId: ManifestController_one
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: One manifest and the parcels on it
+      tags: *ref_8
+      x-required-scopes:
+        - hub:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/trips:
+    post:
+      operationId: ManifestController_scheduleTrip
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TripDto'
+      responses:
+        '201':
+          description: ''
+      summary: Schedule one run of a seeded route
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/{id}/seal:
+    post:
+      operationId: ManifestController_seal
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      summary: DRAFT → SEALED. A sealed manifest is evidence of what left.
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/{id}/dispatch:
+    post:
+      operationId: ManifestController_dispatch
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      summary: SEALED → DISPATCHED
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/{id}/receive:
+    post:
+      operationId: ManifestController_receive
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      summary: DISPATCHED → RECEIVED
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/manifests/{id}/reconcile:
+    post:
+      operationId: ManifestController_reconcile
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      summary: RECEIVED → RECONCILED, refused while any parcel has not arrived
+      tags: *ref_8
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/pickups:
+    post:
+      operationId: RequestPickupController_create
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPickupDto'
+      responses:
+        '201':
+          description: ''
+      summary: Request a pickup
+      tags:
+        - pickups
+      x-required-scopes:
+        - pickup:create
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    get:
+      operationId: ListPickupsController_listPickups
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: List your pickups, newest first
+      tags:
+        - pickups
+      x-required-scopes:
+        - pickup:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/pickups/{id}/assign:
+    post:
+      operationId: AssignPickupController_assign
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignPickupDto'
+      responses:
+        '201':
+          description: ''
+      summary: Assign a rider to a pickup
+      tags:
+        - pickups
+      x-required-scopes:
+        - pickup:create
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders:
+    post:
+      operationId: RegisterRiderController_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRiderDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredRiderDto'
+      summary: Register a rider
+      tags:
+        - riders
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/sync:
+    get:
+      operationId: RiderSyncController_pull
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: sinceSeq
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Pull pending commands for an offline rider
+      tags: &ref_9
+        - riders
+      x-required-scopes:
+        - rider:sync
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/sync/replay:
+    post:
+      operationId: RiderSyncController_replay
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplayDto'
+      responses:
+        '200':
+          description: ''
+      summary: A device pushing its own offline commands back, in device order, exactly once each
+      tags: *ref_9
+      x-required-scopes:
+        - rider:sync
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/sync/ack:
+    post:
+      operationId: RiderSyncController_ack
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AckDto'
+      responses:
+        '201':
+          description: ''
+      summary: Acknowledge one queued command
+      tags: *ref_9
+      x-required-scopes:
+        - rider:sync
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/position:
+    post:
+      operationId: RiderPositionController_record
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordPositionDto'
+      responses:
+        '200':
+          description: ''
+      summary: Record a rider position. Never visible on public tracking.
+      tags:
+        - riders
+      x-required-scopes:
+        - rider:sync
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/utilisation:
+    get:
+      operationId: UtilisationController_riderUtilisation
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Rider's current load factor
+      tags: &ref_10
+        - riders
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/pool-utilisation:
+    get:
+      operationId: UtilisationController_poolUtilisation
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Pool-wide rider utilisation KPI
+      tags: *ref_10
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/attempts:
+    post:
+      operationId: RecordAttemptController_record
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordAttemptDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordedAttemptDto'
+      summary: Record a failed delivery attempt
+      tags:
+        - deliveries
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries:
+    post:
+      operationId: CreateDeliveryController_create
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedDeliveryJobDto'
+      summary: Open a delivery job
+      tags:
+        - deliveries
+      x-required-scopes:
+        - delivery:create
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/accept:
+    post:
+      operationId: AdvanceDeliveryController_accept
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryStatusDto'
+      summary: Rider accepts a delivery job
+      tags: &ref_11
+        - deliveries
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/dispatch:
+    post:
+      operationId: AdvanceDeliveryController_dispatch
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryStatusDto'
+      summary: Rider heads out for delivery
+      tags: *ref_11
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/complete:
+    post:
+      operationId: AdvanceDeliveryController_complete
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteDeliveryDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryStatusDto'
+      summary: Confirm delivery and collect COD
+      tags: *ref_11
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/proof/code:
+    post:
+      description: >-
+        Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is valid
+        for ten minutes or five attempts, whichever comes first.
+      operationId: DeliveryProofController_issueCode
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedDeliveryCodeDto'
+      summary: Issue a delivery code for the recipient to read out
+      tags: &ref_12
+        - deliveries
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/deliveries/{id}/proof:
+    post:
+      description: >-
+        Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete
+        refuses to mark a parcel delivered until this has succeeded.
+      operationId: DeliveryProofController_submit
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitProofDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmittedDeliveryProofDto'
+      summary: Redeem a delivery code with a photo and a location
+      tags: *ref_12
+      x-required-scopes:
+        - delivery:complete
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/settlements:
+    post:
+      operationId: CreateSettlementController_create
+      parameters: []
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedSettlementDto'
+      summary: Freeze your unsettled entries into a settlement
+      tags:
+        - settlements
+      x-required-scopes:
+        - settlements:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    get:
+      operationId: ListSettlementsController_listSettlements
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementPageDto'
+      summary: List your settlements, newest first
+      tags:
+        - settlements
+      x-required-scopes:
+        - settlements:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/settlements/{id}/approve:
+    post:
+      operationId: ApproveSettlementController_approve
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveSettlementDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovedSettlementDto'
+      summary: Approve a settlement — the point of no return
+      tags:
+        - settlements
+      x-required-scopes:
+        - settlements:approve
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/settlements/{id}/initiate-payment:
+    post:
+      operationId: SettlementPaymentController_initiatePayment
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiatedSettlementPaymentDto'
+      summary: Initiate the provider payout for an approved settlement
+      tags: &ref_13
+        - settlements
+      x-required-scopes:
+        - settlements:approve
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/settlements/{id}/confirm-payment:
+    post:
+      operationId: SettlementPaymentController_confirmPayment
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmedSettlementPaymentDto'
+      summary: Confirm the provider payout and settle
+      tags: *ref_13
+      x-required-scopes:
+        - settlements:approve
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/finance/balance:
+    get:
+      operationId: MerchantBalanceController_mine
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantBalanceDto'
+      summary: Your derived balance, itemised, with anything blocking a payout
+      tags:
+        - settlements
+      x-required-scopes:
+        - settlements:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/settlements/{id}:
+    get:
+      operationId: GetSettlementController_one
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementStatementDto'
+      summary: One settlement, itemised
+      tags: &ref_14
+        - settlements
+      x-required-scopes:
+        - settlements:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/settlements/{id}/statement.csv:
+    get:
+      operationId: GetSettlementController_csv
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Download the itemised statement
+      tags: *ref_14
+      x-required-scopes:
+        - settlements:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/returns:
+    post:
+      operationId: ReturnController_request
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestReturnDto'
+      responses:
+        '201':
+          description: ''
+      summary: Request a return against the original shipment
+      tags: &ref_15
+        - returns
+      x-required-scopes:
+        - returns:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    get:
+      operationId: ListReturnsController_listReturns
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: List your returns, newest first
+      tags:
+        - returns
+      x-required-scopes:
+        - returns:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: false
+  /v1/returns/{id}/approve:
+    post:
+      operationId: ReturnController_approve
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideReturnDto'
+      responses:
+        '201':
+          description: ''
+      summary: Approve a return — the merchant decision
+      tags: *ref_15
+      x-required-scopes:
+        - returns:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/returns/{id}/reject:
+    post:
+      operationId: ReturnController_reject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideReturnDto'
+      responses:
+        '201':
+          description: ''
+      summary: Reject a return — the merchant decision
+      tags: *ref_15
+      x-required-scopes:
+        - returns:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/returns/{id}/advance:
+    post:
+      operationId: ReturnController_advance
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      summary: Walk one transit leg toward the merchant
+      tags: *ref_15
+      x-required-scopes:
+        - returns:write
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/notification-preferences:
+    get:
+      description: >-
+        Every event that can notify, answered either way. Absent means on: a merchant is opted out
+        of an event by writing a row, never by leaving one out.
+      operationId: NotificationPreferencesController_list
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Which parcel notifications your customers receive
+      tags: &ref_16
+        - notifications
+      x-required-scopes:
+        - notifications:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    put:
+      description: >-
+        Setting enabled=true removes the row rather than storing "on", so absence stays the single
+        way to say "default".
+      operationId: NotificationPreferencesController_set
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetNotificationPreferenceDto'
+      responses:
+        '200':
+          description: ''
+      summary: Opt one event out, or back in
+      tags: *ref_16
+      x-required-scopes:
+        - notifications:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/hubs/scans:
+    post:
+      operationId: HubScanController_scan
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HubScanDto'
+      responses:
+        '201':
+          description: ''
+      summary: Record a hub scan for a shipment
+      tags:
+        - hubs
+      x-required-scopes:
+        - hub:scan
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/hubs:
+    get:
+      operationId: HubConsoleController_list
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Every hub and how many parcels are waiting at it
+      tags: &ref_17
+        - hubs
+      x-required-scopes:
+        - hub:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/hubs/{hubCode}/parcels:
+    get:
+      operationId: HubConsoleController_parcels
+      parameters:
+        - name: hubCode
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: Parcels waiting at one hub, and the scan each needs next
+      tags: *ref_17
+      x-required-scopes:
+        - hub:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/control-tower/live-counts:
+    get:
+      operationId: DashboardController_getLiveCounts
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Live network counts, one snapshot in time
+      tags:
+        - control-tower
+      x-required-scopes:
+        - network:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/control-tower/report:
+    get:
+      operationId: ReportController_getReport
+      parameters:
+        - name: from
+          required: false
+          in: query
+          description: 'Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: last 30 days.'
+          schema:
+            pattern: ^\d{4}-\d{2}-\d{2}$
+            type: string
+        - name: to
+          required: false
+          in: query
+          description: 'Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today.'
+          schema:
+            pattern: ^\d{4}-\d{2}-\d{2}$
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: 'Operational KPI report: projection ranges plus live snapshot'
+      tags:
+        - control-tower
+      x-required-scopes:
+        - network:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/control-tower/map:
+    get:
+      operationId: MapController_getMap
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      summary: Hubs and rider positions for the live map. Rider positions never reach public tracking.
+      tags:
+        - control-tower
+      x-required-scopes:
+        - hub:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/analytics/merchant:
+    get:
+      operationId: MerchantAnalyticsController_mine
+      parameters:
+        - name: from
+          required: false
+          in: query
+          description: 'Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: 30 days ago.'
+          schema:
+            pattern: ^\d{4}-\d{2}-\d{2}$
+            type: string
+        - name: to
+          required: false
+          in: query
+          description: 'Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today.'
+          schema:
+            pattern: ^\d{4}-\d{2}-\d{2}$
+            type: string
+      responses:
+        '200':
+          description: One point per day, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantSeriesDto'
+      summary: Your own daily parcel counts and COD money, one point per day
+      tags:
+        - analytics
+      x-required-scopes:
+        - cod:read
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/jobs:
+    get:
+      operationId: RiderJobsController_jobs
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: limit
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      summary: A rider's pickup and delivery jobs, newest first
+      tags:
+        - riders
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+info:
+  title: ZipZap API
+  description: |-
+    Logistics operating system for e-commerce fulfillment and last-mile delivery.
+
+    Bangladesh first. Models a real courier business end to end: order, pricing, pickup,
+    origin hub, line-haul, destination hub, last-mile, COD, settlement.
+
+    ## Credentials
+
+    Every `/v1` endpoint except `auth/login` and the public `/track` routes needs a
+    credential. Two forms work on the same `Authorization` header:
+
+    - `Authorization: Bearer <session-token>` — a session from `POST /v1/auth/login`.
+    - `Authorization: ApiKey <key-id>.<secret>` — a machine principal.
+
+    A browser signed in through a ZipZap console sends `Cookie: zipzap_session=<token>`
+    instead; see `docs/api/auth.md`.
+
+    ## What an operation requires
+
+    `x-required-scopes` lists the scope(s) the operation enforces, taken from its own
+    `ScopeGuard` rather than restated by hand. `x-rate-limit` names the bucket it draws from
+    and whether that bucket closes or opens when Redis is unreachable.
+
+    ## Errors
+
+    Every failure is the §87 envelope described by `ErrorEnvelopeDto`: `type`, `title`,
+    `status`, `code`, `detail`, `request_id`. Switch on `code`; `title` and `detail` are
+    prose and may be reworded. Nothing else is ever returned as an error body.
+
+    ## Money
+
+    Integer minor units (poisha) plus a currency. Per-row amounts are JSON numbers with
+    `type: integer`; aggregates are decimal strings, because a sum can exceed what a JSON
+    number represents exactly. Never a float — see `docs/ADR/0009-money-representation.md`.
+
+    ## Idempotency
+
+    Mutations listed in `docs/api/idempotency.md` require an `Idempotency-Key` header.
+    Replaying the same key returns the original result rather than applying the mutation
+    twice.
+  version: '1.0'
+  contact: {}
+tags:
+  - name: analytics
+    description: Read-only projections of your own parcel and money history.
+  - name: cod
+    description: Cash-on-delivery records, exceptions, and reconciliation.
+  - name: control-tower
+    description: The network-wide operational picture.
+  - name: dashboard
+    description: Live operational counts and the control-tower report.
+  - name: deliveries
+    description: Delivery jobs, attempts, and proof of delivery.
+  - name: finance
+    description: Settlements, statements and merchant balance.
+  - name: health
+    description: Liveness and readiness probes.
+  - name: hubs
+    description: Hub inventory and the scan-first dock console.
+  - name: identity
+    description: Sessions, credentials and the authenticated principal.
+  - name: merchant
+    description: 'Merchant-scoped settings: API keys and notification preferences.'
+  - name: network
+    description: Manifests, line-haul trips, coverage and zones.
+  - name: notifications
+    description: Which messages a merchant sends, and over which channel.
+  - name: pickups
+    description: Pickup requests and rider assignment.
+  - name: returns
+    description: Return requests and decisions.
+  - name: riders
+    description: Rider registration, positions, utilisation and the offline command queue.
+  - name: shipments
+    description: 'Shipment lifecycle: create, quote, track, hold, release, cancel.'
+  - name: tracking
+    description: Public, credential-free parcel tracking by code.
+  - name: webhooks
+    description: Outbound webhook endpoints, delivery log and replay.
+servers:
+  - url: /
+    description: Same origin — the web apps proxy /api here.
+components:
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Bearer <session-token> or ApiKey <key-id>.<secret>. Same header, two principal kinds.
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: zipzap_session
+      description: HttpOnly session cookie set by POST /v1/auth/login. Browsers signed in to a console.
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    LoginDto:
+      type: object
+      properties:
+        merchantId:
+          type: string
+          description: Business to open the session against
+          format: uuid
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+    EndpointViewDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        merchantId:
+          type: string
+          example: m-1
+        url:
+          type: string
+          example: https://example.com/webhook
+        events:
+          type: array
+          items:
+            required: true
+            example:
+              - shipment.delivered
+              - shipment.exception
+            type: array
+            items:
+              type: string
+        status:
+          enum:
+            - ACTIVE
+            - PAUSED
+            - FAILING
+          type: string
+          example: ACTIVE
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - merchantId
+        - url
+        - events
+        - status
+        - createdAt
+    CreateWebhookDto:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+      required:
+        - url
+        - events
+    CreatedEndpointDto:
+      type: object
+      properties:
+        endpoint:
+          $ref: '#/components/schemas/EndpointViewDto'
+        secret:
+          type: string
+          example: whsec_abc123...
+          description: Signing secret, shown once at creation
+      required:
+        - endpoint
+        - secret
+    RotatedSecretDto:
+      type: object
+      properties:
+        secret:
+          type: string
+          example: whsec_new123...
+          description: New signing secret, shown once upon rotation
+      required:
+        - secret
+    DeliveryLogRowDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: del-123
+        endpointId:
+          type: string
+          example: ep-123
+        eventType:
+          type: string
+          example: shipment.delivered
+        attempt:
+          type: number
+          example: 1
+        statusCode:
+          type: number
+          nullable: true
+          example: 200
+        error:
+          type: string
+          nullable: true
+          example: null
+        delivered:
+          type: boolean
+          example: true
+        terminal:
+          type: boolean
+          example: true
+        attemptedAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - endpointId
+        - eventType
+        - attempt
+        - statusCode
+        - error
+        - delivered
+        - terminal
+        - attemptedAt
+    DeliveryLogPageDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryLogRowDto'
+        nextCursor:
+          type: string
+          nullable: true
+          example: cursor_xyz
+      required:
+        - data
+        - nextCursor
+    ReplayedDeliveryDto:
+      type: object
+      properties:
+        deliveryId:
+          type: string
+          example: del-456
+        endpointId:
+          type: string
+          example: ep-123
+        wireEvent:
+          type: string
+          example: shipment.delivered
+      required:
+        - deliveryId
+        - endpointId
+        - wireEvent
+    CreateApiKeyDto:
+      type: object
+      properties:
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - shipments:read
+              - shipments:write
+              - tracking:read
+              - hub:read
+              - hub:scan
+              - rider:sync
+              - pickup:create
+              - pickup:read
+              - delivery:create
+              - delivery:read
+              - delivery:complete
+              - returns:read
+              - returns:write
+              - cod:read
+              - settlements:read
+              - settlements:approve
+              - webhooks:manage
+              - notifications:manage
+              - keys:manage
+              - network:read
+      required:
+        - scopes
+    CreatedApiKeyDto:
+      type: object
+      properties:
+        keyId:
+          type: string
+          example: key_123456789
+        secret:
+          type: string
+          example: zz_live_abc123...
+          description: Raw secret, shown once at creation
+        scopes:
+          type: array
+          items:
+            required: true
+            items:
+              type: string
+              enum:
+                - shipments:read
+                - shipments:write
+                - tracking:read
+                - hub:read
+                - hub:scan
+                - rider:sync
+                - pickup:create
+                - pickup:read
+                - delivery:create
+                - delivery:read
+                - delivery:complete
+                - returns:read
+                - returns:write
+                - cod:read
+                - settlements:read
+                - settlements:approve
+                - webhooks:manage
+                - notifications:manage
+                - keys:manage
+                - network:read
+            example:
+              - shipments:read
+              - shipments:write
+            description: Granted API scopes
+            type: array
+      required:
+        - keyId
+        - secret
+        - scopes
+    CreateShipmentDto:
+      type: object
+      properties:
+        senderName:
+          type: string
+          maxLength: 120
+        senderPhone:
+          type: string
+          pattern: ^\+8801[3-9]\d{8}$
+        senderAddress:
+          type: string
+          maxLength: 400
+        recipientName:
+          type: string
+          maxLength: 120
+        recipientPhone:
+          type: string
+          pattern: ^\+8801[3-9]\d{8}$
+        recipientAddress:
+          type: string
+          maxLength: 400
+        parcelWeightGrams:
+          type: number
+          minimum: 1
+        parcelDescription:
+          type: string
+          maxLength: 200
+        codAmountMinor:
+          type: number
+          description: Money as integer minor units. A decimal here is a bug, not a convenience.
+          minimum: 1
+        codCurrency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        zone:
+          type: string
+          maxLength: 80
+        remoteArea:
+          type: boolean
+        fragile:
+          type: boolean
+        packagingKind:
+          type: string
+          maxLength: 40
+      required:
+        - senderName
+        - senderPhone
+        - senderAddress
+        - recipientName
+        - recipientPhone
+        - recipientAddress
+        - parcelWeightGrams
+        - parcelDescription
+        - zone
+        - remoteArea
+        - fragile
+    CodAmountDto:
+      type: object
+      properties:
+        amountMinor:
+          type: number
+          example: 125050
+          description: Integer minor units (poisha)
+        currency:
+          type: string
+          example: BDT
+          description: ISO currency code
+      required:
+        - amountMinor
+        - currency
+    CreatedShipmentDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        trackingCode:
+          type: string
+          example: ZZ-2610-ABCD
+        status:
+          type: string
+          example: CREATED
+        cod:
+          $ref: '#/components/schemas/CodAmountDto'
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - id
+        - trackingCode
+        - status
+        - cod
+        - createdAt
+        - replayed
+    ShipmentSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        trackingCode:
+          type: string
+          example: ZZ-2610-ABCD
+        status:
+          type: string
+          example: CREATED
+        merchantReference:
+          type: string
+          nullable: true
+          example: INV-1001
+        codAmountMinor:
+          type: number
+          example: 125050
+        codCurrency:
+          type: string
+          example: BDT
+        zone:
+          type: string
+          nullable: true
+          example: dhaka-metro
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - trackingCode
+        - status
+        - merchantReference
+        - codAmountMinor
+        - codCurrency
+        - zone
+        - createdAt
+    CursorPaginationDto:
+      type: object
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+          example: eyJsYXN0SWQiOiIxMjMifQ==
+          description: Opaque cursor for the next page; null on the last page
+        hasMore:
+          type: boolean
+          example: false
+          description: True when more rows exist past this page
+      required:
+        - nextCursor
+        - hasMore
+    ShipmentPageDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShipmentSummaryDto'
+        pagination:
+          $ref: '#/components/schemas/CursorPaginationDto'
+      required:
+        - data
+        - pagination
+    TimelineEntryDto:
+      type: object
+      properties:
+        eventType:
+          type: string
+          example: ShipmentCreated
+        occurredAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        actorType:
+          type: string
+          example: human
+          description: human | system | rider
+        metadata:
+          type: object
+          additionalProperties: true
+          example:
+            hubCode: DHK-01
+        correctsEventId:
+          type: string
+          nullable: true
+          example: null
+      required:
+        - eventType
+        - occurredAt
+        - actorType
+        - metadata
+        - correctsEventId
+    ShipmentDetailDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        trackingCode:
+          type: string
+          example: ZZ-2610-ABCD
+        status:
+          type: string
+          example: CREATED
+        merchantReference:
+          type: string
+          nullable: true
+          example: INV-1001
+        senderName:
+          type: string
+          example: Rahim
+        senderPhone:
+          type: string
+          example: '+8801700000000'
+        senderAddress:
+          type: string
+          example: House 1, Road 2, Dhanmondi, Dhaka
+        recipientName:
+          type: string
+          example: Karim
+        recipientPhone:
+          type: string
+          example: '+8801800000000'
+        recipientAddress:
+          type: string
+          example: Agrabad, Chattogram
+        parcelWeightGrams:
+          type: number
+          example: 1000
+        parcelDescription:
+          type: string
+          example: Books and stationery
+        codAmountMinor:
+          type: number
+          example: 125050
+        codCurrency:
+          type: string
+          example: BDT
+        zone:
+          type: string
+          nullable: true
+          example: dhaka-metro
+        pricingVersion:
+          type: number
+          example: 1
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEntryDto'
+      required:
+        - id
+        - trackingCode
+        - status
+        - merchantReference
+        - senderName
+        - senderPhone
+        - senderAddress
+        - recipientName
+        - recipientPhone
+        - recipientAddress
+        - parcelWeightGrams
+        - parcelDescription
+        - codAmountMinor
+        - codCurrency
+        - zone
+        - pricingVersion
+        - createdAt
+        - timeline
+    CancelledShipmentDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          type: string
+          example: CANCELLED
+      required:
+        - id
+        - status
+    UploadBulkDto:
+      type: object
+      properties:
+        csv:
+          type: string
+          maxLength: 10000000
+        filename:
+          type: string
+          maxLength: 255
+      required:
+        - csv
+        - filename
+    BulkJobViewDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: job-123
+        merchantId:
+          type: string
+          example: merchant-456
+        filename:
+          type: string
+          example: shipments.csv
+        status:
+          type: string
+          example: PENDING
+        totalRows:
+          type: number
+          example: 100
+        processedRows:
+          type: number
+          example: 0
+        succeededRows:
+          type: number
+          example: 0
+        failedRows:
+          type: number
+          example: 0
+        skippedRows:
+          type: number
+          example: 0
+      required:
+        - id
+        - merchantId
+        - filename
+        - status
+        - totalRows
+        - processedRows
+        - succeededRows
+        - failedRows
+        - skippedRows
+    BulkPreviewRowDto:
+      type: object
+      properties:
+        lineNumber:
+          type: number
+          example: 2
+        invoice:
+          type: string
+          example: INV-1001
+        outcome:
+          type: string
+          example: VALID
+        reason:
+          type: string
+          nullable: true
+          example: null
+      required:
+        - lineNumber
+        - invoice
+        - outcome
+        - reason
+    BulkPreviewDto:
+      type: object
+      properties:
+        job:
+          $ref: '#/components/schemas/BulkJobViewDto'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkPreviewRowDto'
+      required:
+        - job
+        - rows
+    AcceptBulkDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+      required:
+        - jobId
+    ReportExceptionDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+            - LOST
+            - DAMAGED
+        note:
+          type: string
+          nullable: true
+          maxLength: 500
+      required:
+        - reason
+    ReportedExceptionDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          type: string
+          example: LOST
+          description: Target exception status (e.g. LOST, DAMAGED)
+      required:
+        - shipmentId
+        - status
+    HoldDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+          maxLength: 500
+    HeldShipmentDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          type: string
+          example: HOLD
+      required:
+        - shipmentId
+        - status
+    QuoteDto:
+      type: object
+      properties:
+        weightGrams:
+          type: number
+          minimum: 1
+        codAmountMinor:
+          type: number
+          minimum: 0
+        zone:
+          type: string
+          maxLength: 80
+        remoteArea:
+          type: boolean
+        fragile:
+          type: boolean
+        packagingKind:
+          type: string
+          maxLength: 40
+        currency:
+          type: string
+          enum:
+            - BDT
+          pattern: ^[A-Z]{3}$
+        version:
+          type: number
+          minimum: 1
+      required:
+        - weightGrams
+        - codAmountMinor
+        - zone
+        - remoteArea
+        - fragile
+    CollectCodDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          format: uuid
+        collectedMinor:
+          type: number
+          description: Integer minor units. A decimal here is a bug, not a convenience.
+          minimum: 0
+      required:
+        - shipmentId
+        - collectedMinor
+    CollectedCodDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        expectedMinor:
+          type: number
+          example: 125050
+          description: Expected COD amount in minor units (poisha)
+        collectedMinor:
+          type: number
+          example: 125050
+          description: Collected COD amount in minor units (poisha)
+        shortfallMinor:
+          type: number
+          example: 0
+          description: 'Shortfall: expected - collected, 0 when fully collected'
+        status:
+          type: string
+          example: COLLECTED
+          description: COLLECTED | PARTIALLY_COLLECTED
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - shipmentId
+        - expectedMinor
+        - collectedMinor
+        - shortfallMinor
+        - status
+        - replayed
+    ReconcileCodDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          format: uuid
+        note:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required:
+        - shipmentId
+        - note
+    ReconciledCodDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          type: string
+          example: RECONCILED
+      required:
+        - shipmentId
+        - status
+    CodRecordSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        shipmentId:
+          type: string
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+        status:
+          type: string
+          example: COLLECTED
+        expectedMinor:
+          type: number
+          example: 125050
+        collectedMinor:
+          type: number
+          nullable: true
+          example: 125050
+        currency:
+          type: string
+          example: BDT
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - shipmentId
+        - status
+        - expectedMinor
+        - collectedMinor
+        - currency
+        - createdAt
+    CodRecordPageDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodRecordSummaryDto'
+        pagination:
+          $ref: '#/components/schemas/CursorPaginationDto'
+      required:
+        - data
+        - pagination
+    CodExceptionDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        shipmentId:
+          type: string
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+        expectedMinor:
+          type: number
+          example: 125050
+        collectedMinor:
+          type: number
+          nullable: true
+          example: 100000
+        differenceMinor:
+          type: number
+          example: -25050
+          description: collected - expected; negative means shortfall
+        currency:
+          type: string
+          example: BDT
+        reviewNote:
+          type: string
+          nullable: true
+          example: null
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - shipmentId
+        - expectedMinor
+        - collectedMinor
+        - differenceMinor
+        - currency
+        - reviewNote
+        - createdAt
+    CodExceptionPageDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodExceptionDto'
+        pagination:
+          $ref: '#/components/schemas/CursorPaginationDto'
+      required:
+        - data
+        - pagination
+    CreateManifestDto:
+      type: object
+      properties:
+        tripId:
+          type: string
+          format: uuid
+        shipmentIds:
+          type: array
+          items:
+            type: string
+      required:
+        - tripId
+        - shipmentIds
+    TripDto:
+      type: object
+      properties:
+        routeCode:
+          type: string
+      required:
+        - routeCode
+    RequestPickupDto:
+      type: object
+      properties:
+        shipmentIds:
+          minItems: 1
+          type: array
+          items:
+            type: string
+            format: uuid
+        totalWeightGrams:
+          type: number
+          minimum: 1
+      required:
+        - shipmentIds
+        - totalWeightGrams
+    AssignmentCandidateDto:
+      type: object
+      properties:
+        riderId:
+          type: string
+          format: uuid
+        distanceMetres:
+          type: number
+          nullable: true
+          minimum: 0
+        activeJobs:
+          type: number
+          minimum: 0
+        capacity:
+          type: number
+          minimum: 1
+        recentRefusals:
+          type: number
+          minimum: 0
+      required:
+        - riderId
+    AssignPickupDto:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignmentCandidateDto'
+      required:
+        - candidates
+    RegisterRiderDto:
+      type: object
+      properties:
+        displayName:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          pattern: ^\+8801[3-9]\d{8}$
+        capacity:
+          type: number
+          minimum: 1
+      required:
+        - displayName
+        - phone
+    RegisteredRiderDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          enum:
+            - SUSPENDED
+            - OFFLINE
+            - AVAILABLE
+            - ON_PICKUP
+            - ON_DELIVERY
+            - ON_BREAK
+          type: string
+          example: AVAILABLE
+      required:
+        - id
+        - status
+    DeviceCommandDto:
+      type: object
+      properties:
+        deviceSequence:
+          type: number
+          description: >-
+            The device's own monotonic counter. With `createdAt` it forms the dedupe key and the
+            order.
+          minimum: 1
+        createdAt:
+          type: string
+          description: >-
+            The device's clock. Deliberately not the server's — the server cannot know when it was
+            pressed.
+        commandType:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        expectedState:
+          type: object
+          additionalProperties: true
+          description: >-
+            What the device believed at the time. `{ status }` for a command about the rider,
+
+            `{ shipmentId, shipmentStatus }` for one about a parcel — the latter is what lets the
+            server
+
+            reject a scan of something that was cancelled while the phone was in a pocket.
+      required:
+        - deviceSequence
+        - createdAt
+        - commandType
+        - payload
+    ReplayDto:
+      type: object
+      properties:
+        commands:
+          minItems: 1
+          maxItems: 200
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceCommandDto'
+      required:
+        - commands
+    AckDto:
+      type: object
+      properties:
+        commandId:
+          type: string
+      required:
+        - commandId
+    RecordPositionDto:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        recordedAt:
+          type: string
+          description: The device's clock. A stale ping is refused by the service rather than applied.
+        accuracyMeters:
+          type: number
+      required:
+        - latitude
+        - longitude
+        - recordedAt
+    RecordAttemptDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+            - CUSTOMER_UNAVAILABLE
+            - WRONG_ADDRESS
+            - PHONE_UNREACHABLE
+            - CUSTOMER_REFUSED
+            - ADDRESS_INCOMPLETE
+            - PAYMENT_ISSUE
+            - DAMAGED_PACKAGE
+            - WEATHER
+            - OPERATIONAL_EXCEPTION
+        note:
+          type: string
+          maxLength: 500
+      required:
+        - reason
+    RecordedAttemptDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        sequence:
+          type: number
+          example: 1
+        status:
+          enum:
+            - CREATED
+            - OUT_FOR_DELIVERY
+            - DELIVERED
+            - FAILED
+            - ASSIGNED
+            - ACCEPTED
+            - ATTEMPTED
+          type: string
+          example: OUT_FOR_DELIVERY
+        retryScheduled:
+          type: boolean
+          example: true
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - jobId
+        - sequence
+        - status
+        - retryScheduled
+        - replayed
+    CreateDeliveryDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          format: uuid
+        riderId:
+          type: string
+          format: uuid
+      required:
+        - shipmentId
+    CreatedDeliveryJobDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        shipmentId:
+          type: string
+          example: shp-123
+        riderId:
+          type: string
+          nullable: true
+          example: r-123
+        status:
+          enum:
+            - CREATED
+            - OUT_FOR_DELIVERY
+            - DELIVERED
+            - FAILED
+            - ASSIGNED
+            - ACCEPTED
+            - ATTEMPTED
+          type: string
+          example: CREATED
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - id
+        - shipmentId
+        - status
+        - replayed
+    DeliveryStatusDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          enum:
+            - CREATED
+            - OUT_FOR_DELIVERY
+            - DELIVERED
+            - FAILED
+            - ASSIGNED
+            - ACCEPTED
+            - ATTEMPTED
+          type: string
+          example: ACCEPTED
+      required:
+        - id
+        - status
+    CompleteDeliveryDto:
+      type: object
+      properties:
+        collectedMinor:
+          type: number
+          description: Integer minor units collected at the door. A decimal here is a bug, not a convenience.
+          minimum: 0
+      required:
+        - collectedMinor
+    IssuedDeliveryCodeDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        status:
+          enum:
+            - PENDING
+          type: string
+          example: PENDING
+        expiresAt:
+          type: string
+          example: '2026-10-10T06:10:00.000Z'
+        attemptsRemaining:
+          type: number
+          example: 5
+        code:
+          type: string
+          example: '123456'
+          description: Plaintext OTP returned once and never stored
+      required:
+        - jobId
+        - status
+        - expiresAt
+        - attemptsRemaining
+        - code
+    SubmitProofDto:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request.
+        photoBase64:
+          type: string
+          description: 'Raw base64, no data: prefix — the client encodes the bytes and sends them.'
+          maxLength: 4000000
+        photoContentType:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/webp
+        latitude:
+          type: number
+          description: Where the parcel was handed over. Checked against Bangladesh, not trusted as a number.
+        longitude:
+          type: number
+      required:
+        - code
+        - photoBase64
+        - photoContentType
+        - latitude
+        - longitude
+    SubmittedDeliveryProofDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        proofId:
+          type: string
+          example: prf-123
+        status:
+          enum:
+            - VERIFIED
+          type: string
+          example: VERIFIED
+        photoSha256:
+          type: string
+          example: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        photoByteLength:
+          type: number
+          example: 254321
+        otpVerifiedAt:
+          type: string
+          example: '2026-10-10T06:05:00.000Z'
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - jobId
+        - proofId
+        - status
+        - photoSha256
+        - photoByteLength
+        - otpVerifiedAt
+        - replayed
+    SettlementItemDto:
+      type: object
+      properties:
+        entryId:
+          type: string
+          example: entry-123
+        type:
+          type: string
+          example: COD_COLLECTED
+        direction:
+          type: number
+          example: 1
+        amountMinor:
+          type: number
+          example: 125050
+      required:
+        - entryId
+        - type
+        - direction
+        - amountMinor
+    CreatedSettlementDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        reference:
+          type: string
+          example: SET-2610-0001
+        merchantId:
+          type: string
+          example: m-1
+        status:
+          type: string
+          example: PENDING
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementItemDto'
+        netMinor:
+          type: number
+          example: 1250500
+        currency:
+          type: string
+          example: BDT
+      required:
+        - id
+        - reference
+        - merchantId
+        - status
+        - items
+        - netMinor
+        - currency
+    ApproveSettlementDto:
+      type: object
+      properties:
+        approverId:
+          type: string
+          format: uuid
+      required:
+        - approverId
+    ApprovedSettlementDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        reference:
+          type: string
+          example: SET-2610-0001
+        status:
+          type: string
+          example: APPROVED
+        netMinor:
+          type: number
+          example: 1250500
+        currency:
+          type: string
+          example: BDT
+        approvedBy:
+          type: string
+          example: u-1
+        approvedAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - id
+        - reference
+        - status
+        - netMinor
+        - currency
+        - approvedBy
+        - approvedAt
+        - replayed
+    SettlementSummaryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        reference:
+          type: string
+          example: SET-2610-0001
+        status:
+          type: string
+          example: SETTLED
+        frozenNetMinor:
+          type: number
+          example: 1250500
+        currency:
+          type: string
+          example: BDT
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+      required:
+        - id
+        - reference
+        - status
+        - frozenNetMinor
+        - currency
+        - createdAt
+    SettlementPageDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementSummaryDto'
+        pagination:
+          $ref: '#/components/schemas/CursorPaginationDto'
+      required:
+        - data
+        - pagination
+    InitiatedSettlementPaymentDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        reference:
+          type: string
+          example: SET-2610-0001
+        status:
+          type: string
+          example: PROCESSING
+        paymentReference:
+          type: string
+          example: PAY-PROVIDER-123
+        netMinor:
+          type: number
+          example: 1250500
+        currency:
+          type: string
+          example: BDT
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - id
+        - reference
+        - status
+        - paymentReference
+        - netMinor
+        - currency
+        - replayed
+    ConfirmedSettlementPaymentDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        reference:
+          type: string
+          example: SET-2610-0001
+        status:
+          type: string
+          example: SETTLED
+        paymentReference:
+          type: string
+          example: PAY-PROVIDER-123
+        providerStatus:
+          type: string
+          example: COMPLETED
+        netMinor:
+          type: number
+          example: 1250500
+        currency:
+          type: string
+          example: BDT
+        replayed:
+          type: boolean
+          example: false
+          description: True when request was replayed via Idempotency-Key
+      required:
+        - id
+        - reference
+        - status
+        - paymentReference
+        - providerStatus
+        - netMinor
+        - currency
+        - replayed
+    BalanceLineDto:
+      type: object
+      properties:
+        type:
+          type: string
+          example: DELIVERY_FEE
+        direction:
+          type: number
+          example: 1
+          description: 1 for credit (owed to merchant), -1 for debit (owed by merchant)
+        amountMinor:
+          type: number
+          example: 125050
+          description: Sum of entries of this type in minor units
+        entries:
+          type: number
+          example: 42
+          description: How many ledger rows made up this line
+      required:
+        - type
+        - direction
+        - amountMinor
+        - entries
+    BalanceBlockDto:
+      type: object
+      properties:
+        status:
+          type: string
+          example: RECONCILIATION_EXCEPTION
+        count:
+          type: number
+          example: 2
+      required:
+        - status
+        - count
+    NextSettlementSummaryDto:
+      type: object
+      properties:
+        reference:
+          type: string
+          example: SET-2610-0001
+        netMinor:
+          type: number
+          example: 250000
+      required:
+        - reference
+        - netMinor
+    MerchantBalanceDto:
+      type: object
+      properties:
+        merchantId:
+          type: string
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        balanceMinor:
+          type: number
+          example: -1250500
+          description: 'Signed minor units: negative means owed to merchant'
+        currency:
+          type: string
+          example: BDT
+        asOf:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceLineDto'
+        blocked:
+          type: array
+          items:
+            $ref: '#/components/schemas/BalanceBlockDto'
+        blockedReason:
+          type: string
+          nullable: true
+          example: null
+        nextSettlement:
+          nullable: true
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/NextSettlementSummaryDto'
+      required:
+        - merchantId
+        - balanceMinor
+        - currency
+        - asOf
+        - lines
+        - blocked
+        - blockedReason
+        - nextSettlement
+    StatementLineDto:
+      type: object
+      properties:
+        entryId:
+          type: string
+          example: entry-123
+        type:
+          type: string
+          example: COD_COLLECTED
+        direction:
+          type: number
+          example: 1
+        amountMinor:
+          type: number
+          example: 125050
+        memo:
+          type: string
+          nullable: true
+          example: Delivery to Dhanmondi
+        occurredAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        shipmentId:
+          type: string
+          nullable: true
+          example: shp-123
+      required:
+        - entryId
+        - type
+        - direction
+        - amountMinor
+        - memo
+        - occurredAt
+        - shipmentId
+    SettlementStatementDto:
+      type: object
+      properties:
+        reference:
+          type: string
+          example: SET-2610-0001
+        status:
+          type: string
+          example: APPROVED
+        currency:
+          type: string
+          example: BDT
+        createdAt:
+          type: string
+          example: '2026-10-10T06:00:00.000Z'
+        netMinor:
+          type: number
+          example: 1250500
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementLineDto'
+      required:
+        - reference
+        - status
+        - currency
+        - createdAt
+        - netMinor
+        - lines
+    RequestReturnDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum:
+            - CUSTOMER_REFUSED
+            - CUSTOMER_UNAVAILABLE
+            - WRONG_ADDRESS
+            - DAMAGED
+            - MERCHANT_REQUEST
+            - OTHER
+      required:
+        - shipmentId
+        - reason
+    DecideReturnDto:
+      type: object
+      properties:
+        approverId:
+          type: string
+          format: uuid
+        note:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required:
+        - approverId
+        - note
+    SetNotificationPreferenceDto:
+      type: object
+      properties:
+        eventType:
+          type: string
+          enum:
+            - ShipmentCreated
+            - DeliveryOutForDelivery
+            - DeliveryCompleted
+        enabled:
+          type: boolean
+      required:
+        - eventType
+        - enabled
+    HubScanDto:
+      type: object
+      properties:
+        shipmentId:
+          type: string
+          format: uuid
+        scan:
+          type: string
+          enum:
+            - INBOUND
+            - SORT
+            - OUTBOUND
+            - DEPARTED
+            - ARRIVED
+        hubCode:
+          type: string
+          nullable: true
+      required:
+        - shipmentId
+        - scan
+    MerchantDayPointDto:
+      type: object
+      properties:
+        day:
+          type: string
+          example: '2026-10-09'
+          description: Asia/Dhaka day bucket
+        shipmentsCreated:
+          type: number
+          example: 42
+          description: Shipments created that day
+        pickedUp:
+          type: number
+          example: 38
+          description: Parcels picked up that day
+        delivered:
+          type: number
+          example: 31
+          description: Parcels delivered that day
+        currency:
+          type: string
+          nullable: true
+          example: BDT
+          description: Null when no COD was recorded that day
+        expectedMinor:
+          type: string
+          example: '1250500'
+          description: Expected COD in minor units (poisha), as a string
+        collectedMinor:
+          type: string
+          example: '900000'
+          description: Collected COD in minor units (poisha), as a string
+        settledMinor:
+          type: string
+          example: '700000'
+          description: Settled COD in minor units (poisha), as a string
+      required:
+        - day
+        - shipmentsCreated
+        - pickedUp
+        - delivered
+        - currency
+        - expectedMinor
+        - collectedMinor
+        - settledMinor
+    MerchantSeriesDto:
+      type: object
+      properties:
+        from:
+          type: string
+          example: '2026-09-10'
+          description: First day of the requested window, inclusive
+        to:
+          type: string
+          example: '2026-10-09'
+          description: Last day of the requested window, inclusive
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantDayPointDto'
+      required:
+        - from
+        - to
+        - days

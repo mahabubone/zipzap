@@ -43,6 +43,14 @@
         "summary": "The authenticated principal",
         "tags": [
           "identity"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -113,6 +121,17 @@
         "summary": "List your webhook endpoints",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "post": {
@@ -143,6 +162,17 @@
         "summary": "Register a webhook endpoint; secret returned once",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -174,6 +204,17 @@
         "summary": "Rotate the signing secret; new secret returned once",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -205,6 +246,17 @@
         "summary": "Pause delivery to an endpoint",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -236,6 +288,17 @@
         "summary": "Resume delivery to an endpoint",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -286,6 +349,17 @@
         "summary": "Every webhook delivery attempt for your endpoints, newest first",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -317,6 +391,17 @@
         "summary": "Replay a terminal delivery with a fresh delivery id",
         "tags": [
           "webhooks"
+        ],
+        "x-required-scopes": [
+          "webhooks:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -349,6 +434,23 @@
         "summary": "Create a scoped API key (secret shown once)",
         "tags": [
           "api-keys"
+        ],
+        "x-required-scopes": [
+          "keys:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -373,6 +475,12 @@
         "summary": "Live timeline events for one tracking code (SSE)",
         "tags": [
           "tracking"
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "public",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -397,6 +505,12 @@
         "summary": "Public tracking by unguessable token (26 chars, 130 bits) — not enumerable",
         "tags": [
           "tracking"
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "public",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -421,6 +535,12 @@
         "summary": "Public shipment tracking by tracking code",
         "tags": [
           "tracking"
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "public",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -462,6 +582,23 @@
         "summary": "Create a shipment",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       },
       "get": {
@@ -544,6 +681,23 @@
         "summary": "List your shipments, newest first",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -575,6 +729,23 @@
         "summary": "Get one of your shipments",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -606,6 +777,23 @@
         "summary": "Cancel a shipment that has not shipped yet",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -638,6 +826,17 @@
         "summary": "Upload CSV, get the human preview checkpoint",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -670,6 +869,17 @@
         "summary": "Accept the preview — enqueue chunked processing",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -701,6 +911,17 @@
         "summary": "Poll job progress",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -725,6 +946,17 @@
         "summary": "Download the row-level result CSV",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -766,6 +998,23 @@
         "summary": "Report a LOST or DAMAGED exception for one of your shipments",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -807,6 +1056,23 @@
         "summary": "Put one of your shipments on hold (pauses movement)",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -838,6 +1104,23 @@
         "summary": "Release a held shipment back to its interrupted state",
         "tags": [
           "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -863,6 +1146,14 @@
         "summary": "Quote a shipment price",
         "tags": [
           "pricing"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -878,6 +1169,14 @@
         "summary": "Your rate card, with worked examples",
         "tags": [
           "pricing"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -919,6 +1218,14 @@
         "summary": "Record a COD collection",
         "tags": [
           "cod"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -951,6 +1258,14 @@
         "summary": "Resolve a COD mismatch after human review",
         "tags": [
           "cod"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -990,6 +1305,23 @@
         "summary": "List your COD records, newest first",
         "tags": [
           "cod"
+        ],
+        "x-required-scopes": [
+          "cod:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -1029,6 +1361,23 @@
         "summary": "Unreviewed COD reconciliation exceptions, newest first",
         "tags": [
           "cod"
+        ],
+        "x-required-scopes": [
+          "cod:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -1053,6 +1402,14 @@
         "summary": "Serviceability check for one zone",
         "tags": [
           "coverage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1068,6 +1425,14 @@
         "summary": "Every zone you can ship to",
         "tags": [
           "coverage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1092,6 +1457,17 @@
         "summary": "Manifests, newest first, optionally by status",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "post": {
@@ -1115,6 +1491,17 @@
         "summary": "Schedule a trip, or create a DRAFT manifest on an existing one",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1139,6 +1526,17 @@
         "summary": "One manifest and the parcels on it",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1164,6 +1562,17 @@
         "summary": "Schedule one run of a seeded route",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1188,6 +1597,17 @@
         "summary": "DRAFT → SEALED. A sealed manifest is evidence of what left.",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1212,6 +1632,17 @@
         "summary": "SEALED → DISPATCHED",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1236,6 +1667,17 @@
         "summary": "DISPATCHED → RECEIVED",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1260,6 +1702,17 @@
         "summary": "RECEIVED → RECONCILED, refused while any parcel has not arrived",
         "tags": [
           "manifests"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1294,6 +1747,17 @@
         "summary": "Request a pickup",
         "tags": [
           "pickups"
+        ],
+        "x-required-scopes": [
+          "pickup:create"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "get": {
@@ -1324,6 +1788,23 @@
         "summary": "List your pickups, newest first",
         "tags": [
           "pickups"
+        ],
+        "x-required-scopes": [
+          "pickup:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -1366,6 +1847,17 @@
         "summary": "Assign a rider to a pickup",
         "tags": [
           "pickups"
+        ],
+        "x-required-scopes": [
+          "pickup:create"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1398,6 +1890,14 @@
         "summary": "Register a rider",
         "tags": [
           "riders"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1438,6 +1938,17 @@
         "summary": "Pull pending commands for an offline rider",
         "tags": [
           "riders"
+        ],
+        "x-required-scopes": [
+          "rider:sync"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1472,6 +1983,17 @@
         "summary": "A device pushing its own offline commands back, in device order, exactly once each",
         "tags": [
           "riders"
+        ],
+        "x-required-scopes": [
+          "rider:sync"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1514,6 +2036,17 @@
         "summary": "Acknowledge one queued command",
         "tags": [
           "riders"
+        ],
+        "x-required-scopes": [
+          "rider:sync"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1548,6 +2081,17 @@
         "summary": "Record a rider position. Never visible on public tracking.",
         "tags": [
           "riders"
+        ],
+        "x-required-scopes": [
+          "rider:sync"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1572,6 +2116,14 @@
         "summary": "Rider's current load factor",
         "tags": [
           "riders"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1587,6 +2139,14 @@
         "summary": "Pool-wide rider utilisation KPI",
         "tags": [
           "riders"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1636,6 +2196,17 @@
         "summary": "Record a failed delivery attempt",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1677,6 +2248,17 @@
         "summary": "Open a delivery job",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:create"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1708,6 +2290,17 @@
         "summary": "Rider accepts a delivery job",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1739,6 +2332,17 @@
         "summary": "Rider heads out for delivery",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1788,6 +2392,17 @@
         "summary": "Confirm delivery and collect COD",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1828,6 +2443,17 @@
         "summary": "Issue a delivery code for the recipient to read out",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1878,6 +2504,17 @@
         "summary": "Redeem a delivery code with a photo and a location",
         "tags": [
           "deliveries"
+        ],
+        "x-required-scopes": [
+          "delivery:complete"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -1900,6 +2537,17 @@
         "summary": "Freeze your unsettled entries into a settlement",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "get": {
@@ -1937,6 +2585,23 @@
         "summary": "List your settlements, newest first",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -1986,6 +2651,17 @@
         "summary": "Approve a settlement — the point of no return",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:approve"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2025,6 +2701,17 @@
         "summary": "Initiate the provider payout for an approved settlement",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:approve"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2064,6 +2751,17 @@
         "summary": "Confirm the provider payout and settle",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:approve"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2086,6 +2784,17 @@
         "summary": "Your derived balance, itemised, with anything blocking a payout",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2117,6 +2826,17 @@
         "summary": "One settlement, itemised",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2141,6 +2861,17 @@
         "summary": "Download the itemised statement",
         "tags": [
           "settlements"
+        ],
+        "x-required-scopes": [
+          "settlements:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2175,6 +2906,17 @@
         "summary": "Request a return against the original shipment",
         "tags": [
           "returns"
+        ],
+        "x-required-scopes": [
+          "returns:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "get": {
@@ -2205,6 +2947,23 @@
         "summary": "List your returns, newest first",
         "tags": [
           "returns"
+        ],
+        "x-required-scopes": [
+          "returns:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
         ]
       }
     },
@@ -2239,6 +2998,17 @@
         "summary": "Approve a return — the merchant decision",
         "tags": [
           "returns"
+        ],
+        "x-required-scopes": [
+          "returns:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2273,6 +3043,17 @@
         "summary": "Reject a return — the merchant decision",
         "tags": [
           "returns"
+        ],
+        "x-required-scopes": [
+          "returns:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2297,6 +3078,17 @@
         "summary": "Walk one transit leg toward the merchant",
         "tags": [
           "returns"
+        ],
+        "x-required-scopes": [
+          "returns:write"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2313,6 +3105,17 @@
         "summary": "Which parcel notifications your customers receive",
         "tags": [
           "notifications"
+        ],
+        "x-required-scopes": [
+          "notifications:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       },
       "put": {
@@ -2337,6 +3140,17 @@
         "summary": "Opt one event out, or back in",
         "tags": [
           "notifications"
+        ],
+        "x-required-scopes": [
+          "notifications:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2362,6 +3176,23 @@
         "summary": "Record a hub scan for a shipment",
         "tags": [
           "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:scan"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": true
+          }
         ]
       }
     },
@@ -2377,6 +3208,17 @@
         "summary": "Every hub and how many parcels are waiting at it",
         "tags": [
           "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2409,6 +3251,17 @@
         "summary": "Parcels waiting at one hub, and the scan each needs next",
         "tags": [
           "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2424,6 +3277,17 @@
         "summary": "Live network counts, one snapshot in time",
         "tags": [
           "control-tower"
+        ],
+        "x-required-scopes": [
+          "network:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2460,6 +3324,17 @@
         "summary": "Operational KPI report: projection ranges plus live snapshot",
         "tags": [
           "control-tower"
+        ],
+        "x-required-scopes": [
+          "network:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2475,6 +3350,17 @@
         "summary": "Hubs and rider positions for the live map. Rider positions never reach public tracking.",
         "tags": [
           "control-tower"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2518,6 +3404,17 @@
         "summary": "Your own daily parcel counts and COD money, one point per day",
         "tags": [
           "analytics"
+        ],
+        "x-required-scopes": [
+          "cod:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     },
@@ -2550,24 +3447,122 @@
         "summary": "A rider's pickup and delivery jobs, newest first",
         "tags": [
           "riders"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
         ]
       }
     }
   },
   "info": {
     "title": "ZipZap API",
-    "description": "Logistics operating system for e-commerce fulfillment and last-mile delivery.",
+    "description": "Logistics operating system for e-commerce fulfillment and last-mile delivery.\n\nBangladesh first. Models a real courier business end to end: order, pricing, pickup,\norigin hub, line-haul, destination hub, last-mile, COD, settlement.\n\n## Credentials\n\nEvery `/v1` endpoint except `auth/login` and the public `/track` routes needs a\ncredential. Two forms work on the same `Authorization` header:\n\n- `Authorization: Bearer <session-token>` — a session from `POST /v1/auth/login`.\n- `Authorization: ApiKey <key-id>.<secret>` — a machine principal.\n\nA browser signed in through a ZipZap console sends `Cookie: zipzap_session=<token>`\ninstead; see `docs/api/auth.md`.\n\n## What an operation requires\n\n`x-required-scopes` lists the scope(s) the operation enforces, taken from its own\n`ScopeGuard` rather than restated by hand. `x-rate-limit` names the bucket it draws from\nand whether that bucket closes or opens when Redis is unreachable.\n\n## Errors\n\nEvery failure is the §87 envelope described by `ErrorEnvelopeDto`: `type`, `title`,\n`status`, `code`, `detail`, `request_id`. Switch on `code`; `title` and `detail` are\nprose and may be reworded. Nothing else is ever returned as an error body.\n\n## Money\n\nInteger minor units (poisha) plus a currency. Per-row amounts are JSON numbers with\n`type: integer`; aggregates are decimal strings, because a sum can exceed what a JSON\nnumber represents exactly. Never a float — see `docs/ADR/0009-money-representation.md`.\n\n## Idempotency\n\nMutations listed in `docs/api/idempotency.md` require an `Idempotency-Key` header.\nReplaying the same key returns the original result rather than applying the mutation\ntwice.",
     "version": "1.0",
     "contact": {}
   },
-  "tags": [],
-  "servers": [],
+  "tags": [
+    {
+      "name": "analytics",
+      "description": "Read-only projections of your own parcel and money history."
+    },
+    {
+      "name": "cod",
+      "description": "Cash-on-delivery records, exceptions, and reconciliation."
+    },
+    {
+      "name": "control-tower",
+      "description": "The network-wide operational picture."
+    },
+    {
+      "name": "dashboard",
+      "description": "Live operational counts and the control-tower report."
+    },
+    {
+      "name": "deliveries",
+      "description": "Delivery jobs, attempts, and proof of delivery."
+    },
+    {
+      "name": "finance",
+      "description": "Settlements, statements and merchant balance."
+    },
+    {
+      "name": "health",
+      "description": "Liveness and readiness probes."
+    },
+    {
+      "name": "hubs",
+      "description": "Hub inventory and the scan-first dock console."
+    },
+    {
+      "name": "identity",
+      "description": "Sessions, credentials and the authenticated principal."
+    },
+    {
+      "name": "merchant",
+      "description": "Merchant-scoped settings: API keys and notification preferences."
+    },
+    {
+      "name": "network",
+      "description": "Manifests, line-haul trips, coverage and zones."
+    },
+    {
+      "name": "notifications",
+      "description": "Which messages a merchant sends, and over which channel."
+    },
+    {
+      "name": "pickups",
+      "description": "Pickup requests and rider assignment."
+    },
+    {
+      "name": "returns",
+      "description": "Return requests and decisions."
+    },
+    {
+      "name": "riders",
+      "description": "Rider registration, positions, utilisation and the offline command queue."
+    },
+    {
+      "name": "shipments",
+      "description": "Shipment lifecycle: create, quote, track, hold, release, cancel."
+    },
+    {
+      "name": "tracking",
+      "description": "Public, credential-free parcel tracking by code."
+    },
+    {
+      "name": "webhooks",
+      "description": "Outbound webhook endpoints, delivery log and replay."
+    }
+  ],
+  "servers": [
+    {
+      "url": "/",
+      "description": "Same origin — the web apps proxy /api here."
+    }
+  ],
   "components": {
     "securitySchemes": {
       "ApiKey": {
         "type": "apiKey",
         "in": "header",
-        "name": "Authorization"
+        "name": "Authorization",
+        "description": "Bearer <session-token> or ApiKey <key-id>.<secret>. Same header, two principal kinds."
+      },
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "zipzap_session",
+        "description": "HttpOnly session cookie set by POST /v1/auth/login. Browsers signed in to a console."
+      },
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
       }
     },
     "schemas": {
