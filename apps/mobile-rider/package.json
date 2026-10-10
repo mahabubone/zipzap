@@ -4,11 +4,28 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "expo start",
+    "build": "expo export",
+    "typecheck": "tsc --noEmit",
     "verify:queue": "node scripts/verify-queue.mjs",
-    "typecheck": "tsc --noEmit"
+    "verify:client": "node scripts/verify-client.mjs"
   },
-  "//": "The offline queue and its proof only. No Expo, no React Native, no app shell yet — see the note in src/offline/command-queue.ts about why the logic is framework-free and separately provable.",
+  "dependencies": {
+    "@tanstack/react-query": "^5.80.0",
+    "@zipzap/api-client": "workspace:*",
+    "expo": "^52.0.0",
+    "react": "19.3.0",
+    "react-native": "0.76.0"
+  },
   "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/runtime": "^8.0.7",
+    "@expo/metro-runtime": "~4.0.1",
+    "@types/node": "24.10.1",
+    "@types/react": "^19.3.0",
+    "@types/react-native": "^0.73.0",
+    "react-dom": "19.3.0",
+    "react-native-web": "^0.21.4",
     "typescript": "6.0.3"
   }
 }

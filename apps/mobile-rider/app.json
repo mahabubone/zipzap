@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "ZipZap Rider",
+    "slug": "zipzap-rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zipzap.rider"
+    },
+    "android": {
+      "package": "com.zipzap.rider"
+    },
+    "plugins": []
+  }
+}

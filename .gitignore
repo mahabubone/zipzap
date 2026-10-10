@@ -40,3 +40,10 @@ infra/compose/**/data/
 
 # Repository Custom needs
 prompt.txt
+
+# Expo web export + local caches (regenerate with `expo export`)
+apps/mobile-rider/dist-web/
+apps/mobile-rider/.expo-cache/
+apps/mobile-rider/.expohome/
+apps/mobile-rider/.cache/
+apps/mobile-rider/.tmp/
