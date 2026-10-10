@@ -60,10 +60,10 @@ Two reasons this is a separate projection rather than a filtered query:
 
 Two public routes, both rate-limited per IP at 100/min, both reading only this projection:
 
-| Route | Space | Use |
-| --- | --- | --- |
+| Route                  | Space                                             | Use                             |
+| ---------------------- | ------------------------------------------------- | ------------------------------- |
 | `/track/:trackingCode` | `ZP-` + 10 chars of a 32-letter alphabet ≈ 1.1e15 | Links already sent to customers |
-| `/track/token/:token` | 26 chars of the same alphabet = 130 bits | Links issued from now on |
+| `/track/token/:token`  | 26 chars of the same alphabet = 130 bits          | Links issued from now on        |
 
 The token is **added alongside** the code, not swapped for it. Every code-shaped link already sits
 in a customer's inbox or on a printed label; replacing the route breaks all of them to fix a problem

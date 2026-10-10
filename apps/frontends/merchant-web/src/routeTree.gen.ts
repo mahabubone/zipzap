@@ -18,6 +18,7 @@ import { Route as AppMoneyRouteImport } from './routes/app/money'
 import { Route as AppPricingRouteImport } from './routes/app/pricing'
 import { Route as AppSettlementsRouteImport } from './routes/app/settlements'
 import { Route as AppShipmentsRouteImport } from './routes/app/shipments'
+import { Route as AppWebhooksRouteImport } from './routes/app/webhooks'
 import { Route as AppSettlementsIndexRouteImport } from './routes/app/settlements.index'
 import { Route as AppSettlementsIdRouteImport } from './routes/app/settlements.$id'
 import { Route as AppShipmentsIndexRouteImport } from './routes/app/shipments.index'
@@ -70,6 +71,11 @@ const AppShipmentsRoute = AppShipmentsRouteImport.update({
   path: '/shipments',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWebhooksRoute = AppWebhooksRouteImport.update({
+  id: '/webhooks',
+  path: '/webhooks',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettlementsIndexRoute = AppSettlementsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/app/pricing': typeof AppPricingRoute
   '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app/': typeof AppIndexRoute
   '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/app/cod': typeof AppCodRoute
   '/app/money': typeof AppMoneyRoute
   '/app/pricing': typeof AppPricingRoute
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app': typeof AppIndexRoute
   '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/app/pricing': typeof AppPricingRoute
   '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app/': typeof AppIndexRoute
   '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/app/pricing'
     | '/app/settlements'
     | '/app/shipments'
+    | '/app/webhooks'
     | '/app/'
     | '/app/settlements/$id'
     | '/app/shipments/$id'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/app/cod'
     | '/app/money'
     | '/app/pricing'
+    | '/app/webhooks'
     | '/app'
     | '/app/settlements/$id'
     | '/app/shipments/$id'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/app/pricing'
     | '/app/settlements'
     | '/app/shipments'
+    | '/app/webhooks'
     | '/app/'
     | '/app/settlements/$id'
     | '/app/shipments/$id'
@@ -270,6 +282,13 @@ declare module '@tanstack/react-router' {
       path: '/shipments'
       fullPath: '/app/shipments'
       preLoaderRoute: typeof AppShipmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/webhooks': {
+      id: '/app/webhooks'
+      path: '/webhooks'
+      fullPath: '/app/webhooks'
+      preLoaderRoute: typeof AppWebhooksRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/settlements/': {
@@ -355,6 +374,7 @@ interface AppRouteChildren {
   AppPricingRoute: typeof AppPricingRoute
   AppSettlementsRoute: typeof AppSettlementsRouteWithChildren
   AppShipmentsRoute: typeof AppShipmentsRouteWithChildren
+  AppWebhooksRoute: typeof AppWebhooksRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
@@ -364,6 +384,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPricingRoute: AppPricingRoute,
   AppSettlementsRoute: AppSettlementsRouteWithChildren,
   AppShipmentsRoute: AppShipmentsRouteWithChildren,
+  AppWebhooksRoute: AppWebhooksRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

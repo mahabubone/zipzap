@@ -775,9 +775,9 @@ Competitive deltas, in order of value:
 
 **What the token actually needed.** Reading the code first changed this item twice.
 
-| This plan originally said   | Reality                                                                                                                                              |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "swap in a token"           | **Added alongside.** `/track/:code` stays. Those links are already in customers' inboxes and on printed labels; a cut-over breaks all of them |
+| This plan originally said             | Reality                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "swap in a token"                     | **Added alongside.** `/track/:code` stays. Those links are already in customers' inboxes and on printed labels; a cut-over breaks all of them                    |
 | "mint it where the parcel is created" | The shipment module cannot write `tracking.public_tokens` (rule 2). Minted by the projection consumer, `ON CONFLICT DO NOTHING` so a replay cannot rotate a link |
 
 Proved by `apps/backend/scripts/verify-tokens.mjs`, 36 assertions against a running API and real
@@ -787,7 +787,7 @@ Postgres. The token is minted by the real consumer booted from `dist/`, not inse
 **The proof found a defect the token was not looking for.** The consumer allocates
 `public_timeline.sequence` as `MAX(sequence) + 1` with no lock, so concurrent projections collide;
 1,658 duplicate `(tracking_code, sequence)` pairs exist. `ORDER BY sequence` is therefore a partial
-order, and two routes over the same rows returned them in *different* orders — and since `status` is
+order, and two routes over the same rows returned them in _different_ orders — and since `status` is
 read off the last row, one parcel reported two different current states. Reads now order by
 `sequence, occurred_at, id`, confirmed by A/B against the pre-fix build. The allocation race itself is
 **unfixed**: a unique index cannot be added while duplicates exist and rule 8 forbids editing history,

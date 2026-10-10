@@ -20,6 +20,7 @@ const LINKS = [
   { label: 'Reconciliation', href: '/app/cod' },
   { label: 'Settlements', href: '/app/settlements' },
   { label: 'Rate card', href: '/app/pricing' },
+  { label: 'Webhooks', href: '/app/webhooks' },
 ] as const;
 
 function navFor(pathname: string): NavGroup[] {

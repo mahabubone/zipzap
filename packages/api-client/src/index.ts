@@ -870,6 +870,61 @@ export class ZipZapClient {
     return data;
   }
 
+  /* ---------------------------------------------------------------- rider mobile
+   *
+   * The rider app interacts with offline sync and job execution.
+   */
+
+  /** GET /v1/riders/:riderId/jobs — one rider's pickups and delivery jobs. */
+  async riderJobs(
+    riderId: string,
+    limit?: number,
+  ): Promise<{
+    pickups: Array<{
+      id: string;
+      merchantId: string;
+      shipmentIds: string[];
+      riderId: string | null;
+      status: string;
+      totalWeightGrams: number;
+      createdAt: string;
+    }>;
+    deliveries: Array<{
+      id: string;
+      shipmentId: string;
+      riderId: string;
+      status: string;
+      attemptsMade: number;
+      lastFailureReason: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    const { data } = await this.request<{
+      pickups: Array<{
+        id: string;
+        merchantId: string;
+        shipmentIds: string[];
+        riderId: string | null;
+        status: string;
+        totalWeightGrams: number;
+        createdAt: string;
+      }>;
+      deliveries: Array<{
+        id: string;
+        shipmentId: string;
+        riderId: string;
+        status: string;
+        attemptsMade: number;
+        lastFailureReason: string | null;
+        createdAt: string;
+      }>;
+    }>(`/v1/riders/${encodeURIComponent(riderId)}/jobs`, {
+      method: 'GET',
+      query: limit !== undefined ? { limit: String(limit) } : {},
+    });
+    return data;
+  }
+
   /** GET /v1/control-tower/live-counts — the control tower snapshot. */
   async liveCounts(): Promise<LiveCounts> {
     const { data } = await this.request<LiveCounts>('/v1/control-tower/live-counts', {
@@ -990,5 +1045,236 @@ export class ZipZapClient {
       throw new ZipZapApiError(errorEnvelopeOf(body, response.status), null);
     }
     return response.text();
+  }
+
+  /* ---------------------------------------------------------------- rider mobile
+   *
+   * The rider app interacts with offline sync and job execution.
+   */
+
+  /** GET /v1/riders/:riderId/sync — pull work queued for this rider. */
+  async pullRiderSync(
+    riderId: string,
+    options?: { sinceSeq?: string; limit?: string },
+  ): Promise<{
+    commands: Array<{
+      id: string;
+      commandType: string;
+      payload: Record<string, unknown>;
+      expectedState: Record<string, unknown> | null;
+      deviceSequence: number;
+      createdAt: string;
+    }>;
+    queueSize: number;
+    capWarning: boolean;
+  }> {
+    const { data } = await this.request<{
+      commands: Array<{
+        id: string;
+        commandType: string;
+        payload: Record<string, unknown>;
+        expectedState: Record<string, unknown> | null;
+        deviceSequence: number;
+        createdAt: string;
+      }>;
+      queueSize: number;
+      capWarning: boolean;
+    }>(`/v1/riders/${encodeURIComponent(riderId)}/sync`, {
+      method: 'GET',
+      query: options,
+    });
+    return data;
+  }
+
+  /** POST /v1/riders/:riderId/sync/ack — acknowledge work executed. */
+  async ackRiderSync(
+    riderId: string,
+    commandId: string,
+    idempotencyKey: string,
+  ): Promise<{
+    outcome: { kind: string; replayed: boolean };
+    createdAt: string;
+  }> {
+    const { data } = await this.request<{
+      outcome: { kind: string; replayed: boolean };
+      createdAt: string;
+    }>(
+      `/v1/riders/${encodeURIComponent(riderId)}/sync/ack`,
+      {
+        method: 'POST',
+        body: { commandId },
+      },
+      idempotencyKey,
+    );
+    return data;
+  }
+
+  /** POST /v1/riders/:riderId/sync/replay — device pushing its queued work batch. */
+  async replayRiderSync(
+    riderId: string,
+    commands: Array<{
+      deviceSequence: number;
+      createdAt: string;
+      commandType: string;
+      payload: Record<string, unknown>;
+      expectedState?: Record<string, unknown>;
+    }>,
+  ): Promise<{
+    results: Array<{
+      deviceSequence: number;
+      commandId: string;
+      kind: 'applied' | 'rejected' | 'duplicate';
+      reason: string | null;
+    }>;
+    queueSize: number;
+    capWarning: boolean;
+  }> {
+    const { data } = await this.request<{
+      results: Array<{
+        deviceSequence: number;
+        commandId: string;
+        kind: 'applied' | 'rejected' | 'duplicate';
+        reason: string | null;
+      }>;
+      queueSize: number;
+      capWarning: boolean;
+    }>(`/v1/riders/${encodeURIComponent(riderId)}/sync/replay`, {
+      method: 'POST',
+      body: { commands },
+    });
+    return data;
+  }
+
+  /* ---------------------------------------------------------------- developer & webhooks
+   *
+   * Developer portal & webhook management for merchants.
+   */
+
+  /** GET /v1/webhooks — list your registered webhook endpoints */
+  async listWebhooks(): Promise<
+    Array<{
+      id: string;
+      merchantId: string;
+      url: string;
+      events: string[];
+      status: 'ACTIVE' | 'PAUSED';
+      createdAt: string;
+    }>
+  > {
+    const { data } = await this.request<
+      Array<{
+        id: string;
+        merchantId: string;
+        url: string;
+        events: string[];
+        status: 'ACTIVE' | 'PAUSED';
+        createdAt: string;
+      }>
+    >('/v1/webhooks', { method: 'GET' });
+    return data;
+  }
+
+  /** POST /v1/webhooks — register a new webhook endpoint (returns secret once) */
+  async createWebhook(body: { url: string; events: string[] }): Promise<{
+    endpoint: {
+      id: string;
+      merchantId: string;
+      url: string;
+      events: string[];
+      status: 'ACTIVE' | 'PAUSED';
+      createdAt: string;
+    };
+    secret: string;
+  }> {
+    const { data } = await this.request<{
+      endpoint: {
+        id: string;
+        merchantId: string;
+        url: string;
+        events: string[];
+        status: 'ACTIVE' | 'PAUSED';
+        createdAt: string;
+      };
+      secret: string;
+    }>('/v1/webhooks', { method: 'POST', body });
+    return data;
+  }
+
+  /** GET /v1/webhooks/deliveries — delivery attempts log */
+  async listWebhookDeliveries(options?: {
+    endpointId?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      endpointId: string;
+      eventType: string;
+      attempt: number;
+      statusCode: number | null;
+      error: string | null;
+      delivered: boolean;
+      terminal: boolean;
+      attemptedAt: string;
+    }>;
+    nextCursor: string | null;
+  }> {
+    const { data } = await this.request<{
+      data: Array<{
+        id: string;
+        endpointId: string;
+        eventType: string;
+        attempt: number;
+        statusCode: number | null;
+        error: string | null;
+        delivered: boolean;
+        terminal: boolean;
+        attemptedAt: string;
+      }>;
+      nextCursor: string | null;
+    }>('/v1/webhooks/deliveries', {
+      method: 'GET',
+      query: {
+        endpointId: options?.endpointId,
+        cursor: options?.cursor,
+        limit: options?.limit !== undefined ? String(options.limit) : undefined,
+      },
+    });
+    return data;
+  }
+
+  /** POST /v1/webhooks/deliveries/:deliveryId/replay — replay a failed delivery */
+  async replayWebhookDelivery(deliveryId: string): Promise<{
+    deliveryId: string;
+    endpointId: string;
+    wireEvent: string;
+  }> {
+    const { data } = await this.request<{
+      deliveryId: string;
+      endpointId: string;
+      wireEvent: string;
+    }>(`/v1/webhooks/deliveries/${encodeURIComponent(deliveryId)}/replay`, {
+      method: 'POST',
+      body: {},
+    });
+    return data;
+  }
+
+  /** POST /v1/api-keys — mint a new merchant API key (secret returned once) */
+  async createApiKey(body: { name: string; scopes: string[] }): Promise<{
+    id: string;
+    keyId: string;
+    secret: string;
+    name: string;
+    scopes: string[];
+  }> {
+    const { data } = await this.request<{
+      id: string;
+      keyId: string;
+      secret: string;
+      name: string;
+      scopes: string[];
+    }>('/v1/api-keys', { method: 'POST', body });
+    return data;
   }
 }
