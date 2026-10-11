@@ -9,6 +9,19 @@ infra/compose/**/data
 # prettier rewrite would churn every quote on each regeneration.
 apps/backend/openapi.json
 apps/backend/openapi.yaml
+
+# Agent-manager worktrees. Each is a full second copy of the repository, so a bare `**/*` glob
+# walks thousands of files that are not part of this checkout, and formats things this repo has
+# already committed a different way. Excluded rather than deleted because the worktree may still
+# hold unmerged work.
+.kilo/worktrees/
+
+# Agent-manager UI/recovery state. Written by the extension, not by hand.
+.kilo/*.json
+
+# Leftover from a root-owned build attempt. Untracked and unmovable as the current user, so it is
+# ignored rather than deleted. `apps/backend/dist` is the real build output.
+apps/backend/dist.root-owned/**
 packages/api-client/src/generated.d.ts
 apps/mobile-rider/dist-web/**
 
