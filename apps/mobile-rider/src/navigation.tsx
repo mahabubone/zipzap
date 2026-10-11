@@ -37,7 +37,8 @@ import type { RiderClient } from './rider-client.ts';
 import { colors, typography, space } from './theme.ts';
 import type { AutoSync } from './hooks/useAutoSync.ts';
 import { RiderTabBar } from './components/RiderTabBar.tsx';
-import { JobsScreen, toJobRows, type JobRow, type RiderJobs } from './screens/JobsScreen.tsx';
+import { HomeScreen } from './screens/HomeScreen.tsx';
+import { toJobRows, type JobRow, type RiderJobs } from './screens/JobsScreen.tsx';
 import { JobDetailScreen } from './screens/JobDetailScreen.tsx';
 import { ProofScreen } from './screens/ProofScreen.tsx';
 import { SyncScreen } from './screens/SyncScreen.tsx';
@@ -165,7 +166,7 @@ function JobsStackNavigator({ props }: { props: ScreenProps }) {
     >
       <JobsStack.Screen name="Jobs" options={{ headerShown: false }}>
         {() => (
-          <JobsScreen
+          <HomeScreen
             riderClient={props.riderClient}
             offline={props.offline}
             onOpenJob={useOpenJob()}

@@ -7,13 +7,12 @@ _contract_ and its offline core. This document is about the _screen_.
 
 **The three competitors this file usually benchmarks against have no public rider apps.**
 
-| Competitor | Rider app                          | Evidence                                                                                                                                                                                                              |
-| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Steadfast  | ❌ none                            | Six plausible package IDs probed (`com.steadfast.rider`, `.agent`, `.delivery`, `.courier`, `.riderapp`, `.steadfastrider`) — all 404. Riders appear to use an in-house build tool. ([steadfast.md](steadfast.md):61) |
-| RedX       | ❌ none verified                   | `/redx-truck-driver-app-policy` is a legal document for the FTL/LTL truck network, not a rider app. ([redx.md](redx.md):81)                                                                                           |
-| CarryBee   | ❌ none found                      | —                                                                                                                                                                                                                     |
+| Competitor | Rider app                          | Evidence                                                                                                                                                                                                                                    |
+| ---------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Steadfast  | ❌ none                            | Six plausible package IDs probed (`com.steadfast.rider`, `.agent`, `.delivery`, `.courier`, `.riderapp`, `.steadfastrider`) — all 404. Riders appear to use an in-house build tool. ([steadfast.md](steadfast.md):61)                       |
+| RedX       | ❌ none verified                   | `/redx-truck-driver-app-policy` is a legal document for the FTL/LTL truck network, not a rider app. ([redx.md](redx.md):81)                                                                                                                 |
+| CarryBee   | ❌ none found                      | —                                                                                                                                                                                                                                           |
 | **Pathao** | ✅ **Pathao Drive / Pathao Agent** | The real market leader's rider app. `com.pathao.driver`, `com.pathao.agent` — GPS-tracked, Pathao Pay wallet, daily leaderboard, hot zones. Genuinely shipped and used, and the only one of the four a Bangladeshi rider has actually held. |
-
 
 [_index.md](_index.md):53 already scores us **●●○ on the rider app against ○○○ across the board** — the
 one row in the entire scorecard where we are structurally ahead. Two of three competitors have no app
@@ -59,7 +58,7 @@ Ordered by (value × feasibility). Each item names the pattern it closes and how
 
 ### P0 — No backend, no native. Build now.
 
-#### R1. "Your day" replaces the bare jobs list
+#### R1. "Your day" replaces the bare jobs list ✅
 
 **Closes:** earnings + shift + state cues.
 
@@ -77,7 +76,7 @@ A header block above the jobs feed that answers, in one glance:
 **Proof:** `shots/mobile/2026-10-12_rider_home_*.png` — on-shift with jobs, off-shift, empty day,
 offline with a queue. Four states, driven by the shots script's fixture, not by a hand-typed screen.
 
-#### R2. A shift primitive
+#### R2. A shift primitive ✅
 
 **Closes:** go-online / availability.
 
@@ -94,7 +93,7 @@ That last sentence is the actual requirement, and it is not decoration: without 
 Two assertions in the existing shots script, plus a unit test on the pure predicate in
 `src/rules/shift.ts`.
 
-#### R3. Cash in hand, derived from the device's own queue
+#### R3. Cash in hand, derived from the device's own queue ✅
 
 **Closes:** the carry limit.
 
@@ -111,7 +110,7 @@ machinery.
 **Proof:** queue a ৳23,750 collection and assert "৳237.50 in hand" with the quote beside it; drive it
 past the threshold and assert the warning names the threshold; settle it and assert the number drops.
 
-#### R4. One primary action per job
+#### R4. One primary action per job ✅
 
 **Closes:** minimal cognitive load, large touch targets.
 
@@ -131,7 +130,7 @@ type the cash. Restructure as a **decision screen**:
 assertion pattern from `verify-scans.mjs`, replayed for delivery. Plus: every primary target ≥ 48dp,
 verified in the shots script as the hub console already verifies its own.
 
-#### R5. Call the customer
+#### R5. Call the customer ✅ (scaffolded — dials once a phone number reaches the job)
 
 **Closes:** Steadfast's most-cited UX failure and the cheapest win on the list.
 

@@ -21,6 +21,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import type { QueueStorage } from './offline/command-queue.ts';
+import type { Shift } from './rules/shift.ts';
 
 /** Keyspace for everything the rider app owns in AsyncStorage. */
 export const KEYS = {
@@ -28,6 +29,14 @@ export const KEYS = {
   queue: 'zipzap.rider.offline.v1',
   /** Session metadata: rider id, credential kind, expiry. Not secret. */
   sessionMeta: 'zipzap.rider.session.meta.v1',
+  /**
+   * The current shift. Not secret, and deliberately local.
+   *
+   * A shift starts when the rider opens the app, not when a dispatcher says so, and a phone with no
+   * signal must be able to start one — that is exactly when the rider needs it most. A shift that
+   * only exists server-side is a shift a rider cannot start in a basement.
+   */
+  shift: 'zipzap.rider.shift.v1',
 } as const;
 
 /**
@@ -159,4 +168,35 @@ export async function clearSession(): Promise<void> {
     // Already absent, or no secure storage on this platform. Either way it is gone.
   }
   await AsyncStorage.removeItem(KEYS.sessionMeta);
+}
+
+/* ---------------------------------------------------------------------- shift */
+
+/**
+ * Read the stored shift, or null if there is none.
+ *
+ * A corrupt row reads as "no shift" rather than throwing, for the same reason a corrupt queue does:
+ * a rider must be able to start a shift after a bad write, and a boot that throws on a bad shift
+ * takes the app away from someone who did nothing wrong.
+ */
+export async function readShift(): Promise<Shift | null> {
+  const raw = await AsyncStorage.getItem(KEYS.shift);
+  if (raw === null) return null;
+  try {
+    const parsed = JSON.parse(raw) as Shift;
+    if (typeof parsed.startedAt !== 'string' || typeof parsed.riderId !== 'string') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the shift, replacing any previous one. */
+export async function writeShift(shift: Shift): Promise<void> {
+  await AsyncStorage.setItem(KEYS.shift, JSON.stringify(shift));
+}
+
+/** Drop the shift, leaving every queued command alone. */
+export async function clearShift(): Promise<void> {
+  await AsyncStorage.removeItem(KEYS.shift);
 }
