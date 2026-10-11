@@ -3,6 +3,11 @@ import { useState } from 'react';
 import { ErrorState, PageHeader, Skeleton } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
 import { useAsync } from '../../lib/useAsync.ts';
+import {
+  applyToggle,
+  revertToggle,
+  type PreferenceRow,
+} from '../../rules/notification-preference.ts';
 
 export const Route = createFileRoute('/app/notifications')({
   component: NotificationPreferencesScreen,
@@ -39,17 +44,12 @@ const LABELS: Record<string, { title: string; detail: string }> = {
   },
 };
 
-type Preference = {
-  eventType: string;
-  templateName: string;
-  enabled: boolean;
-  isDefault: boolean;
-};
+type Preference = PreferenceRow;
 
 function NotificationPreferencesScreen() {
   const preferences = useAsync(() => apiClient().notificationPreferences());
   const [pending, setPending] = useState<string | null>(null);
-  const [rows, setRows] = useState<Preference[] | null>(null);
+  const [rows, setRows] = useState<readonly Preference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const current = rows ?? preferences.data;
@@ -60,15 +60,16 @@ function NotificationPreferencesScreen() {
     // The switch moves first and the request follows. Waiting for the round trip to paint a toggle
     // makes the screen feel broken on a slow connection, and a merchant who taps twice because
     // nothing happened is a merchant who has just muted something they meant to enable.
-    setRows((prev) =>
-      (prev ?? preferences.data ?? []).map((r) => ({ ...r, enabled, isDefault: enabled })),
-    );
+    //
+    // `applyToggle` is scoped to the tapped row. An earlier version mapped over every row with the
+    // same `enabled`, so one switch moved all three — and because the server only persisted the
+    // tapped row, the screen then disagreed with the database for the other two. The pure function
+    // in `rules/` has the regression test; this is just the call site.
+    setRows((prev) => applyToggle(prev ?? preferences.data ?? [], eventType, enabled));
     try {
       await apiClient().setNotificationPreference(eventType, enabled);
     } catch (err) {
-      setRows((prev) =>
-        (prev ?? []).map((r) => ({ ...r, enabled: !enabled, isDefault: !enabled })),
-      );
+      setRows((prev) => revertToggle(prev ?? [], eventType, !enabled));
       setError(err instanceof Error ? err.message : 'Could not save that preference.');
     } finally {
       setPending(null);

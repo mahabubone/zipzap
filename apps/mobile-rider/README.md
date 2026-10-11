@@ -34,3 +34,20 @@ Consequences:
 - Native runtime behaviour is unverified. The offline queue's guarantees are covered by
   `command-queue.spec.ts` against the real storage port, so the logic is tested; the integration of
   that port with AsyncStorage on a device is not.
+
+## Shots
+
+`node apps/mobile-rider/scripts/shots.mjs` captures all 11 screens into `shots/mobile/`. It serves
+the local `expo export --platform web` bundle and stubs the API at the network boundary, so a shot
+that looks right means the real components, the real queue states and the real tab shell rendered.
+The filename prefix is derived from the current date, so a fresh run and a stale one are
+distinguishable.
+
+It was capturing only 3 of 11 until 2026-10-11. The cause was not a Playwright limitation — it was a
+real app bug: `useOpenJob()` was called in `JobsStackNavigator`, which renders _above_ the stack it
+owns, so `useNavigation()` resolved to the Tabs navigator. `navigation.navigate('Job', …)` on Tabs is
+accepted and then dropped, because Tabs has no `Job` route and React Navigation does not warn about
+navigating to an unknown sibling. Tapping a job card did nothing at all.
+
+So the fix was in the app, not the script — the hooks now live inside the screens that use them,
+where `useNavigation()` resolves to this stack. Every screen since captures correctly.

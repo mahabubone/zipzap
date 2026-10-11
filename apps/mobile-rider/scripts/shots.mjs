@@ -42,7 +42,10 @@ fs.mkdirSync(OUT, { recursive: true });
 // 375x812 is what a current 5" Android reports in CSS pixels. Width is the axis
 // that matters: it is what a gloved thumb and a job list fight over.
 const PHONE = { width: 375, height: 812 };
-const DAY = '2026-10-10';
+// Derived, not hardcoded. It was a literal for three days, which meant the shots kept the old
+// date prefix while being recaptured — and a date you cannot trust is worse than no date, because
+// it tells you something about recency that is false.
+const DAY = new Date().toISOString().slice(0, 10);
 
 // --- static server for the export --------------------------------------------
 const MIME = {
@@ -187,7 +190,9 @@ await page.route('**/v1/**', async (route) => {
 });
 
 function shoot(name) {
-  const file = `${OUT}2026-10-10_rider_${name}.png`;
+  // `DAY`, not a literal. A hardcoded prefix here meant every recapture kept the date it was first
+  // taken, so a reader could not tell a fresh shot from a three-day-old one.
+  const file = `${OUT}${DAY}_rider_${name}.png`;
   return page.screenshot({ path: file }).then(() => console.log(`shot  ${file}`));
 }
 

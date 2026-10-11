@@ -7,7 +7,7 @@ the conversation that produced it.
 this file is the bug. Sourced from [`ROADMAP.md`](ROADMAP.md), [`docs/product/vision.md`](docs/product/vision.md),
 [`docs/product/surfaces.md`](docs/product/surfaces.md), [`AGENTS.md`](AGENTS.md) and `git log`.
 
-**Last updated:** 2026-10-09 · **Where:** 5 surfaces built/partially built of 10 planned · **Verify:** `pnpm verify`
+**Last updated:** 2026-10-11 · **Where:** 6 surfaces built of 10 planned (5 web/mobile + the docs site) · **Verify:** `pnpm verify`
 
 ---
 
@@ -64,7 +64,7 @@ command proves it.
 | 5 — Advanced logistics (routing, SLA, offline)    | 🔄 rungs 1–3 done; offline server contract done, device app not |
 | 6 — Operations (control tower, analytics, load)   | 🔄 rungs 1–6 shipped; reliability drills + desktop open         |
 
-**Planned surfaces** — ten rows in [surfaces.md](docs/product/surfaces.md). **Five** exist as
+**Planned surfaces** — ten rows in [surfaces.md](docs/product/surfaces.md). **Six** exist as
 packages/apps. The rest do not:
 
 | Surface                  | Package                            | Built                                                                                    |
@@ -78,47 +78,29 @@ packages/apps. The rest do not:
 | Admin Console            | `apps/frontends/admin-console`     | 🔴                                                                                       |
 | Developer Portal         | `apps/frontends/developer-portal`  | 🔴                                                                                       |
 | Desktop                  | `apps/desktop`                     | 🔴                                                                                       |
-| Landing + docs site      | `apps/site`                        | 🟡 landing page in `merchant-web`, no Astro site                                         |
+| Landing + docs site      | `apps/site`                        | 🟢 Astro docs: 6 catalogs + generated API reference                                      |
 
 ---
 
-## 2. Recent mission — what just happened
+## 2. What just landed — the API contract, secure web auth, and the rider rebuild
 
-**Mission: take the UI kit from "component library" to "product you can sign into",**
-backend-first as the user chose — the API and its types before the screens that read them.
+Three arcs, all committed and green. `pnpm verify`: **1902 backend · 36 api-client · 25 rider · 8 merchant-web · 41 fakes**, plus `pnpm api:check` (spec and generated client are current) and all 10 packages building.
 
-Landed in six commits, oldest first:
+| Arc          | What it did                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OpenAPI**  | The spec went from 27 request-only schemas to **145** covering **88 operations**. Every operation now documents its response schema, its error envelope, its parameters, its security schemes, its scopes (`x-required-scopes`, read straight off the `ScopeGuard` instance so there is no second copy to drift) and its rate-limit bucket. `packages/api-client` is 100% derived from it — 32 hand-declared response shapes deleted. `src/openapi.spec.ts` adds 378 assertions that run in `pnpm test`, so the spec cannot go stale again unnoticed. |
+| **Web auth** | The three consoles held a bearer token in `sessionStorage`. Now an `HttpOnly; Secure; SameSite=Lax` cookie behind a same-origin `/api` proxy, with the auth guard in `beforeLoad` (307 before any HTML ships, not a flash of console then a redirect). `POST /v1/auth/token` added for clients that cannot hold a cookie.                                                                                                                                                                                                                             |
+| **Rider**    | Real persistence (AsyncStorage for the queue, SecureStore for the token), React Navigation, NetInfo-driven auto-sync with backoff and jitter, and 25 tests. The offline core was already right — only the shell around it was a demo.                                                                                                                                                                                                                                                                                                                 |
 
-| Commit    | What it did                                                                                                                                                                                                                                                                                                                                                                          |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `2ae4618` | **Backend unblock.** `keys:manage` existed in TypeScript but no migration taught Postgres the enum value, so every seed died. Added migration `0033`. Separately `live-counts` 500'd on every call: `sumOutstandingCODMinor` correctly returns `bigint` per the money rule, and it flowed straight into `JSON.stringify`. Now serialised at the controller edge as a decimal string. |
-| `3a134d7` | **UI kit full pass.** `DataTable` (sort/filter/paginate/select/hide-columns on `@tanstack/react-table`), `AppShell`, `Pagination` + the atoms and molecules they needed.                                                                                                                                                                                                             |
-| `c215579` | **Shots.** The visual-memory convention, captured and committed.                                                                                                                                                                                                                                                                                                                     |
-| `4e07f87` | **api-client types.** Controllers return interfaces, not decorated DTOs, so `openapi-typescript` had no schema and every method returned `unknown`. Hand-declared 6 response shapes read off live responses.                                                                                                                                                                         |
-| `c076c22` | **The console.** Auth guard, shell, control tower, shipments table, shipment detail, parcel tracking.                                                                                                                                                                                                                                                                                |
-| `d96c92c` | **Marketing.** Landing page, split-panel login, brand mark.                                                                                                                                                                                                                                                                                                                          |
+**Membership management** also landed: `POST/PUT/DELETE /v1/merchants/:id/members`, a `members:manage` scope (migration 0048), and two fail-closed rules — a merchant cannot grant a platform role, and the last owner cannot be removed or demoted. Both the removal and the role-change path revoke the target's sessions, which is what `revokeSessionsForUser` was written for and previously had no caller to serve.
 
-**Four bugs the browser found that typecheck could not.** Worth keeping, because every one of
-them passed `tsc`, passed SSR, and was invisible from the terminal:
+### Bugs the shots and the browser found that tests did not
 
-1. **Unbound `fetch`.** `this.fetchImpl = options.fetchImpl ?? fetch` stored the bare function
-   and invoked it as a method, so every browser call threw _"Illegal invocation"_. Login was
-   impossible. `tsc` was happy; the curl-based checks passed because they never ran a browser.
-   Now `fetch.bind(globalThis)`, with a regression test that throws when the receiver is wrong.
-2. **`next_cursor` vs `nextCursor`.** The API sends camelCase; the client read snake_case, so
-   every page of shipments silently paginated wrong. **My own contract test had encoded the bug
-   as the expected shape** — a test written from the implementation instead of from the spec.
-3. **Tailwind never scanned the web app.** v4 auto-detects sources from the _stylesheet's_
-   directory — `packages/ui/src` — so it shipped theme variables with zero utilities and the
-   console rendered as unstyled HTML. Fixed with an explicit `@source` per app. A third app
-   needs a third line there or it renders unstyled too.
-4. **`.ts` importing a `.tsx`.** `tsc` resolves it via `rewriteRelativeImportExtensions`;
-   **Vite does not.** SSR fell back to client rendering with an empty body.
+1. **`credentials: 'omit'` on the login client.** It tells the browser not to send cookies AND not to store any the response sets — so login returned 201, the console navigated to `/app` as if it worked, and the SSR guard bounced straight back to `/login`. Every post-login screenshot was of the login page and nothing reported an error. The comment on `api.ts` warned about exactly this while the code did it.
+2. **`useOpenJob()` called above the stack that owns the route.** `useNavigation()` there resolves to the Tabs navigator, which has no `Job` route; `navigate` is accepted and dropped without a warning. Tapping a job card did nothing at all — which is why the mobile shots script only ever captured 3 of 11 screens.
+3. **An optimistic update that wrote every row.** `map` set all three notification switches to the same value instead of the tapped one, so the screen disagreed with the database. Caught by a screenshot showing all three off while `merchant_preferences` still had two enabled. The pure logic now lives in `src/rules/` with a regression test, per the AGENTS.md convention.
 
-Lesson, recorded because it recurred: **SSR succeeding proves nothing about a client-rendered
-app.** Curl the HTML and you get a 200 and the right copy while the screen is blank.
-
----
+Lesson, recorded because it recurs: **a passing screenshot pipeline is worth more than a passing test suite for this class of bug.** All three were invisible to `tsc` and to the unit tests, and each was found by looking at an image or a live page.
 
 ## 3. Ongoing — what is in flight right now
 
@@ -148,9 +130,13 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 - `useAsync` has no cache and no request dedupe — every mount refetches. It is one hook doing
   one job for four screens. **Add `@tanstack/react-query` when a second screen needs the same
   list, or when a mutation must invalidate something a screen fetched.** Not before.
-- Session lives in `sessionStorage`, so SSR cannot read it. Fine for a session-token console;
-  it is the reason there are no server loaders.
-- `apps/mobile-rider` has the Expo shell, five screens (auth, jobs, job detail, sync, profile), and the proven `OfflineQueue` underneath. AsyncStorage/SecureStore persistence and brand assets are the remaining device work.
+- Server loaders are still thin. The auth guard runs in `beforeLoad` on the server now, but the
+  screens themselves fetch client-side through `useAsync`, which has no cache and no request
+  dedupe. Add `@tanstack/react-query` when a second screen needs the same list, or when a mutation
+  must invalidate something a screen fetched — not before.
+- `apps/mobile-rider` has AsyncStorage + SecureStore persistence, React Navigation, NetInfo
+  auto-sync, and 25 tests. **Native does not bundle here**: `expo export --platform ios` fails inside
+  `react-native-screens`' Fabric component, so `build` is web-only. See `apps/mobile-rider/README.md`.
 
 ### What was just proven and verified (2026-10-09)
 
@@ -178,9 +164,10 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ### Next, in the order the roadmap implies
 
-1. **Rider device persistence** — swap the in-memory `QueueStorage`/session for AsyncStorage + SecureStore, add brand assets to `app.json`, and run the airplane-mode day drill against a live backend.
+1. **Airplane-mode day drill** — run the rider app against a live backend with the signal off, and prove a scan survives, replays, and resolves. The queue's guarantees are unit-tested; the integration with AsyncStorage on a device is not, and the native bundle does not currently build to test it.
 2. **Complete reliability drill scenarios** — Extend [reliability-drills.integration.test.ts](file:///home/meaow/cook/zipzap/apps/backend/test/integration/reliability-drills.integration.test.ts) to cover process kill (worker/publisher) and provider outages.
-3. **Phase 1 identity finish** — Sessions rotation, audit log writing, and argon2id password upgrade.
+3. **Phase 1 identity finish** — account suspension (a membership can be removed but not disabled), session fingerprinting, and the argon2id password upgrade.
+4. **Docs site content** — the catalogs are seeded but thin (one page each for rider, hub, operations, FAQ).
 
 ### Blockers and traps — do not re-learn these
 
@@ -206,8 +193,8 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ### Environment debt — worth fixing, nobody has
 
-- **No git remote.** `git remote -v` is empty. 20+ commits exist on this machine only. First
-  push publishes them; `main` is public by default on a new GitHub repo.
+- **23 commits unpushed.** `origin` exists now (`git@github.com:mahabububone/zipzap.git`) — the old
+  "no git remote" note was itself stale — but nothing since the enrichment branch has been pushed.
 - **`ROADMAP.md` line "apps/ holds `backend` only" is stale**, and `docs/product/surfaces.md`'s
   surface list is now honest but mostly unbuilt: `control-tower`, `hub-console`,
   `support-console`, `admin-console` and `developer-portal` have no package.

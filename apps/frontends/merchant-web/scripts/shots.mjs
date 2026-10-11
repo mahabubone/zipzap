@@ -125,8 +125,31 @@ await shoot(page, 'app_notifications');
 
 // Toggle one off, so the shot holds the state a merchant actually produces: two on, one off.
 const switches = page.locator('[role="switch"]');
+// Click, then wait for the STATE rather than the clock. A fixed 600ms shot a page still showing the
+// old value: the toggle is optimistic, React re-renders on the next tick, and the screenshot landed
+// in between. Polling the aria-checked attribute is what makes this shot deterministic.
+//
+// `playwright-core` is the library, not the runner, so it ships locators and no `expect`. The
+// polling is written out — and it doubles as the assertion that would have caught the optimistic
+// update writing every row.
+async function waitForChecked(index, expected) {
+  const deadline = Date.now() + 5000;
+  for (;;) {
+    const value = await switches.nth(index).getAttribute('aria-checked');
+    if (value === expected) return;
+    if (Date.now() > deadline) {
+      throw new Error(`switch ${index} never became ${expected} (still ${value})`);
+    }
+    await page.waitForTimeout(100);
+  }
+}
+
 await switches.nth(1).click();
-await page.waitForTimeout(600);
+await waitForChecked(1, 'false');
+// The other two must be untouched. Before the optimistic update was scoped to the tapped row, one
+// click moved all three and this is what would have failed.
+await waitForChecked(0, 'true');
+await waitForChecked(2, 'true');
 await shoot(page, 'app_notifications_muted');
 
 // One row click proves the table navigates to the detail route.

@@ -137,9 +137,16 @@ export function RiderNavigator(props: ScreenProps) {
 }
 
 function JobsStackNavigator({ props }: { props: ScreenProps }) {
-  const openJob = useOpenJob();
-  const captureProof = useCaptureProof();
-
+  // NOTE: no navigation hooks at this level.
+  //
+  // `useNavigation()` here resolves to the TABS navigator, because this component renders *above*
+  // the stack it owns — the closest navigator in its ancestry is `Tabs.Navigator`. Calling
+  // `navigation.navigate('Job', …)` on that is accepted and then dropped: Tabs has no `Job` route,
+  // and React Navigation does not warn about a navigate to an unknown sibling. The rider taps a job
+  // card, nothing happens, and the only trace is a navigate that returned successfully.
+  //
+  // Both hooks therefore live inside the screens that use them, where `useNavigation()` resolves to
+  // THIS stack. See `useOpenJob` and `useCaptureProof` at the bottom of this file.
   return (
     <JobsStack.Navigator
       screenOptions={{
@@ -150,7 +157,7 @@ function JobsStackNavigator({ props }: { props: ScreenProps }) {
       }}
     >
       <JobsStack.Screen name="Jobs" options={{ headerShown: false }}>
-        {() => <JobsScreen riderClient={props.riderClient} onOpenJob={openJob} />}
+        {() => <JobsScreen riderClient={props.riderClient} onOpenJob={useOpenJob()} />}
       </JobsStack.Screen>
       <JobsStack.Screen name="Job" options={{ title: 'Job' }}>
         {() => (
@@ -158,7 +165,7 @@ function JobsStackNavigator({ props }: { props: ScreenProps }) {
             riderClient={props.riderClient}
             job={useJobFromRoute()}
             onQueued={props.onPendingChange}
-            onCaptureProof={captureProof}
+            onCaptureProof={useCaptureProof()}
           />
         )}
       </JobsStack.Screen>

@@ -33,11 +33,16 @@ export function apiClient(overrides?: Partial<ClientOptions>): ZipZapClient {
 }
 
 /**
- * The unauthenticated client, for `login`.
+ * The client for `login`, before any session exists.
  *
- * Same base URL — the origin is the console's either way — and no credential attached, so it
- * cannot be mistaken for a session-carrying call.
+ * `credentials` is `'same-origin'`, NOT `'omit'`. `omit` tells the browser not to send cookies AND
+ * not to store any the response sets — so `POST /v1/auth/login` returns 201, the console navigates
+ * to /app as though it worked, and the SSR guard on /app finds no cookie and bounces back to
+ * /login. Every post-login screenshot is then of the login page, and nothing reports an error.
+ *
+ * There is no credential to attach: there isn't one yet. `same-origin` sends what exists (nothing)
+ * and stores what arrives (the session cookie), which is the whole purpose of the call.
  */
 export function anonClient(): ZipZapClient {
-  return new ZipZapClient({ baseUrl: '/api', credentials: 'omit' });
+  return new ZipZapClient({ baseUrl: '/api', credentials: 'same-origin' });
 }
