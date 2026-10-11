@@ -1,40 +1,54 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Badge, Button, Card, Field, Icon, Muted } from '../components/ui.tsx';
+import { JobMissing } from '../navigation.tsx';
+import { actionsFor, isFinalAttempt, primaryAction, type JobAction } from '../rules/job-actions.ts';
+import { contactHint, contactLabel, contactStateFor, telHref } from '../rules/contact.ts';
 import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
-import { JobMissing } from '../navigation.tsx';
 import type { JobRow } from './JobsScreen.tsx';
 
-/**
- * One job, three write paths — scan, fail with a reason, succeed with cash.
- *
- * Every action appends to the OfflineQueue and returns immediately. The
- * rider sees "Queued" and can keep working with no signal; `sync()` replays
- * later, exactly once, and the Sync tab reports the server's ruling. An
- * action that waited for the network first would lose the rider's whole
- * screen to a spinner in exactly the dead zones this app exists for.
- *
- * "Queue delivery" is a doorway, not a button: the server will not mark a
- * parcel delivered without a proof behind it, so the tap opens the proof
- * screen instead of queueing something the sync would reject. Making the
- * rider discover that from a rejection on the Sync tab, ten minutes later,
- * on a bad connection, is the failure this routing exists to prevent.
- */
+/** Statuses a rider cannot act on at all. */
+const TERMINAL = new Set(['DELIVERED', 'COMPLETED', 'COLLECTED', 'CANCELLED', 'RETURNED']);
 
-/** Closed failure vocabulary, matching the server's FAILURE_REASONS. */
+/** Failure reasons the server's closed vocabulary names. */
 const FAILURE_REASONS = [
   'CUSTOMER_UNAVAILABLE',
-  'WRONG_ADDRESS',
-  'PHONE_UNREACHABLE',
   'CUSTOMER_REFUSED',
-  'ADDRESS_INCOMPLETE',
-  'PAYMENT_ISSUE',
-  'DAMAGED_PACKAGE',
-  'WEATHER',
-  'OPERATIONAL_EXCEPTION',
+  'WRONG_ADDRESS',
+  'PAYMENT_FAILED',
+  'CASH_UNAVAILABLE',
+  'PARCEL_DAMAGED',
+  'AREA_UNREACHABLE',
+  'NATURAL_CALAMITY',
+  'OTHER',
 ] as const;
 
+/**
+ * The four a rider actually reaches for. The rest exist for the audit trail, not for the door, and
+ * hiding them is why the primary path is fast rather than a nine-way choice.
+ */
+const LIKELY_REASONS = FAILURE_REASONS.slice(0, 4);
+
+/** Attempts made, from the job payload rather than parsed from display copy. */
+function attemptsMadeOf(job: JobRow): number {
+  if (job.kind !== 'delivery') return 0;
+  const match = /^Attempt (\d+)$/.exec(job.detail);
+  if (!match) return 0;
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/**
+ * One job, as a decision.
+ *
+ * The old screen was three equal-weight forms and a choice of nine failure reasons: a rider at a
+ * door had to work out which of them was the next thing to do. Now the screen computes the one legal
+ * primary action and shows only that, with the supporting paths beneath it at a visibly lower weight
+ * and reachable in a tap.
+ *
+ * What is deliberately unchanged: every action the old screen offered is still reachable.
+ */
 export function JobDetailScreen({
   riderClient,
   job,
@@ -42,95 +56,93 @@ export function JobDetailScreen({
   onCaptureProof,
 }: {
   riderClient: RiderClient;
-  /**
-   * Null when the route's `{ jobId }` no longer resolves: the job was cancelled server-side while
-   * the rider was offline, or a deep link named a job that is not theirs. That is a normal outcome
-   * of offline work, so it renders `JobMissing` rather than an empty form.
-   */
   job: JobRow | null;
   onQueued: (pending: number) => void;
   onCaptureProof: () => void;
 }) {
-  // Every hook above this point has run, so this conditional is not "hooks changed between renders"
-  // — it is one hook's outcome. The previous version had the same shape, with `onBack` instead.
-  if (job === null) return <JobMissing />;
-  const [scan, setScan] = useState('');
-  const [reason, setReason] = useState<string | null>(null);
+  const [parcelId, setParcelId] = useState('');
   const [note, setNote] = useState('');
   const [cash, setCash] = useState('');
+  const [reason, setReason] = useState<string | null>(null);
+  const [moreReasons, setMoreReasons] = useState(false);
+  const [expanded, setExpanded] = useState<'deliver' | 'fail' | 'scan' | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  /** Recompute the tab badge after an action, from the queue itself. */
-  const refreshPending = async () => {
+  const refreshPending = useCallback(async () => {
     onQueued((await riderClient.queue.pending()).length);
-  };
+  }, [riderClient, onQueued]);
 
-  const queuePickupScan = async () => {
-    const shipmentId = scan.trim() || job.shipmentId;
-    if (!shipmentId || busy) return;
+  if (job === null) {
+    return <JobMissing />;
+  }
+
+  const primary = primaryAction(job);
+  const supporting = actionsFor(job).filter((action) => action.weight === 'secondary');
+  const attempts = attemptsMadeOf(job);
+  const final = isFinalAttempt(attempts);
+
+  const run = async (command: () => Promise<unknown>, success: string) => {
     setBusy(true);
     setMessage(null);
     try {
-      const queued = await riderClient.recordPickup(job.id, shipmentId);
-      setScan('');
-      setMessage(`Queued pickup scan #${queued.deviceSequence}.`);
+      await command();
+      setMessage(success);
       await refreshPending();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not queue the scan.');
+      setMessage(err instanceof Error ? err.message : 'Could not queue that.');
     } finally {
       setBusy(false);
     }
   };
 
-  const queueAttempt = async () => {
-    if (!reason || !job.shipmentId || busy) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const queued = await riderClient.recordDeliveryAttempt(
-        job.id,
-        job.shipmentId,
-        reason,
-        note.trim() || undefined,
-      );
-      setReason(null);
-      setNote('');
-      setMessage(`Queued attempt #${queued.deviceSequence}: ${reason}.`);
-      await refreshPending();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not queue the attempt.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const queueScan = () =>
+    run(async () => {
+      const id = parcelId.trim() || job.shipmentId;
+      if (!id) throw new Error('Type or scan a parcel id first.');
+      const result = await riderClient.recordPickup(job.id, id);
+      setParcelId('');
+      return result;
+    }, 'Pickup scan queued. It syncs when signal returns.');
 
-  const queueComplete = async () => {
-    if (!job.shipmentId || busy) return;
-    const minor = cash.trim() === '' ? 0 : Number(cash.trim());
-    if (!Number.isInteger(minor) || minor < 0) {
-      setMessage('Cash collected must be a whole number of poisha (e.g. 125050).');
+  const queueAttempt = () => {
+    if (!reason) {
+      setMessage('Pick a reason so the dispatcher knows why.');
       return;
     }
-    setBusy(true);
-    setMessage(null);
-    try {
+    if (!job.shipmentId) {
+      setMessage('This delivery has no parcel to record against.');
+      return;
+    }
+    return run(
+      async () =>
+        riderClient.recordDeliveryAttempt(
+          job.id,
+          job.shipmentId!,
+          reason,
+          note.trim() || undefined,
+        ),
+      final
+        ? 'Final failed attempt queued. The parcel goes to returns.'
+        : 'Failed attempt queued. It syncs when signal returns.',
+    );
+  };
+
+  const queueDelivery = () =>
+    run(async () => {
+      if (!job.shipmentId) throw new Error('This delivery has no parcel to complete.');
+      const minor = cash.trim() === '' ? 0 : Number(cash.trim());
+      if (!Number.isInteger(minor) || minor < 0) {
+        throw new Error('Cash collected must be a whole number of poisha (e.g. 125050).');
+      }
       await riderClient.recordDelivery(job.shipmentId);
       if (minor > 0) await riderClient.recordCodCollection(job.shipmentId, minor);
       setCash('');
-      setMessage(`Queued delivery${minor > 0 ? ` with ${minor} poisha COD` : ''}.`);
-      await refreshPending();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not queue the delivery.');
-    } finally {
-      setBusy(false);
-    }
-  };
+      return undefined;
+    }, 'Delivery queued. Capture proof of delivery for the photo and the code.');
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {/* Hero: the parcel, its state, and its identifier. The old screen opened with the same
-          "Delivery 77777777" text as the list row, so opening a job changed nothing visually. */}
       <Card style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.heroKind}>
@@ -155,104 +167,190 @@ export function JobDetailScreen({
             <Text style={styles.heroIdValue} numberOfLines={1} selectable>
               {job.shipmentId}
             </Text>
-            {/* `selectable` and a copy affordance: a rider reads this id out to a dispatcher. */}
           </View>
         )}
+
+        {attempts > 0 && (
+          <View style={styles.heroMeta}>
+            <Icon
+              name={final ? 'warning' : 'information-circle'}
+              size="sm"
+              color={final ? colors.warning : colors.textMuted}
+            />
+            <Text style={styles.heroMetaText}>
+              {final
+                ? `Attempt ${attempts} — after this one the parcel goes to returns.`
+                : `Attempt ${attempts} so far.`}
+            </Text>
+          </View>
+        )}
+
+        {/* The one action a rider cannot do their job without. Present on every delivery, honest
+            about the state: a button that dials nothing is worse than no button. */}
+        <ContactRow job={job} />
       </Card>
 
-      {job.kind === 'pickup' ? (
-        <Card>
-          <SectionTitle icon="scan-outline" title="Pickup scan" />
-          <Field
-            label="Shipment ID"
-            icon="barcode-outline"
-            value={scan}
-            onChange={setScan}
-            placeholder={job.shipmentId ?? 'Scan or type the parcel id'}
-            hint="Scans queue if you are offline and sync when signal returns."
-          />
-          <Button
-            label={busy ? 'Queueing…' : 'Queue pickup scan'}
-            icon="cloud-upload-outline"
-            onPress={queuePickupScan}
-            disabled={busy}
-            loading={busy}
-          />
-        </Card>
-      ) : (
-        <>
-          <Card>
-            <SectionTitle icon="warning-outline" title="Failed delivery attempt" />
-            <Muted style={styles.cardSub}>
-              Why it failed decides whether the parcel is tried again or handed to returns.
-            </Muted>
-            <View style={styles.reasons}>
-              {FAILURE_REASONS.map((r) => (
-                <TouchableOpacity
-                  key={r}
-                  onPress={() => setReason(reason === r ? null : r)}
-                  style={[styles.reason, reason === r && styles.reasonActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: reason === r }}
-                >
-                  {reason === r && <Icon name="checkmark" size="sm" color={colors.onBrand} />}
-                  <Text style={[styles.reasonLabel, reason === r && styles.reasonLabelActive]}>
-                    {r.replace(/_/g, ' ')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Field
-              label="Note (optional)"
-              icon="document-text-outline"
-              value={note}
-              onChange={setNote}
-              placeholder="Gate code, neighbour, …"
-            />
-            <Button
-              label={busy ? 'Queueing…' : 'Queue failed attempt'}
-              icon="alert-circle-outline"
-              onPress={queueAttempt}
-              disabled={!reason || busy}
-              tone="danger"
-              loading={busy}
-            />
-          </Card>
+      {primary !== null && (
+        <Card style={styles.primaryCard}>
+          <ActionHeader action={primary} />
+          <Muted style={styles.primaryDetail}>{primary.detail}</Muted>
+          <View style={styles.primaryFields}>
+            {primary.id === 'scan' && (
+              <>
+                <Field
+                  label="Parcel id"
+                  icon="barcode-outline"
+                  value={parcelId}
+                  onChange={setParcelId}
+                  placeholder={job.shipmentId ?? 'Scan or type the parcel id'}
+                  hint="Either type it or scan it. It queues offline either way."
+                />
+                <Button
+                  label={busy ? 'Queueing…' : 'Queue pickup scan'}
+                  icon="cloud-upload-outline"
+                  onPress={queueScan}
+                  disabled={busy}
+                  loading={busy}
+                  block
+                  size="lg"
+                />
+              </>
+            )}
 
-          <Card>
-            <SectionTitle icon="cash-outline" title="Complete with COD" />
-            <Muted style={styles.cardSub}>
-              A parcel cannot be marked delivered without proof: the customer reading out a code, a
-              photo, and where it happened.
-            </Muted>
-            <Field
-              label="Cash collected (poisha)"
-              icon="wallet-outline"
-              value={cash}
-              onChange={setCash}
-              placeholder="125050 — blank means prepaid"
-              keyboardType="numeric"
-              hint="Whole poisha only. The amount the quote froze is what the customer agreed to."
+            {primary.id === 'fail' && (
+              <AttemptForm
+                attempts={attempts}
+                final={final}
+                reason={reason}
+                note={note}
+                moreReasons={moreReasons}
+                busy={busy}
+                onReason={setReason}
+                onNote={setNote}
+                onMoreReasons={() => setMoreReasons(true)}
+                onSubmit={queueAttempt}
+              />
+            )}
+
+            {primary.id === 'deliver' && (
+              <>
+                <Field
+                  label="Cash collected (poisha)"
+                  icon="wallet-outline"
+                  value={cash}
+                  onChange={setCash}
+                  placeholder="125050 — blank means prepaid"
+                  keyboardType="numeric"
+                  hint="Whole poisha only. A decimal is refused rather than rounded, because a rider hands over cash, not a float."
+                />
+                <Button
+                  label="Capture proof of delivery"
+                  icon="camera-outline"
+                  onPress={onCaptureProof}
+                  block
+                  size="lg"
+                />
+                <View style={styles.divider} />
+                <Button
+                  label="Queue delivery without proof"
+                  onPress={queueDelivery}
+                  disabled={busy}
+                  tone="ghost"
+                  loading={busy}
+                />
+                {/* Ghost on purpose. Proof is the normal path; this is the path for a customer who is
+                    not there to give a code. Making it prominent teaches riders to skip proof. */}
+              </>
+            )}
+          </View>
+        </Card>
+      )}
+
+      {supporting.length > 0 && (
+        <Card style={styles.supportCard}>
+          <Text style={styles.supportLabel}>Or instead</Text>
+          {supporting.map((action) => (
+            <TouchableOpacity
+              key={action.id}
+              onPress={() => setExpanded(expanded === action.id ? null : action.id)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: expanded === action.id }}
+              style={styles.supportRow}
+            >
+              <View style={styles.supportIcon}>
+                <Icon name={action.icon} size="sm" color={colors.textMuted} />
+              </View>
+              <View style={styles.supportText}>
+                <Text style={styles.supportTitle}>{action.label}</Text>
+                <Text style={styles.supportDetail}>{action.detail}</Text>
+              </View>
+              <Icon
+                name={expanded === action.id ? 'chevron-down' : 'chevron-forward'}
+                size="sm"
+                color={colors.textFaint}
+              />
+            </TouchableOpacity>
+          ))}
+
+          {/* The form for whichever supporting action was tapped, revealed in place rather than
+              pushed. Only `fail` has a secondary form today; the rest describe what would happen
+              without pretending to offer it. */}
+          {expanded === 'fail' && (
+            <AttemptForm
+              attempts={attempts}
+              final={final}
+              reason={reason}
+              note={note}
+              moreReasons={moreReasons}
+              busy={busy}
+              onReason={setReason}
+              onNote={setNote}
+              onMoreReasons={() => setMoreReasons(true)}
+              onSubmit={queueAttempt}
             />
-            <Button
-              label="Capture proof of delivery"
-              icon="camera-outline"
-              onPress={onCaptureProof}
-              disabled={busy}
-              block
-            />
-            <View style={styles.divider} />
-            <Button
-              label={busy ? 'Queueing…' : 'Queue delivery without proof'}
-              onPress={queueComplete}
-              disabled={busy}
-              tone="ghost"
-              loading={busy}
-            />
-            {/* Muted intentionally. Labelling it plainly is the honest treatment: proof is the normal
-                path, and this is the path for when the customer is not available to give one. */}
-          </Card>
-        </>
+          )}
+
+          {expanded === 'scan' && (
+            <View style={styles.supportForm}>
+              <Muted style={styles.supportFormHint}>
+                This parcel is picked up from the shop by scanning it there. The scan happens on the
+                pickup job, not this one.
+              </Muted>
+            </View>
+          )}
+
+          {expanded === 'deliver' && (
+            <View style={styles.supportForm}>
+              <Muted style={styles.supportFormHint}>
+                A delivery is completed from the primary action above, with proof of delivery.
+              </Muted>
+            </View>
+          )}
+        </Card>
+      )}
+
+      {primary === null && supporting.length === 0 && (
+        <Card>
+          <View style={styles.closedHead}>
+            <Icon name="checkmark-circle" size="sm" color={colors.success} />
+            <Text style={styles.closedTitle}>
+              {TERMINAL.has(job.status) ? 'This job is done' : 'Nothing left to do here'}
+            </Text>
+          </View>
+          <Muted style={styles.closedDetail}>
+            {TERMINAL.has(job.status)
+              ? `This job is ${job.status.toLowerCase().replace(/_/g, ' ')}.`
+              : 'The server will not accept another action on this job right now. Pull to refresh if that looks wrong.'}
+          </Muted>
+        </Card>
+      )}
+
+      {primary === null && supporting.length > 0 && (
+        <Card>
+          <Text style={styles.supportOnly}>
+            The main action is not available right now. Use one of the options above.
+          </Text>
+        </Card>
       )}
 
       {message !== null && (
@@ -265,20 +363,147 @@ export function JobDetailScreen({
   );
 }
 
-/** A card's heading, as one component so every card's heading looks the same. */
-function SectionTitle({
-  icon,
-  title,
-}: {
-  icon: 'scan-outline' | 'warning-outline' | 'cash-outline';
-  title: string;
-}) {
+/** A supporting action's heading, sized for its weight rather than the primary one. */
+function ActionHeader({ action }: { action: JobAction }) {
   return (
-    <View style={styles.sectionTitle}>
-      <View style={styles.sectionIcon}>
-        <Icon name={icon} size="sm" color={colors.brand} />
+    <View style={styles.primaryHead}>
+      <View style={styles.primaryIcon}>
+        <Icon name={action.icon} size="sm" color={colors.brand} />
       </View>
-      <Text style={styles.sectionTitleText}>{title}</Text>
+      <Text style={styles.primaryLabel}>{action.label}</Text>
+    </View>
+  );
+}
+
+/** What `AttemptForm` needs to draw and drive the failure path. */
+interface AttemptFormProps {
+  readonly attempts: number;
+  readonly final: boolean;
+  readonly reason: string | null;
+  readonly note: string;
+  readonly moreReasons: boolean;
+  readonly busy: boolean;
+  readonly onReason: (reason: string | null) => void;
+  readonly onNote: (note: string) => void;
+  readonly onMoreReasons: () => void;
+  readonly onSubmit: () => void;
+}
+
+/**
+ * The failed-attempt form.
+ *
+ * Extracted because the screen now shows it in two places: as the primary action once a delivery
+ * has been tried, and as a supporting action before that. Sharing one component is what keeps the
+ * two from drifting into two different question sets — a reason offered in one context and not the
+ * other is a rider who guesses.
+ *
+ * The likely reasons come first and the rest stay folded. Nine equal chips is a state machine in a
+ * costume; four obvious ones is a decision.
+ */
+function AttemptForm({
+  attempts,
+  final,
+  reason,
+  note,
+  moreReasons,
+  busy,
+  onReason,
+  onNote,
+  onMoreReasons,
+  onSubmit,
+}: AttemptFormProps) {
+  return (
+    <View style={styles.attemptForm}>
+      <Text style={styles.reasonLabel}>
+        {final
+          ? 'Last attempt — after this the parcel goes to returns'
+          : attempts > 0
+            ? 'Why did this attempt fail?'
+            : 'Why did the delivery fail?'}
+      </Text>
+
+      <View style={styles.reasons}>
+        {(moreReasons ? FAILURE_REASONS : LIKELY_REASONS).map((r) => (
+          <TouchableOpacity
+            key={r}
+            onPress={() => onReason(reason === r ? null : r)}
+            style={[styles.reason, reason === r && styles.reasonActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: reason === r }}
+          >
+            {reason === r && <Icon name="checkmark" size="sm" color={colors.onBrand} />}
+            <Text style={[styles.reasonText, reason === r && styles.reasonTextActive]}>
+              {r.replace(/_/g, ' ')}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {!moreReasons && (
+        <Button
+          label={`${FAILURE_REASONS.length - LIKELY_REASONS.length} more reasons`}
+          icon="chevron-down"
+          onPress={onMoreReasons}
+          tone="ghost"
+          size="sm"
+        />
+      )}
+
+      <Field
+        label="Note (optional)"
+        icon="document-text-outline"
+        value={note}
+        onChange={onNote}
+        placeholder="Gate code, neighbour, …"
+      />
+
+      <Button
+        label={busy ? 'Queueing…' : 'Queue failed attempt'}
+        icon="alert-circle-outline"
+        onPress={onSubmit}
+        disabled={!reason || busy}
+        tone="danger"
+        loading={busy}
+        block
+        size="lg"
+      />
+    </View>
+  );
+}
+
+/**
+ * The customer contact row.
+ *
+ * `Linking.openURL` is the web-safe way to hand a number to the phone app, and it degrades to a
+ * link on the exported bundle the screenshots run in. The state machine lives in `rules/contact.ts`
+ * so the copy — "there is nobody to dial", not a silent no-op — is testable without a handset.
+ *
+ * The number is `null` today because `RiderDeliveryJobDto` carries none; that is R6 in the revmap,
+ * and this row is built to start dialling the day that lands rather than being rebuilt for it.
+ */
+function ContactRow({ job }: { job: JobRow }) {
+  const state = contactStateFor(job, null, false);
+  const href = telHref(state);
+
+  return (
+    <View style={styles.contactRow}>
+      <View style={styles.contactText}>
+        <Text style={styles.contactLabel}>{contactLabel(state)}</Text>
+        <Text style={styles.contactHint}>{contactHint(state)}</Text>
+      </View>
+      {href !== null ? (
+        <TouchableOpacity
+          onPress={() => void Linking.openURL(href)}
+          accessibilityRole="button"
+          accessibilityLabel={`Call customer on ${state.kind === 'ready' ? state.phone : ''}`}
+          style={styles.contactButton}
+        >
+          <Icon name="call" size="sm" color={colors.onBrand} />
+          <Text style={styles.contactButtonLabel}>Call</Text>
+        </TouchableOpacity>
+      ) : (
+        <Icon name="call-outline" size="sm" color={colors.textFaint} />
+      )}
     </View>
   );
 }
@@ -312,11 +537,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.brand,
   },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heroKind: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,20 +558,36 @@ const styles = StyleSheet.create({
     gap: space.xxs,
   },
   heroIdLabel: { ...typography.overline, color: colors.textFaint, marginBottom: 0 },
-  heroIdValue: {
-    ...typography.label,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    color: colors.text,
-  },
+  heroIdValue: { ...typography.label, fontFamily: 'monospace', fontSize: 12, color: colors.text },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.xs },
+  heroMetaText: { ...typography.caption, color: colors.textMuted, flex: 1 },
 
-  sectionTitle: {
+  contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    marginBottom: space.md,
+    gap: space.md,
+    marginTop: space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: space.md,
   },
-  sectionIcon: {
+  contactText: { flex: 1, gap: space.xxs },
+  contactLabel: { ...typography.label, fontSize: 14 },
+  contactHint: { ...typography.caption, color: colors.textMuted, lineHeight: 17 },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    backgroundColor: colors.brand,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  contactButtonLabel: { ...typography.label, fontSize: 13, color: colors.onBrand },
+
+  primaryCard: { gap: space.sm, paddingVertical: space.lg },
+  primaryHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  primaryIcon: {
     width: 28,
     height: 28,
     borderRadius: radius.sm,
@@ -358,10 +595,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitleText: { ...typography.heading, flex: 1 },
-  cardSub: { fontSize: 13, lineHeight: 19, marginBottom: space.md },
+  primaryLabel: { ...typography.heading, flex: 1 },
+  primaryDetail: { fontSize: 13, lineHeight: 19 },
+  primaryFields: { gap: space.md, marginTop: space.xs },
 
-  reasons: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md },
+  supportCard: { paddingVertical: space.md },
+  supportLabel: { ...typography.overline, color: colors.textFaint, marginBottom: space.xs },
+  supportForm: { marginTop: space.sm },
+  supportFormHint: { fontSize: 13, lineHeight: 19 },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.sm,
+  },
+  supportIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.neutralBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supportText: { flex: 1, gap: space.xxs },
+  supportTitle: { ...typography.label, fontSize: 14 },
+  supportDetail: { ...typography.caption, color: colors.textMuted },
+
+  closedHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
+  closedTitle: { ...typography.heading },
+  closedDetail: { fontSize: 13, lineHeight: 19 },
+  supportOnly: { ...typography.caption, color: colors.textMuted },
+
+  reasonLabel: { ...typography.label, color: colors.textMuted },
+  attemptForm: { gap: space.md, marginTop: space.md },
+  reasons: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   reason: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,14 +641,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   reasonActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  reasonLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
-  reasonLabelActive: { color: colors.onBrand },
+  reasonText: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  reasonTextActive: { color: colors.onBrand },
 
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginVertical: space.md,
-  },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 
   messageBox: {
     flexDirection: 'row',

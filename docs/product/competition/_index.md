@@ -139,6 +139,7 @@ Sequenced by value-per-unit-of-work. Nothing here requires an architectural chan
 - **A map.** Nobody in this market has one on a customer-facing surface; it is a feature-shaped
   distraction for a system that does not own vehicles.
 - **A rider app yet.** Two of three competitors appear to have none, and the third's is Cordova. Our
+  position there is detailed in [rider-app-revmap.md](rider-app-revmap.md)
   sync contract is done and that is the correct order — the device half is a separate bet.
 - **Anything to match their scale claims.** 300,000 registered merchants against ~5.7M cumulative
   parcels is a long tail with a 1.6★ Shopify app. We want the underserved mid-market, not the head.

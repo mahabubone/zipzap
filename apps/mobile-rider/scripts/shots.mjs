@@ -223,7 +223,7 @@ await shoot('job-pickup');
 
 // Queue a scan: the detail screen confirms with the device sequence.
 await page
-  .getByText('Shipment ID')
+  .getByText('Parcel id')
   .locator('..')
   .getByRole('textbox')
   .fill('22222222-2222-4222-8222-222222222222');
@@ -243,6 +243,9 @@ await settle();
 await shoot('job-delivery');
 
 // Queue a failed attempt with a reason chip, then show the confirmation.
+// The failure path is now a supporting action under the primary one, expanded the way a rider
+// expands it: one tap on "Or instead". The reason chips live behind it.
+await page.getByText(/Customer not in/).click();
 await page.getByText('CUSTOMER UNAVAILABLE').click();
 await page.getByRole('button', { name: 'Queue failed attempt' }).click();
 await page.waitForTimeout(600);
@@ -267,8 +270,18 @@ await page.getByRole('tab', { name: /^Sync/ }).click();
 await settle();
 await shoot('sync-pending');
 
-await page.getByRole('button', { name: /Sync now/ }).click();
-await page.waitForTimeout(1200);
+// The Sync button is enabled only while something is waiting, so after a successful sync it
+// correctly refuses to press again. The shot is worth taking in both states, but it is not a
+// failure if there is nothing left to flush — that is the button doing its job.
+const syncButton = page.getByRole('button', { name: /^Sync now/ });
+if (await syncButton.isEnabled()) {
+  await syncButton.click();
+  await page.waitForTimeout(1200);
+} else {
+  // The queue is already empty. Record it rather than pretending a click happened: a shot labelled
+  // "settled" that was taken without syncing is not a settlement shot.
+  console.log('skip  sync settle — queue was already empty, nothing to flush');
+}
 await shoot('sync-settled');
 
 await page.getByRole('tab', { name: 'Profile' }).click();

@@ -713,9 +713,11 @@ write appends to the proven `OfflineQueue` and returns immediately; no screen wa
 Nine screenshots in [shots/mobile](../../../shots/mobile), captured by
 [shots.mjs](../../../apps/mobile-rider/scripts/shots.mjs) through `expo export --platform web`.
 
-**What is still missing on the device:** route and map, the notification feed, and exceptions as
-their own screen. Also unbuilt: AsyncStorage/SecureStore persistence (the in-memory store behind the
-`QueueStorage` port is a one-line swap) and a real navigation library.
+**What is still missing on the device** — superseded on 2026-10-11 by
+[rider-app-revmap.md](rider-app-revmap.md), which audits the screens against the market. In short: the
+contract, the persistence (`AsyncStorage` + `expo-secure-store`), React Navigation, auto-sync on
+reconnect, and a real design system are all built. What is left is the screen: no earnings figure, no
+cash-in-hand, no shift, and a job detail that is three equal-weight forms rather than one decision.
 
 ---
 
@@ -1018,6 +1020,8 @@ neither is built.
 ## Related
 
 - [_index.md](_index.md) — the scorecard and ranked gaps this plan closes
+- [rider-app-revmap.md](rider-app-revmap.md) — the rider **screen** against the market: what to build
+  next, and what is deliberately not worth building
 - [carrybee.md](carrybee.md) · [redx.md](redx.md) · [steadfast.md](steadfast.md)
 - [../surfaces.md](../surfaces.md) — the ten surfaces this plan sequences
 - [../../ROADMAP.md](../../ROADMAP.md) — build order and phase gates
