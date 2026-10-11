@@ -175,6 +175,7 @@ export default function App() {
           onPendingChange={setPending}
           onSignOut={signOut}
           autoSync={autoSync}
+          offline={autoSync.offline}
         />
       </QueryClientProvider>
     </SafeAreaProvider>
@@ -202,7 +203,7 @@ async function buildClient(
 function Boot() {
   return (
     <View style={styles.boot}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={colors.brand} />
     </View>
   );
 }

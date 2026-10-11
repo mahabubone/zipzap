@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, Muted, Title } from '../components/ui.tsx';
-import { colors, space } from '../theme.ts';
+import { Badge, Button, Card, Muted, ProgressBar, Title } from '../components/ui.tsx';
+import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
 import type { AutoSync } from '../hooks/useAutoSync.ts';
 import type { Settled } from '../offline/command-queue.ts';
@@ -91,52 +91,53 @@ export function SyncScreen({
 
       {/* Connectivity first: the rider's question on opening this screen is "will it sync", and
           answering it after the queue state means they look at a list they cannot act on. */}
-      <Card>
-        {autoSync.offline ? (
-          <>
-            <Badge label="OFFLINE" tone="warning" />
-            <View style={styles.gap} />
-            <Muted>
-              Nothing is leaving this device until signal returns. Everything you scan is queued and
-              safe — it will flush itself when you are back online.
-            </Muted>
-          </>
-        ) : (
-          <>
-            <Badge
-              label={autoSync.syncing ? 'SYNCING' : 'ONLINE'}
-              tone={autoSync.syncing ? 'info' : 'success'}
+      {/* The connectivity card, with the state as a coloured pill and a one-line rule rather
+          than three paragraphs of grey. A rider glances at this; they do not read it. */}
+      <Card style={styles.statusCard}>
+        <View style={styles.statusHead}>
+          <View
+            style={[
+              styles.statusDot,
+              {
+                backgroundColor: autoSync.offline
+                  ? colors.warning
+                  : autoSync.syncing
+                    ? colors.brand
+                    : colors.success,
+              },
+            ]}
+          />
+          <Text style={styles.statusLabel}>
+            {autoSync.offline ? 'Offline' : autoSync.syncing ? 'Syncing' : 'Online'}
+          </Text>
+          {pending.length > 0 && <Text style={styles.statusCount}>{pending.length} waiting</Text>}
+        </View>
+
+        <Muted style={styles.statusBody}>
+          {autoSync.offline
+            ? 'Nothing leaves this device until signal returns. Every scan is queued and safe — it flushes itself when you are back online.'
+            : autoSync.syncing
+              ? 'Flushing the queue now.'
+              : 'Connected. Scans flush themselves as soon as signal returns.'}
+        </Muted>
+
+        {/* Retry visibility, only once it is actually retrying: a rider does not need to know
+            about attempt 1, but they do need to know when the app has given up and is waiting. */}
+        {autoSync.attempts > 0 && (
+          <View style={styles.attempts}>
+            <ProgressBar
+              value={autoSync.attempts / 8}
+              tone={autoSync.attempts >= 8 ? 'danger' : 'warning'}
+              height={4}
             />
-            <View style={styles.gap} />
-            <Muted>
-              {autoSync.syncing
-                ? 'Flushing the queue now.'
-                : 'Connected. New scans flush themselves as soon as signal returns.'}
-            </Muted>
-          </>
-        )}
-
-        {/* Retry visibility, only once it is actually retrying: a rider does not need to know about
-            attempt 1, but they do need to know when the app has given up and is waiting for them. */}
-        {autoSync.attempts > 0 ? (
-          <>
-            <View style={styles.gap} />
-            <Muted>
+            <Text style={styles.attemptsLabel}>
               {autoSync.attempts >= 8
-                ? 'Sync tried 8 times and stopped. Tap Sync now when you have signal.'
-                : `Retrying (attempt ${autoSync.attempts} of 8).`}
-            </Muted>
-          </>
-        ) : null}
+                ? 'Tried 8 times and stopped. Tap Sync now when you have signal.'
+                : `Retrying — attempt ${autoSync.attempts} of 8.`}
+            </Text>
+          </View>
+        )}
       </Card>
-
-      {autoSync.lastError !== null ? (
-        <Card>
-          <Badge label="NEEDS A LOOK" tone="danger" />
-          <View style={styles.gap} />
-          <Muted>{autoSync.lastError}</Muted>
-        </Card>
-      ) : null}
 
       {capWarning ? (
         <Card>
@@ -223,6 +224,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.md },
   gap: { height: space.sm },
+  statusCard: { padding: space.lg, gap: space.sm },
+  statusHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusLabel: { ...typography.heading, flex: 1 },
+  statusCount: {
+    ...typography.label,
+    color: colors.warning,
+    fontVariant: ['tabular-nums'],
+  },
+  statusBody: { fontSize: 13, lineHeight: 19 },
+  attempts: { marginTop: space.xs, gap: space.xs },
+  attemptsLabel: { ...typography.caption, color: colors.textMuted },
+
   cardTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: space.md },
   row: {
     flexDirection: 'row',

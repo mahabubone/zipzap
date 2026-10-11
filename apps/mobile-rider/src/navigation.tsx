@@ -91,7 +91,7 @@ const riderTheme = {
   dark: false,
   colors: {
     ...DefaultTheme.colors,
-    primary: colors.primary,
+    primary: colors.brand,
     background: colors.bg,
     card: colors.card,
     text: colors.text,
@@ -109,10 +109,17 @@ export interface ScreenProps {
   /** Clears the session client-side. The server-side revoke happens in `logout()`. */
   readonly onSignOut: () => void | Promise<void>;
   readonly autoSync: AutoSync;
+  /**
+   * Whether the device currently has connectivity, from `useAutoSync`.
+   *
+   * Passed down rather than read from a context: the Jobs screen is the only surface that shows it,
+   * and a provider for one boolean is indirection with no payoff.
+   */
+  readonly offline: boolean;
 }
 
 export function RiderNavigator(props: ScreenProps) {
-  const { riderClient, onPendingChange, pending, onSignOut, autoSync } = props;
+  const { riderClient, onPendingChange, pending, onSignOut, autoSync, offline } = props;
 
   return (
     <NavigationContainer linking={linking} theme={riderTheme}>
@@ -157,7 +164,13 @@ function JobsStackNavigator({ props }: { props: ScreenProps }) {
       }}
     >
       <JobsStack.Screen name="Jobs" options={{ headerShown: false }}>
-        {() => <JobsScreen riderClient={props.riderClient} onOpenJob={useOpenJob()} />}
+        {() => (
+          <JobsScreen
+            riderClient={props.riderClient}
+            offline={props.offline}
+            onOpenJob={useOpenJob()}
+          />
+        )}
       </JobsStack.Screen>
       <JobsStack.Screen name="Job" options={{ title: 'Job' }}>
         {() => (

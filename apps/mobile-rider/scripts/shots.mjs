@@ -235,7 +235,7 @@ await shoot('job-pickup-queued');
 // same interaction a rider makes, which is the point of using a real navigator.
 // Back to the list. The tab bar's "Jobs" is the reliable target: the stack header's back arrow
 // is an unlabelled icon, and pressing the tab pops the whole stack, which is what a rider does.
-await page.getByRole('button', { name: 'Jobs' }).first().click();
+await page.getByRole('tab', { name: /^Jobs/ }).first().click();
 await settle();
 // The delivery with one prior attempt → reason chips + COD form.
 await page.getByText(/Delivery 77777777/).click();
@@ -263,7 +263,7 @@ await shoot('proof-code');
 // The image picker is a native dialog a screenshot cannot open, so the shot stops one
 // step short on purpose: the code is read out, the photo is still missing, and the queue
 // button stays disabled until both are present. That disabled state is the thing worth seeing.
-await page.getByRole('button', { name: /Sync/ }).click();
+await page.getByRole('tab', { name: /^Sync/ }).click();
 await settle();
 await shoot('sync-pending');
 
@@ -271,7 +271,7 @@ await page.getByRole('button', { name: /Sync now/ }).click();
 await page.waitForTimeout(1200);
 await shoot('sync-settled');
 
-await page.getByRole('button', { name: 'Profile' }).click();
+await page.getByRole('tab', { name: 'Profile' }).click();
 await settle();
 await shoot('profile');
 

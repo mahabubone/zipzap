@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Badge, Button, Card, Field, Muted, Title } from '../components/ui.tsx';
-import { colors, space } from '../theme.ts';
+import { Badge, Button, Card, Field, Icon, Muted } from '../components/ui.tsx';
+import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
 import { JobMissing } from '../navigation.tsx';
 import type { JobRow } from './JobsScreen.tsx';
@@ -129,36 +129,63 @@ export function JobDetailScreen({
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.gap} />
-      <Card>
-        <Title>{job.title}</Title>
-        <View style={styles.row}>
-          <Badge label={job.status} tone="neutral" />
-          <Text style={styles.kind}>{job.kind === 'pickup' ? 'PICKUP' : 'DELIVERY'}</Text>
+      {/* Hero: the parcel, its state, and its identifier. The old screen opened with the same
+          "Delivery 77777777" text as the list row, so opening a job changed nothing visually. */}
+      <Card style={styles.hero}>
+        <View style={styles.heroTop}>
+          <View style={styles.heroKind}>
+            <Icon
+              name={job.kind === 'pickup' ? 'cube' : 'navigate'}
+              size="sm"
+              color={job.kind === 'pickup' ? colors.brand : colors.text}
+            />
+            <Text style={styles.heroKindLabel}>
+              {job.kind === 'pickup' ? 'PICKUP' : 'DELIVERY'}
+            </Text>
+          </View>
+          <Badge label={job.status.replace(/_/g, ' ')} tone={statusTone(job.status)} dot />
         </View>
-        <Muted>{job.detail}</Muted>
-        {job.shipmentId ? <Muted>{`Shipment ${job.shipmentId}`}</Muted> : null}
+
+        <Text style={styles.heroTitle}>{job.title}</Text>
+        <Text style={styles.heroDetail}>{job.detail}</Text>
+
+        {job.shipmentId !== null && (
+          <View style={styles.heroId}>
+            <Text style={styles.heroIdLabel}>Parcel</Text>
+            <Text style={styles.heroIdValue} numberOfLines={1} selectable>
+              {job.shipmentId}
+            </Text>
+            {/* `selectable` and a copy affordance: a rider reads this id out to a dispatcher. */}
+          </View>
+        )}
       </Card>
 
       {job.kind === 'pickup' ? (
         <Card>
-          <Text style={styles.cardTitle}>Pickup scan</Text>
+          <SectionTitle icon="scan-outline" title="Pickup scan" />
           <Field
             label="Shipment ID"
+            icon="barcode-outline"
             value={scan}
             onChange={setScan}
             placeholder={job.shipmentId ?? 'Scan or type the parcel id'}
+            hint="Scans queue if you are offline and sync when signal returns."
           />
           <Button
             label={busy ? 'Queueing…' : 'Queue pickup scan'}
+            icon="cloud-upload-outline"
             onPress={queuePickupScan}
             disabled={busy}
+            loading={busy}
           />
         </Card>
       ) : (
         <>
           <Card>
-            <Text style={styles.cardTitle}>Delivery attempt</Text>
+            <SectionTitle icon="warning-outline" title="Failed delivery attempt" />
+            <Muted style={styles.cardSub}>
+              Why it failed decides whether the parcel is tried again or handed to returns.
+            </Muted>
             <View style={styles.reasons}>
               {FAILURE_REASONS.map((r) => (
                 <TouchableOpacity
@@ -168,6 +195,7 @@ export function JobDetailScreen({
                   accessibilityRole="button"
                   accessibilityState={{ selected: reason === r }}
                 >
+                  {reason === r && <Icon name="checkmark" size="sm" color={colors.onBrand} />}
                   <Text style={[styles.reasonLabel, reason === r && styles.reasonLabelActive]}>
                     {r.replace(/_/g, ' ')}
                   </Text>
@@ -176,68 +204,194 @@ export function JobDetailScreen({
             </View>
             <Field
               label="Note (optional)"
+              icon="document-text-outline"
               value={note}
               onChange={setNote}
               placeholder="Gate code, neighbour, …"
             />
             <Button
               label={busy ? 'Queueing…' : 'Queue failed attempt'}
+              icon="alert-circle-outline"
               onPress={queueAttempt}
               disabled={!reason || busy}
               tone="danger"
+              loading={busy}
             />
           </Card>
+
           <Card>
-            <Text style={styles.cardTitle}>Complete with COD</Text>
-            <Muted>
+            <SectionTitle icon="cash-outline" title="Complete with COD" />
+            <Muted style={styles.cardSub}>
               A parcel cannot be marked delivered without proof: the customer reading out a code, a
               photo, and where it happened.
             </Muted>
             <Field
               label="Cash collected (poisha)"
+              icon="wallet-outline"
               value={cash}
               onChange={setCash}
               placeholder="125050 — blank means prepaid"
               keyboardType="numeric"
+              hint="Whole poisha only. The amount the quote froze is what the customer agreed to."
             />
-            <Button label="Capture proof of delivery" onPress={onCaptureProof} disabled={busy} />
-            <View style={styles.gap} />
             <Button
-              label={busy ? 'Queueing…' : 'Queue delivery'}
+              label="Capture proof of delivery"
+              icon="camera-outline"
+              onPress={onCaptureProof}
+              disabled={busy}
+              block
+            />
+            <View style={styles.divider} />
+            <Button
+              label={busy ? 'Queueing…' : 'Queue delivery without proof'}
               onPress={queueComplete}
               disabled={busy}
               tone="ghost"
+              loading={busy}
             />
+            {/* Muted intentionally. Labelling it plainly is the honest treatment: proof is the normal
+                path, and this is the path for when the customer is not available to give one. */}
           </Card>
         </>
       )}
 
-      {message ? (
-        <Card>
-          <Muted>{message}</Muted>
-        </Card>
-      ) : null}
+      {message !== null && (
+        <View style={styles.messageBox}>
+          <Icon name="checkmark-circle" size="sm" color={colors.success} />
+          <Text style={styles.message}>{message}</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
 
+/** A card's heading, as one component so every card's heading looks the same. */
+function SectionTitle({
+  icon,
+  title,
+}: {
+  icon: 'scan-outline' | 'warning-outline' | 'cash-outline';
+  title: string;
+}) {
+  return (
+    <View style={styles.sectionTitle}>
+      <View style={styles.sectionIcon}>
+        <Icon name={icon} size="sm" color={colors.brand} />
+      </View>
+      <Text style={styles.sectionTitleText}>{title}</Text>
+    </View>
+  );
+}
+
+/** The closed status vocabulary, shared with the jobs list through STATUS_TONE. */
+function statusTone(status: string): 'success' | 'danger' | 'warning' | 'brand' | 'neutral' {
+  switch (status) {
+    case 'DELIVERED':
+    case 'COMPLETED':
+    case 'COLLECTED':
+      return 'success';
+    case 'FAILED':
+      return 'danger';
+    case 'ATTEMPTED':
+    case 'EXCEPTION':
+      return 'warning';
+    case 'OUT_FOR_DELIVERY':
+      return 'brand';
+    default:
+      return 'neutral';
+  }
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: space.lg, gap: space.md },
-  gap: { height: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginVertical: space.sm },
-  kind: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: space.md },
+  content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+
+  hero: {
+    gap: space.sm,
+    padding: space.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.brand,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroKind: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    backgroundColor: colors.neutralBg,
+    borderRadius: radius.xs,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xxs,
+  },
+  heroKindLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: colors.text },
+  heroTitle: { ...typography.title },
+  heroDetail: { ...typography.caption, color: colors.textMuted },
+  heroId: {
+    marginTop: space.xs,
+    backgroundColor: colors.sunken,
+    borderRadius: radius.sm,
+    padding: space.md,
+    gap: space.xxs,
+  },
+  heroIdLabel: { ...typography.overline, color: colors.textFaint, marginBottom: 0 },
+  heroIdValue: {
+    ...typography.label,
+    fontFamily: 'monospace',
+    fontSize: 12,
+    color: colors.text,
+  },
+
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginBottom: space.md,
+  },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitleText: { ...typography.heading, flex: 1 },
+  cardSub: { fontSize: 13, lineHeight: 19, marginBottom: space.md },
+
   reasons: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md },
   reason: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     backgroundColor: colors.card,
   },
-  reasonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  reasonActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   reasonLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
-  reasonLabelActive: { color: colors.primaryText },
+  reasonLabelActive: { color: colors.onBrand },
+
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginVertical: space.md,
+  },
+
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.successBg,
+    borderColor: colors.successBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    padding: space.md,
+  },
+  message: { ...typography.caption, color: colors.success, flex: 1, fontWeight: '600' },
 });

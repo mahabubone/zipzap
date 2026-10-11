@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Badge, Button, Card, Field, Muted, Title } from '../components/ui.tsx';
-import { colors, radius, space } from '../theme.ts';
+import { Badge, Button, Card, Field, Icon, Muted } from '../components/ui.tsx';
+import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
 import { JobMissing } from '../navigation.tsx';
 import type { JobRow } from './JobsScreen.tsx';
@@ -30,6 +30,11 @@ interface Captured {
   base64: string;
   contentType: string;
   uri: string;
+  /**
+   * What the picker called the file, when it said. Not required because a web file input may
+   * produce an anonymous blob, and a photo with no name still proves a handover.
+   */
+  fileName?: string;
 }
 
 export function ProofScreen({
@@ -142,24 +147,31 @@ export function ProofScreen({
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card>
-        <Title>Proof of delivery</Title>
-        <Muted>{job.title}</Muted>
-        <View style={styles.row}>
-          <Badge label={job.status} tone="neutral" />
-          <Text style={styles.step}>1 code · 2 photo · 3 queue</Text>
-        </View>
-      </Card>
+      {/* A step strip, not a paragraph. This screen has three actions that must happen in order,
+          and the old "1 code · 2 photo · 3 queue" line of grey told a rider nothing about which
+          was done. */}
+      <StepStrip
+        done={photo !== null && issued !== null}
+        active={code.trim().length === 4 ? 2 : issued !== null ? 1 : 0}
+      />
 
       <Card>
-        <Text style={styles.cardTitle}>1 · Customer confirms</Text>
-        <Muted>
-          The customer reads a code out. It is the one thing a stranger at the door cannot fake, and
-          it is what a dispute is answered from.
-        </Muted>
-        {issued ? (
+        <View style={styles.cardHead}>
+          <View style={styles.cardBadge}>
+            <Text style={styles.cardBadgeNum}>1</Text>
+          </View>
+          <View style={styles.cardHeadText}>
+            <Text style={styles.cardTitle}>Customer confirms</Text>
+            <Muted style={styles.cardSub}>
+              The customer reads a code out. It is the one thing a stranger at the door cannot fake,
+              and it is what a dispute is answered from.
+            </Muted>
+          </View>
+        </View>
+
+        {issued !== null && (
           <View style={styles.codeBox}>
-            <Text style={styles.codeLabel}>Read out</Text>
+            <Text style={styles.codeLabel}>Read this out</Text>
             <Text
               style={styles.code}
               accessibilityLabel={`Delivery code ${issued.code.split('').join(' ')}`}
@@ -167,57 +179,141 @@ export function ProofScreen({
               {issued.code}
             </Text>
           </View>
-        ) : null}
+        )}
+
         <Button
-          label={busy ? 'Sending…' : issued ? 'Send a new code' : 'Send code to customer'}
+          label={busy ? 'Sending…' : issued !== null ? 'Send a new code' : 'Send code to customer'}
+          icon="chatbubble-ellipses-outline"
           onPress={askForCode}
           disabled={busy}
+          loading={busy}
+          block
         />
+
+        <View style={styles.divider} />
         <Field
           label="What the customer said"
+          icon="keypad-outline"
           value={code}
           onChange={setCode}
           placeholder="4 digits"
           keyboardType="numeric"
+          hint={
+            code.trim().length > 0 && code.trim().length !== 4
+              ? 'A delivery code is 4 digits.'
+              : undefined
+          }
         />
       </Card>
 
       <Card>
-        <Text style={styles.cardTitle}>2 · Photograph the handover</Text>
-        {photo ? (
-          <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" />
+        <View style={styles.cardHead}>
+          <View style={[styles.cardBadge, photo !== null && styles.cardBadgeDone]}>
+            {photo !== null ? (
+              <Icon name="checkmark" size="sm" color={colors.success} />
+            ) : (
+              <Text style={styles.cardBadgeNum}>2</Text>
+            )}
+          </View>
+          <View style={styles.cardHeadText}>
+            <Text style={styles.cardTitle}>Photograph the handover</Text>
+            <Muted style={styles.cardSub}>A photo of where the parcel ended up.</Muted>
+          </View>
+        </View>
+
+        {photo !== null ? (
+          <>
+            <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" />
+            <View style={styles.photoRow}>
+              <Icon name="image-outline" size="sm" color={colors.success} />
+              <Text style={styles.photoName} numberOfLines={1}>
+                {photo.fileName ?? 'Photo attached'}
+              </Text>
+            </View>
+          </>
         ) : (
           <View style={styles.placeholder}>
+            <Icon name="camera-outline" size="xl" color={colors.textFaint} />
             <Text style={styles.placeholderText}>No photo attached</Text>
           </View>
         )}
+
         <Button
-          label={busy ? 'Opening…' : photo ? 'Replace photo' : 'Attach photo'}
+          label={busy ? 'Opening…' : photo !== null ? 'Replace photo' : 'Attach photo'}
+          icon="camera-outline"
           onPress={takePhoto}
           disabled={busy}
           tone="ghost"
+          block
         />
       </Card>
 
       <Card>
-        <Text style={styles.cardTitle}>3 · Queue the proof</Text>
-        <Muted>
-          Your location is recorded with it. The parcel cannot be marked delivered until this lands
-          on the server, so queueing it now and syncing later is safe.
-        </Muted>
+        <View style={styles.cardHead}>
+          <View style={styles.cardBadge}>
+            <Text style={styles.cardBadgeNum}>3</Text>
+          </View>
+          <View style={styles.cardHeadText}>
+            <Text style={styles.cardTitle}>Queue the proof</Text>
+            <Muted style={styles.cardSub}>
+              Your location is recorded with it. The parcel cannot be marked delivered until this
+              lands on the server, so queueing it now and syncing later is safe.
+            </Muted>
+          </View>
+        </View>
+
         <Button
           label={busy ? 'Queueing…' : 'Queue proof of delivery'}
+          icon="cloud-upload-outline"
           onPress={queueProof}
-          disabled={busy || !issued}
+          disabled={busy || issued === null}
+          loading={busy}
+          block
         />
+        {issued === null && <Muted style={styles.blockHint}>Send the customer a code first.</Muted>}
       </Card>
 
-      {message ? (
-        <Card>
-          <Muted>{message}</Muted>
-        </Card>
-      ) : null}
+      {message !== null && (
+        <View style={styles.messageBox}>
+          <Icon name="checkmark-circle" size="sm" color={colors.success} />
+          <Text style={styles.message}>{message}</Text>
+        </View>
+      )}
     </ScrollView>
+  );
+}
+
+/**
+ * The three steps, as a strip.
+ *
+ * `active` is the step the rider is on; `done` means all three are satisfied. A strip beats three
+ * numbered cards because a rider can see at a glance that step 1 is finished without reading it.
+ */
+function StepStrip({ done, active }: { done: boolean; active: number }) {
+  return (
+    <View style={styles.strip}>
+      {[0, 1, 2].map((index) => {
+        const complete = done || index < active;
+        return (
+          <View key={index} style={styles.stripSegWrap}>
+            <View
+              style={[
+                styles.stripDot,
+                complete && styles.stripDotDone,
+                index === active && !done && styles.stripDotActive,
+              ]}
+            >
+              {complete ? (
+                <Icon name="checkmark" size="sm" color={colors.onBrand} />
+              ) : (
+                <Text style={styles.stripNum}>{index + 1}</Text>
+              )}
+            </View>
+            {index < 2 && <View style={[styles.stripLine, complete && styles.stripLineDone]} />}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -236,41 +332,112 @@ function currentPosition(): Promise<{ latitude: number; longitude: number }> {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: space.lg, gap: space.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginVertical: space.sm },
-  step: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: space.sm },
-  codeBox: {
-    marginVertical: space.md,
-    paddingVertical: space.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.neutralBg,
-    alignItems: 'center',
-  },
-  codeLabel: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.textFaint,
-  },
-  code: {
-    fontSize: 40,
-    fontWeight: '700',
-    letterSpacing: 10,
-    color: colors.primary,
-    marginLeft: 10,
-  },
-  preview: { width: '100%', height: 180, borderRadius: radius.md, marginVertical: space.md },
-  placeholder: {
-    width: '100%',
-    height: 180,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+  content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+
+  strip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.xs },
+  stripSegWrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  stripDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: colors.neutralBg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stripDotDone: { backgroundColor: colors.success },
+  stripDotActive: { backgroundColor: colors.brand },
+  stripNum: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  stripLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: colors.border,
+    marginHorizontal: space.xs,
+    borderRadius: 1,
+  },
+  stripLineDone: { backgroundColor: colors.success },
+
+  cardHead: {
+    flexDirection: 'row',
+    gap: space.md,
+    marginBottom: space.md,
+    alignItems: 'flex-start',
+  },
+  cardBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBadgeDone: { backgroundColor: colors.successBg },
+  cardBadgeNum: { fontSize: 13, fontWeight: '800', color: colors.brand },
+  cardHeadText: { flex: 1, gap: space.xxs },
+  cardTitle: { ...typography.heading },
+  cardSub: { fontSize: 13, lineHeight: 19 },
+
+  codeBox: {
+    marginBottom: space.md,
+    paddingVertical: space.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.brandBorder,
+    alignItems: 'center',
+  },
+  codeLabel: {
+    ...typography.overline,
+    color: colors.brand,
+    marginBottom: space.sm,
+  },
+  code: {
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: 8,
+    color: colors.brand,
+    marginLeft: space.sm,
+  },
+
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
     marginVertical: space.md,
   },
-  placeholderText: { fontSize: 13, color: colors.textFaint },
+
+  preview: {
+    width: '100%',
+    height: 180,
+    borderRadius: radius.md,
+    marginBottom: space.md,
+  },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginBottom: space.md },
+  photoName: { ...typography.caption, color: colors.textMuted, flex: 1 },
+  placeholder: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    // A dashed-style frame reads as "something goes here"; a solid fill reads as a disabled control.
+    backgroundColor: colors.sunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    marginBottom: space.md,
+  },
+  placeholderText: { ...typography.caption, color: colors.textFaint },
+
+  blockHint: { ...typography.caption, textAlign: 'center', marginTop: space.sm },
+
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.successBg,
+    borderColor: colors.successBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    padding: space.md,
+  },
+  message: { ...typography.caption, color: colors.success, flex: 1, fontWeight: '600' },
 });
