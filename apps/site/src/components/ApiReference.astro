@@ -1,0 +1,24 @@
+---
+/**
+ * The API reference, rendered by Stoplight Elements.
+ *
+ * `<elements-api>` is a web component, so it only runs in the browser: Stoplight fetches
+ * `/openapi.json` itself and does its own routing, deep links and search. That is why this file is
+ * nearly empty — the work is in having a correct spec at `/openapi.json`, which
+ * `scripts/sync-openapi.mjs` guarantees, and in the custom element being registered, which
+ * `Base.astro` does once for the whole site.
+ *
+ * The element carries no client directive. Astro's `client:*` resolve an *import*, and for a custom
+ * element there is nothing to import but the registration already performed — so `client:load` here
+ * fails the build with `NoMatchingImport`, an error that names the tag rather than the directive.
+ */
+
+/*
+ * `router="hash"` matters more than it looks. Stoplight supports `hash` and `memory`, and `memory`
+ * keeps its route in JS state — so a bookmarked `#/tag/Shipments/operation/create` breaks on reload,
+ * and a link pasted into a ticket opens the overview instead of the operation. `hash` makes every
+ * internal link a real, shareable URL.
+ */
+---
+
+<elements-api apiDescriptionUrl="/openapi.json" layout="sidebar" router="hash" />

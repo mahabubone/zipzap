@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "expo start",
-    "build": "expo export",
+    "build": "expo export --platform web",
+    "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
     "verify:queue": "node scripts/verify-queue.mjs",
     "verify:client": "node scripts/verify-client.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

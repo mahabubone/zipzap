@@ -1,0 +1,18 @@
+---
+/**
+ * The catalog landing page.
+ *
+ * Not a redirect to the first page: someone arriving here is still deciding whether this section is
+ * theirs, and a listing answers that where a first page cannot.
+ */
+import CatalogIndex from '../../components/CatalogIndex.astro';
+
+const props = {
+  collection: 'faq',
+  label: 'FAQ',
+  basePath: '/faq',
+  blurb: 'Money, retries, signatures and the questions that arrive by support ticket most often.',
+};
+---
+
+<CatalogIndex {...props} />

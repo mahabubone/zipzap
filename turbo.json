@@ -45,6 +45,18 @@
     "@zipzap/api-client#build": {
       "dependsOn": ["^build", "@zipzap/backend#openapi:export"]
     },
+    /* The docs site needs the contract in `public/` BEFORE Astro runs. Reverse the order and
+     * the build succeeds while serving a 404 for `/openapi.json`, which renders a blank API
+     * reference with no error — the failure mode a docs site must not have. */
+    "sync:spec": {
+      "dependsOn": ["@zipzap/backend#openapi:export"],
+      "inputs": ["scripts/**"],
+      "outputs": ["public/openapi.json"]
+    },
+    "@zipzap/site#build": {
+      "dependsOn": ["^build", "sync:spec"],
+      "outputs": ["dist/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

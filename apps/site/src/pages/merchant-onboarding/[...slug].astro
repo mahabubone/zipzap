@@ -1,0 +1,29 @@
+---
+/**
+ * One route per catalog, generated from its content collection.
+ *
+ * `getStaticPaths` rather than `[...slug].astro`, because the catalogs have different base paths
+ * (`/merchant-onboarding` vs `/rider`) and a single catch-all would need a lookup table anyway.
+ * Astro's file-based routing is the table.
+ *
+ * Slug comes from the filename, which is why the onboarding pages are numbered: `01-sign-up.md`
+ * becomes `/merchant-onboarding/01-sign-up`, so the filesystem order is the nav order.
+ */
+import DocPage from '../../components/DocPage.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('onboarding');
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+---
+
+<DocPage collection="onboarding" entry={entry} label="Merchant Onboarding" basePath="/merchant-onboarding">
+  <Content />
+</DocPage>

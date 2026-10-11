@@ -1,0 +1,18 @@
+---
+/**
+ * The catalog landing page.
+ *
+ * Not a redirect to the first page: someone arriving here is still deciding whether this section is
+ * theirs, and a listing answers that where a first page cannot.
+ */
+import CatalogIndex from '../../components/CatalogIndex.astro';
+
+const props = {
+  collection: 'hub',
+  label: 'Hub Operations',
+  basePath: '/hub',
+  blurb: 'The scan-first dock console, manifests, line-haul and reconciliation.',
+};
+---
+
+<CatalogIndex {...props} />

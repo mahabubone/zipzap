@@ -1,0 +1,53 @@
+---
+/**
+ * A catalog's landing page — not the first doc.
+ *
+ * Worth its own route rather than a redirect to the first page, because a landing page answers
+ * "is this the right section for me" and a first-page answer only helps someone who already
+ * decided. The listing is the same set `DocPage`'s sidebar shows, so it cannot drift from the nav.
+ */
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const { collection, label, basePath, blurb } = Astro.props as {
+  collection: 'onboarding' | 'rider' | 'hub' | 'operations' | 'faq';
+  label: string;
+  basePath: string;
+  blurb: string;
+};
+
+const entries = (await getCollection(collection)).sort((left, right) => {
+  const leftOrder = left.data.order ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = right.data.order ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return left.data.title.localeCompare(right.data.title);
+});
+---
+
+<Base title={label} description={blurb} current={basePath}>
+  <main class="mx-auto max-w-4xl px-5 py-14">
+    <h1 class="text-3xl font-bold tracking-tight">{label}</h1>
+    <p class="mt-3 text-[15px] leading-relaxed text-slate">{blurb}</p>
+
+    <ol class="mt-10 flex flex-col gap-3">
+      {
+        entries.map((entry) => (
+          <li>
+            <a
+              href={`${basePath}/${entry.id}`}
+              class="group block rounded-xl border border-line bg-paper p-5 transition-colors hover:border-slate"
+            >
+              <div class="flex items-baseline justify-between gap-3">
+                <h2 class="text-base font-semibold text-ink">{entry.data.title}</h2>
+                <span class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate">
+                  {entry.data.audience}
+                </span>
+              </div>
+              <p class="mt-1.5 text-sm text-slate">{entry.data.description}</p>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </main>
+</Base>

@@ -1,0 +1,18 @@
+---
+/**
+ * The catalog landing page.
+ *
+ * Not a redirect to the first page: someone arriving here is still deciding whether this section is
+ * theirs, and a listing answers that where a first page cannot.
+ */
+import CatalogIndex from '../../components/CatalogIndex.astro';
+
+const props = {
+  collection: 'onboarding',
+  label: 'Merchant Onboarding',
+  basePath: '/merchant-onboarding',
+  blurb: 'Everything from sign-up to your first settlement.',
+};
+---
+
+<CatalogIndex {...props} />

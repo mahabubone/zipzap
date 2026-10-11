@@ -1,0 +1,110 @@
+/*
+ * Global styles for the docs site.
+ *
+ * Tailwind v4: a single `@import "tailwindcss"` and no config file. `@source` names the
+ * directories to scan — without it v4 scans only what it can see from the entry point, and this
+ * site's components are `.astro` files whose classes are invisible to it. That failure mode is
+ * an unstyled page with no error, and it was hit before in merchant-web.
+ */
+@import 'tailwindcss';
+
+/*
+ * Stoplight Elements' own styles.
+ *
+ * These load once, here, rather than being imported by the component that uses them: the web
+ * component injects its own shadow styles, and importing the stylesheet twice produces a
+ * second copy that wins the cascade in ways that depend on bundle order.
+ */
+@import '@stoplight/elements/styles.min.css';
+
+@source '../**/*.astro';
+@source '../**/*.ts';
+@source '../**/*.tsx';
+
+@theme {
+  /*
+   * The same slate-first palette as the consoles, so the docs and the product read as one thing.
+   * `@zipzap/ui` holds the React version of this; a docs site has no React components to share
+   * with it, so the tokens are restated here rather than imported, and the two are kept in step
+   * by eye until there is a reason to extract them.
+   */
+  --color-ink: #0f172a;
+  --color-slate: #64748b;
+  --color-slate-pale: #94a3b8;
+  --color-line: #e2e8f0;
+  --color-paper: #ffffff;
+  --color-canvas: #f8fafc;
+  --color-accent: #0f172a;
+
+  --font-sans: 'Inter var', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  /*
+   * Prose typography for the markdown catalogs.
+   *
+   * Hand-rolled rather than `@tailwindcss/typography`, because the plugin's defaults are tuned
+   * for blog posts and a reference page needs tighter spacing, monospace inline code, and tables
+   * that scroll rather than overflow the viewport on a phone.
+   */
+  .prose {
+    @apply text-[15px] leading-relaxed;
+  }
+  .prose h1 {
+    @apply mt-0 mb-4 text-2xl font-bold tracking-tight;
+  }
+  .prose h2 {
+    @apply mt-10 mb-3 border-t border-line pt-6 text-lg font-semibold;
+  }
+  .prose h3 {
+    @apply mt-8 mb-2 text-base font-semibold;
+  }
+  .prose p {
+    @apply my-3;
+  }
+  .prose a {
+    @apply text-accent underline decoration-line underline-offset-2 hover:decoration-accent;
+  }
+  .prose code {
+    @apply rounded bg-canvas px-1.5 py-0.5 font-mono text-[13px];
+  }
+  .prose pre {
+    @apply my-4 overflow-x-auto rounded-lg border border-line bg-canvas p-4 text-[13px] leading-relaxed;
+  }
+  .prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .prose ul {
+    @apply my-3 list-disc space-y-1 pl-5;
+  }
+  .prose ol {
+    @apply my-3 list-decimal space-y-1 pl-5;
+  }
+  .prose li::marker {
+    @apply text-slate;
+  }
+  .prose table {
+    @apply my-4 block w-full overflow-x-auto border-collapse text-left text-sm;
+  }
+  .prose th {
+    @apply border-b border-line px-3 py-2 font-semibold;
+  }
+  .prose td {
+    @apply border-b border-line px-3 py-2 align-top;
+  }
+  .prose blockquote {
+    @apply my-4 border-l-2 border-line pl-4 text-slate italic;
+  }
+  .prose hr {
+    @apply my-8 border-line;
+  }
+}

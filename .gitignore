@@ -47,3 +47,15 @@ apps/mobile-rider/.expo-cache/
 apps/mobile-rider/.expohome/
 apps/mobile-rider/.cache/
 apps/mobile-rider/.tmp/
+
+# `expo prebuild` output. Regenerated locally; the native projects are machine-written and
+# their contents are decided by the Expo SDK, not by us, so committing them would make
+# every SDK upgrade a large diff of Xcode and Gradle files. See apps/mobile-rider/README.md.
+apps/mobile-rider/ios/
+apps/mobile-rider/android/
+
+# Docs site
+apps/site/dist/
+apps/site/.astro/
+apps/site/public/openapi.json
+

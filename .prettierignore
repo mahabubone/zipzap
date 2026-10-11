@@ -10,6 +10,20 @@ infra/compose/**/data
 apps/backend/openapi.json
 apps/backend/openapi.yaml
 packages/api-client/src/generated.d.ts
+apps/mobile-rider/dist-web/**
+
+# `expo prebuild` output. Generated locally, and their contents are determined by the Expo
+# version rather than by us — committing them means every SDK upgrade is a large diff of
+# machine-written Xcode and Gradle files.
+apps/mobile-rider/ios/**
+apps/mobile-rider/android/**
+
+# The docs site's generated contract artefact and Astro's generated types.
+# `format:check` on the synced spec reports a diff every time the API changes,
+# which turns a passing check red for a reason that has nothing to do with the change.
+apps/site/public/openapi.json
+apps/site/.astro/**
+apps/site/dist/**
 apps/frontends/merchant-web/src/routeTree.gen.ts
 apps/frontends/customer-tracking/src/routeTree.gen.ts
 apps/frontends/hub-console/src/routeTree.gen.ts

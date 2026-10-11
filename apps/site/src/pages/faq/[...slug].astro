@@ -1,0 +1,26 @@
+---
+/**
+ * One route per catalog, generated from its content collection.
+ *
+ * `getStaticPaths` rather than a single catch-all, because the catalogs live at different base
+ * paths and a shared route would need a lookup table to map one onto the other. Astro's
+ * file-based routing is that table.
+ */
+import DocPage from '../../components/DocPage.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('faq');
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+---
+
+<DocPage collection='faq' entry={entry} label='FAQ' basePath='/faq'>
+  <Content />
+</DocPage>
