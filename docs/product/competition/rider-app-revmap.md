@@ -143,7 +143,7 @@ to call at a shop scan); with no contact on the job it says so instead of dialli
 
 ### P1 — Needs a backend endpoint. Build immediately after P0.
 
-#### R6. Delivery job detail with COD amount and a customer contact
+#### R6. Delivery job detail with COD amount and a customer contact ✅
 
 `RiderJobsDto` carries no COD amount and no customer name/phone — a rider is asked to collect cash
 without being told how much, which cannot be fixed in the UI. One additive field set on
