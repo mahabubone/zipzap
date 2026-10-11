@@ -34,6 +34,8 @@ import { RateLimitGuard } from './modules/identity/rate-limit.guard.ts';
 export const TAG_DESCRIPTIONS: Record<string, string> = {
   analytics: 'Read-only projections of your own parcels and money.',
   'api-keys': 'Long-lived machine credentials for your account.',
+  members:
+    'Who may act inside this business, and as what. The business is named in the path, never the body.',
   auth: 'Sessions: sign in with email and password, and back out again.',
   cod: 'Cash-on-delivery records, exceptions and reconciliation.',
   'control-tower': 'The network-wide operational picture.',

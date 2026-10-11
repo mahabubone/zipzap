@@ -338,6 +338,325 @@ paths:
       summary: Revoke the current session
       tags:
         - auth
+  /v1/merchants/{merchantId}/members:
+    get:
+      description: >-
+        Every person who may act inside this business and the role they hold in it. Ordered
+        owner-first, so the account owner is the first row on a business of any size.
+      operationId: MembershipController_list
+      parameters:
+        - name: merchantId
+          required: true
+          in: path
+          description: The business whose members to read.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            The members, owner first then by email. An empty list is possible and means a business
+            nobody can act inside — which the orphaning rules exist to prevent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberListDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: List this business members
+      tags: &ref_2
+        - members
+      x-required-scopes:
+        - members:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+    post:
+      description: >-
+        Enrols a person by email, creating an account for them if they have none. An email that
+        already has an account gains a second membership — that is what makes one login able to act
+        inside two businesses, and why this is not a "create user" endpoint.
+      operationId: MembershipController_invite
+      parameters:
+        - name: merchantId
+          required: true
+          in: path
+          description: The business to add the member to.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: The email to enrol and the role to grant. No merchant id is accepted here.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteMemberDto'
+      responses:
+        '201':
+          description: >-
+            The membership as stored. A disabled account is refused rather than reactivated by an
+            invite — enabling it is a separate decision from enrolling it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: Add a member to this business
+      tags: *ref_2
+      x-required-scopes:
+        - members:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+  /v1/merchants/{merchantId}/members/{userId}:
+    put:
+      description: >-
+        Changes what a member may do and ends every session they hold, because a demotion narrows
+        the scopes a session asserts and those are derived from the membership on each request.
+        Setting the role they already hold changes nothing and signs nobody out.
+      operationId: MembershipController_changeRole
+      parameters:
+        - name: merchantId
+          required: true
+          in: path
+          description: The business the member belongs to.
+          schema:
+            type: string
+        - name: userId
+          required: true
+          in: path
+          description: The person whose role is changing.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >-
+          The new role. Setting the role the member already holds is a no-op that changes nothing
+          and signs nobody out.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeRoleDto'
+      responses:
+        '200':
+          description: The membership with its new role. Sessions for this person have been revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: Change a member role
+      tags: *ref_2
+      x-required-scopes:
+        - members:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
+    delete:
+      description: >-
+        Removes the membership and ends every session the person holds, immediately. The last owner
+        cannot be removed: a business with no owner has nobody who can add one back, so the lockout
+        would be permanent.
+      operationId: MembershipController_remove
+      parameters:
+        - name: merchantId
+          required: true
+          in: path
+          description: The business to remove the member from.
+          schema:
+            type: string
+        - name: userId
+          required: true
+          in: path
+          description: The person to remove.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The membership as it was, so the removal is confirmable before it is reported back.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: Remove a member from this business
+      tags: *ref_2
+      x-required-scopes:
+        - members:manage
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+      x-rate-limit:
+        - tier: merchant
+          failClosed: true
   /v1/webhooks:
     get:
       operationId: WebhookController_list
@@ -397,7 +716,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: List your webhook endpoints
-      tags: &ref_2
+      tags: &ref_3
         - webhooks
       x-required-scopes:
         - webhooks:manage
@@ -473,7 +792,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Register a webhook endpoint; secret returned once
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -542,7 +861,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rotate the signing secret; new secret returned once
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -610,7 +929,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pause delivery to an endpoint
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -678,7 +997,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Resume delivery to an endpoint
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -773,7 +1092,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every webhook delivery attempt for your endpoints, newest first
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -849,7 +1168,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Replay a terminal delivery with a fresh delivery id
-      tags: *ref_2
+      tags: *ref_3
       x-required-scopes:
         - webhooks:manage
       security:
@@ -963,7 +1282,7 @@ paths:
         '429':
           description: Rate limited. Honour `Retry-After`.
       summary: Live timeline events for one tracking code (SSE)
-      tags: &ref_3
+      tags: &ref_4
         - tracking
       x-rate-limit:
         - tier: public
@@ -1039,7 +1358,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Public tracking by unguessable token (26 chars, 130 bits) — not enumerable
-      tags: *ref_3
+      tags: *ref_4
       x-rate-limit:
         - tier: public
           failClosed: false
@@ -1111,7 +1430,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Public shipment tracking by tracking code
-      tags: *ref_3
+      tags: *ref_4
       x-rate-limit:
         - tier: public
           failClosed: false
@@ -1378,7 +1697,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Get one of your shipments
-      tags: &ref_4
+      tags: &ref_5
         - shipments
       x-required-scopes:
         - shipments:read
@@ -1453,7 +1772,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Cancel a shipment that has not shipped yet
-      tags: *ref_4
+      tags: *ref_5
       x-required-scopes:
         - shipments:write
       security:
@@ -1528,7 +1847,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Upload CSV, get the human preview checkpoint
-      tags: &ref_5
+      tags: &ref_6
         - shipments
       x-required-scopes:
         - shipments:write
@@ -1598,7 +1917,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Accept the preview — enqueue chunked processing
-      tags: *ref_5
+      tags: *ref_6
       x-required-scopes:
         - shipments:write
       security:
@@ -1668,7 +1987,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Poll job progress
-      tags: *ref_5
+      tags: *ref_6
       x-required-scopes:
         - shipments:write
       security:
@@ -1736,7 +2055,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Download the row-level result CSV
-      tags: *ref_5
+      tags: *ref_6
       x-required-scopes:
         - shipments:write
       security:
@@ -1901,7 +2220,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Put one of your shipments on hold (pauses movement)
-      tags: &ref_6
+      tags: &ref_7
         - shipments
       x-required-scopes:
         - shipments:write
@@ -1976,7 +2295,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Release a held shipment back to its interrupted state
-      tags: *ref_6
+      tags: *ref_7
       x-required-scopes:
         - shipments:write
       security:
@@ -2054,7 +2373,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Quote a shipment price
-      tags: &ref_7
+      tags: &ref_8
         - pricing
       security:
         - ApiKey: []
@@ -2116,7 +2435,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Your rate card, with worked examples
-      tags: *ref_7
+      tags: *ref_8
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -2508,7 +2827,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Serviceability check for one zone
-      tags: &ref_8
+      tags: &ref_9
         - coverage
       security:
         - ApiKey: []
@@ -2570,7 +2889,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every zone you can ship to
-      tags: *ref_8
+      tags: *ref_9
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -2640,7 +2959,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Manifests, newest first, optionally by status
-      tags: &ref_9
+      tags: &ref_10
         - manifests
       x-required-scopes:
         - hub:read
@@ -2711,7 +3030,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Schedule a trip, or create a DRAFT manifest on an existing one
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -2780,7 +3099,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: One manifest and the parcels on it
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:read
       security:
@@ -2849,7 +3168,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Schedule one run of a seeded route
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -2917,7 +3236,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: DRAFT → SEALED. A sealed manifest is evidence of what left.
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -2985,7 +3304,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: SEALED → DISPATCHED
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -3053,7 +3372,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: DISPATCHED → RECEIVED
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -3122,7 +3441,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: RECEIVED → RECONCILED, refused while any parcel has not arrived
-      tags: *ref_9
+      tags: *ref_10
       x-required-scopes:
         - hub:scan
       security:
@@ -3523,7 +3842,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pull pending commands for an offline rider
-      tags: &ref_10
+      tags: &ref_11
         - riders
       x-required-scopes:
         - rider:sync
@@ -3606,7 +3925,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: A device pushing its own offline commands back, in device order, exactly once each
-      tags: *ref_10
+      tags: *ref_11
       x-required-scopes:
         - rider:sync
       security:
@@ -3691,7 +4010,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Acknowledge one queued command
-      tags: *ref_10
+      tags: *ref_11
       x-required-scopes:
         - rider:sync
       security:
@@ -3842,7 +4161,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider's current load factor
-      tags: &ref_11
+      tags: &ref_12
         - riders
       security:
         - ApiKey: []
@@ -3903,7 +4222,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Pool-wide rider utilisation KPI
-      tags: *ref_11
+      tags: *ref_12
       security:
         - ApiKey: []
         - SessionCookie: []
@@ -4142,7 +4461,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider accepts a delivery job
-      tags: &ref_12
+      tags: &ref_13
         - deliveries
       x-required-scopes:
         - delivery:complete
@@ -4213,7 +4532,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Rider heads out for delivery
-      tags: *ref_12
+      tags: *ref_13
       x-required-scopes:
         - delivery:complete
       security:
@@ -4301,7 +4620,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Confirm delivery and collect COD
-      tags: *ref_12
+      tags: *ref_13
       x-required-scopes:
         - delivery:complete
       security:
@@ -4384,7 +4703,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Issue a delivery code for the recipient to read out
-      tags: &ref_13
+      tags: &ref_14
         - deliveries
       x-required-scopes:
         - delivery:complete
@@ -4477,7 +4796,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Redeem a delivery code with a photo and a location
-      tags: *ref_13
+      tags: *ref_14
       x-required-scopes:
         - delivery:complete
       security:
@@ -4792,7 +5111,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Initiate the provider payout for an approved settlement
-      tags: &ref_14
+      tags: &ref_15
         - settlements
       x-required-scopes:
         - settlements:approve
@@ -4874,7 +5193,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Confirm the provider payout and settle
-      tags: *ref_14
+      tags: *ref_15
       x-required-scopes:
         - settlements:approve
       security:
@@ -5010,7 +5329,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: One settlement, itemised
-      tags: &ref_15
+      tags: &ref_16
         - settlements
       x-required-scopes:
         - settlements:read
@@ -5079,7 +5398,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Download the itemised statement
-      tags: *ref_15
+      tags: *ref_16
       x-required-scopes:
         - settlements:read
       security:
@@ -5159,7 +5478,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Request a return against the original shipment
-      tags: &ref_16
+      tags: &ref_17
         - returns
       x-required-scopes:
         - returns:write
@@ -5320,7 +5639,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Approve a return — the merchant decision
-      tags: *ref_16
+      tags: *ref_17
       x-required-scopes:
         - returns:write
       security:
@@ -5399,7 +5718,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Reject a return — the merchant decision
-      tags: *ref_16
+      tags: *ref_17
       x-required-scopes:
         - returns:write
       security:
@@ -5469,7 +5788,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Walk one transit leg toward the merchant
-      tags: *ref_16
+      tags: *ref_17
       x-required-scopes:
         - returns:write
       security:
@@ -5537,7 +5856,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Which parcel notifications your customers receive
-      tags: &ref_17
+      tags: &ref_18
         - notifications
       x-required-scopes:
         - notifications:manage
@@ -5614,7 +5933,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Opt one event out, or back in
-      tags: *ref_17
+      tags: *ref_18
       x-required-scopes:
         - notifications:manage
       security:
@@ -5757,7 +6076,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Every hub and how many parcels are waiting at it
-      tags: &ref_18
+      tags: &ref_19
         - hubs
       x-required-scopes:
         - hub:read
@@ -5833,7 +6152,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: Parcels waiting at one hub, and the scan each needs next
-      tags: *ref_18
+      tags: *ref_19
       x-required-scopes:
         - hub:read
       security:
@@ -6264,6 +6583,10 @@ tags:
     description: The authenticated principal.
   - name: manifests
     description: Manifests and the line-haul trips that carry them.
+  - name: members
+    description: >-
+      Who may act inside this business, and as what. The business is named in the path, never the
+      body.
   - name: notifications
     description: Which messages your customers receive, on which channel.
   - name: pickups
@@ -6532,6 +6855,93 @@ components:
         - expiresAt
         - merchantId
         - merchantIds
+    MemberDto:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: 9f8e7d6c-5b4a-3210-fedc-ba9876543210
+          description: The person, not the membership. One person may hold several memberships.
+        merchantId:
+          type: string
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+          description: The business this membership is of, taken from the path.
+        email:
+          type: string
+          example: staff@shop.example
+          description: The login identity, lower-cased.
+        role:
+          enum:
+            - MERCHANT_OWNER
+            - MERCHANT_OPERATOR
+          type: string
+          example: MERCHANT_OPERATOR
+          description: >-
+            The role held in THIS business. The same person may be an owner of one and an operator
+            of another — the role lives on the membership, not on the user.
+        lastUsedAt:
+          type: string
+          nullable: true
+          example: null
+          description: >-
+            Always null today. Filling it would need a read of another schema store, which rule 2
+            forbids, and an approximation would be worse than an honest null.
+        disabledAt:
+          type: string
+          nullable: true
+          example: null
+          description: >-
+            When the account was disabled, if it was. Suspension of a person is deliberately
+            separate from the suspension of a merchant: one suspended business must not lock them
+            out of every other one they belong to.
+      required:
+        - userId
+        - merchantId
+        - email
+        - role
+        - lastUsedAt
+        - disabledAt
+    MemberListDto:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberDto'
+      required:
+        - members
+    InviteMemberDto:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: staff@shop.example
+          description: >-
+            The email to enrol. A person who already has an account gains a second membership — that
+            is what lets one login act inside two businesses.
+        role:
+          enum: &ref_20
+            - MERCHANT_OWNER
+            - MERCHANT_OPERATOR
+          type: string
+          example: MERCHANT_OPERATOR
+          description: >-
+            The role to grant. Platform roles are refused: a merchant granting one would be a tenant
+            writing itself out of its own tenancy.
+      required:
+        - email
+        - role
+    ChangeRoleDto:
+      type: object
+      properties:
+        role:
+          enum: *ref_20
+          type: string
+          example: MERCHANT_OWNER
+          description: The new role. The same value as the current role is a no-op that signs nobody out.
+      required:
+        - role
     EndpointViewDto:
       type: object
       properties:
@@ -6712,6 +7122,7 @@ components:
               - webhooks:manage
               - notifications:manage
               - keys:manage
+              - members:manage
               - network:read
           example:
             - shipments:read
@@ -6757,6 +7168,7 @@ components:
               - webhooks:manage
               - notifications:manage
               - keys:manage
+              - members:manage
               - network:read
           example:
             - shipments:read
@@ -7667,7 +8079,7 @@ components:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
         status:
-          enum: &ref_19
+          enum: &ref_21
             - DRAFT
             - SEALED
             - DISPATCHED
@@ -7719,7 +8131,7 @@ components:
           type: string
           example: b2c3d4e5-f6a7-8901-bcde-f12345678901
         status:
-          enum: *ref_19
+          enum: *ref_21
           type: string
           example: SEALED
           description: Current state. Moves only through the validated transitions.

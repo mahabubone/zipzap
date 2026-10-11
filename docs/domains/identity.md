@@ -83,11 +83,12 @@ rather than falling back to the default: falling back would serve the wrong stor
 An API key principal has exactly one entry in `merchantIds`. A key is issued to one merchant, and a
 machine carrying a membership set would be a credential that could reach a second tenant.
 
-`ponytail:` there is no role-assignment UI, no invitation flow and no password reset. Every
-membership in the database was written by the seed or by migration 0036's backfill. Add the write
-path when a human other than the seed has to create one — an admin surface is the trigger, not a
-date. There is also no "switch business" endpoint yet: a second login with `merchantId` reaches the
-other business today, which is enough to prove the model and not enough to be a good console.
+The write path exists: `POST /v1/merchants/:merchantId/members` invites a person by email (creating
+an account if they have none), `PUT .../members/:userId` changes their role, and `DELETE
+.../members/:userId` removes them. All three revoke every session the target holds. There is still
+no password reset, no account suspension, and no "switch business" endpoint — a second login with
+`merchantId` reaches the other business today, which is enough to prove the model and not enough to
+be a good console.
 
 ## Rules
 

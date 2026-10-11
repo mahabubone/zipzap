@@ -80,6 +80,12 @@ password. Both columns were **dropped, not nulled**: each now has one source of 
 second copy of a credential in the database is one more thing to rotate and one more place to leak
 from.
 
+The membership table has been **writable since 2026-10-11** (migration 0048 added the `members:manage`
+scope). `user_merchants.merchant_id` still has no foreign key, so a membership can name a business
+that does not exist — the write path checks through `MERCHANT_LOOKUP` rather than by querying across
+the boundary, and a membership for a business that has since been deleted is left alone rather than
+cascaded, because `merchant` owns that decision.
+
 ## Naming
 
 Entities `PascalCase`, fields `camelCase`, columns `snake_case` via the shared naming strategy.

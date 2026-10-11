@@ -119,11 +119,30 @@ first-party. `SameSite=Lax` is sufficient for that. It is also why `WEB_ORIGIN` 
 than reflected — an unset `WEB_ORIGIN` used to mean "allow any origin", which is an allowlist
 maintained by the caller.
 
+### Rotation on privilege change — implemented
+
+`POST /v1/merchants/:merchantId/members` (invite), `PUT .../members/:userId` (change role) and
+`DELETE .../members/:userId` all revoke every session the target holds, through
+`MerchantAuthService.revokeSessionsForUser`.
+
+A **removal** ends the sessions because a membership revoked is a permission revoked, and a session
+is a standing assertion that the permission still holds. A **role change** does the same, but only
+when the role actually changes — setting the role the member already holds is a no-op that signs
+nobody out, because a console polling the member list is not a logout mechanism.
+
+Two rules keep the write path safe rather than merely complete, and both are in
+`identity/rules/membership.ts`:
+
+- A merchant may only grant `MERCHANT_OWNER` or `MERCHANT_OPERATOR`. The platform roles are
+  refused, so a tenant cannot name the power that is meant to be outside its tenancy.
+- The last owner cannot be removed or demoted. A business with no owner has nobody who can add one
+  back, mint a key, or approve a settlement, and the lockout would be permanent.
+
+The tenant comes from the path, never the body, and `assertTenant` runs first so a merchant id the
+caller does not belong to gets the same 404 as one that does not exist.
+
 ### What is still owed
 
-- **Rotate on privilege change.** `revokeSessionsForUser` exists and is tested, but has no caller:
-  this API has no membership-mutation endpoint, so there is currently no way to remove someone from
-  a business at all. That gap is larger than the session one.
 - **Session fingerprinting.** Nothing is stored today.
 - **argon2id.** Still scrypt.
 

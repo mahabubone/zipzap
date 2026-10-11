@@ -10,6 +10,8 @@ import { ApiKeyGuard } from './api-key.guard.ts';
 import { MeController } from './me.controller.ts';
 import { LoginController } from './login.controller.ts';
 import { LogoutController } from './logout.controller.ts';
+import { MembershipController } from './membership.controller.ts';
+import { MembershipService } from './membership.service.ts';
 
 /**
  * identity owns two tables as of migration 0036: `users` (a person) and `user_merchants` (the
@@ -32,12 +34,16 @@ import { LogoutController } from './logout.controller.ts';
     AuthenticateApiKeyService,
     ApiKeyGuard,
     UserService,
+    // MembershipService injects MerchantAuthService, which is why MerchantModule is imported
+    // `forwardRef`: the revocation on a role change or removal is the same service the login flow
+    // uses, and duplicating it would be two revocation paths to keep in step.
+    MembershipService,
     { provide: FIND_CREDENTIAL, useExisting: FindCredentialService },
   ],
   // ScopeGuard is deliberately NOT a provider. It takes a scope string as a constructor argument
   // and is instantiated at the decorator site with `new ScopeGuard('shipments:write')`; listing
   // it here makes Nest try to inject a string, which it cannot resolve.
-  exports: [AuthenticateApiKeyService, ApiKeyGuard, UserService],
-  controllers: [MeController, LoginController, LogoutController],
+  exports: [AuthenticateApiKeyService, ApiKeyGuard, UserService, MembershipService],
+  controllers: [MeController, LoginController, LogoutController, MembershipController],
 })
 export class IdentityModule {}

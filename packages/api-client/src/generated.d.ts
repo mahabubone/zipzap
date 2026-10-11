@@ -121,6 +121,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/merchants/{merchantId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List this business members
+         * @description Every person who may act inside this business and the role they hold in it. Ordered owner-first, so the account owner is the first row on a business of any size.
+         */
+        get: operations["MembershipController_list"];
+        put?: never;
+        /**
+         * Add a member to this business
+         * @description Enrols a person by email, creating an account for them if they have none. An email that already has an account gains a second membership — that is what makes one login able to act inside two businesses, and why this is not a "create user" endpoint.
+         */
+        post: operations["MembershipController_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchants/{merchantId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a member role
+         * @description Changes what a member may do and ends every session they hold, because a demotion narrows the scopes a session asserts and those are derived from the membership on each request. Setting the role they already hold changes nothing and signs nobody out.
+         */
+        put: operations["MembershipController_changeRole"];
+        post?: never;
+        /**
+         * Remove a member from this business
+         * @description Removes the membership and ends every session the person holds, immediately. The last owner cannot be removed: a business with no owner has nobody who can add one back, so the lockout would be permanent.
+         */
+        delete: operations["MembershipController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks": {
         parameters: {
             query?: never;
@@ -1545,6 +1593,64 @@ export interface components {
              */
             merchantIds: string[];
         };
+        MemberDto: {
+            /**
+             * @description The person, not the membership. One person may hold several memberships.
+             * @example 9f8e7d6c-5b4a-3210-fedc-ba9876543210
+             */
+            userId: string;
+            /**
+             * @description The business this membership is of, taken from the path.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string;
+            /**
+             * @description The login identity, lower-cased.
+             * @example staff@shop.example
+             */
+            email: string;
+            /**
+             * @description The role held in THIS business. The same person may be an owner of one and an operator of another — the role lives on the membership, not on the user.
+             * @example MERCHANT_OPERATOR
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+            /**
+             * @description Always null today. Filling it would need a read of another schema store, which rule 2 forbids, and an approximation would be worse than an honest null.
+             * @example null
+             */
+            lastUsedAt: string | null;
+            /**
+             * @description When the account was disabled, if it was. Suspension of a person is deliberately separate from the suspension of a merchant: one suspended business must not lock them out of every other one they belong to.
+             * @example null
+             */
+            disabledAt: string | null;
+        };
+        MemberListDto: {
+            members: components["schemas"]["MemberDto"][];
+        };
+        InviteMemberDto: {
+            /**
+             * Format: email
+             * @description The email to enrol. A person who already has an account gains a second membership — that is what lets one login act inside two businesses.
+             * @example staff@shop.example
+             */
+            email: string;
+            /**
+             * @description The role to grant. Platform roles are refused: a merchant granting one would be a tenant writing itself out of its own tenancy.
+             * @example MERCHANT_OPERATOR
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+        };
+        ChangeRoleDto: {
+            /**
+             * @description The new role. The same value as the current role is a no-op that signs nobody out.
+             * @example MERCHANT_OWNER
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+        };
         EndpointViewDto: {
             /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
             id: string;
@@ -1639,7 +1745,7 @@ export interface components {
              *       "tracking:read"
              *     ]
              */
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "network:read")[];
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "members:manage" | "network:read")[];
         };
         CreatedApiKeyDto: {
             /** @example key_123456789 */
@@ -3880,6 +3986,364 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business whose members to read. */
+                merchantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members, owner first then by email. An empty list is possible and means a business nobody can act inside — which the orphaning rules exist to prevent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberListDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business to add the member to. */
+                merchantId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The email to enrol and the role to grant. No merchant id is accepted here. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteMemberDto"];
+            };
+        };
+        responses: {
+            /** @description The membership as stored. A disabled account is refused rather than reactivated by an invite — enabling it is a separate decision from enrolling it. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_changeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business the member belongs to. */
+                merchantId: string;
+                /** @description The person whose role is changing. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The new role. Setting the role the member already holds is a no-op that changes nothing and signs nobody out. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRoleDto"];
+            };
+        };
+        responses: {
+            /** @description The membership with its new role. Sessions for this person have been revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business to remove the member from. */
+                merchantId: string;
+                /** @description The person to remove. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The membership as it was, so the removal is confirmable before it is reported back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
             };
             /** @description Validation failed. Nothing was written. */
             400: {

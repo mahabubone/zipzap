@@ -37,6 +37,13 @@ export const API_SCOPES = [
   // creates shipments the power to silence every delivery notification the account sends.
   'notifications:manage',
   'keys:manage',
+  // Who may act inside this business, and as what. Its own scope because granting and revoking
+  // membership is how every other power is handed out, so folding it into `keys:manage` would mean
+  // any integration key that can mint a credential can also enrol a person.
+  //
+  // A MERCHANT scope, unlike `network:read`: this is one account managing its own staff, not a
+  // power over the network. Owner-only in practice — see `OWNER_ONLY_SCOPES`.
+  'members:manage',
   // The network's own operational picture: every merchant's shipment counts, COD money in
   // poisha, return rates, hub volumes. `GET /v1/control-tower/report` and `.../live-counts` were
   // guarded by ApiKeyGuard alone, so a merchant API key read all of it — the guard authenticated

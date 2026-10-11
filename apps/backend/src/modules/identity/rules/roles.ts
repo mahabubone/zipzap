@@ -78,8 +78,19 @@ export const MERCHANT_SCOPES: readonly ApiScope[] = API_SCOPES.filter(
   (scope) => !PLATFORM_SCOPES.includes(scope),
 );
 
-/** The two an operator may not hold. Named so the reason survives a future edit. */
-export const OWNER_ONLY_SCOPES: readonly ApiScope[] = ['settlements:approve', 'keys:manage'];
+/**
+ * The scopes that are not merely merchant-facing but irreversible if abused.
+ *
+ * `settlements:approve` moves money out; `keys:manage` mints a credential that acts with full
+ * merchant scope; `members:manage` hands out both by enrolling a person. A holder of any of the three
+ * can grant themselves the others, so an operator holding one is effectively an owner — which is why
+ * all three stop at the owner.
+ */
+export const OWNER_ONLY_SCOPES: readonly ApiScope[] = [
+  'settlements:approve',
+  'keys:manage',
+  'members:manage',
+];
 
 function without(scp: readonly ApiScope[], drop: readonly ApiScope[]): readonly ApiScope[] {
   return scp.filter((s) => !drop.includes(s));

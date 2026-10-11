@@ -105,10 +105,11 @@ console arrives signed out. This is a defect users report as "it never keeps me 
 
 ## What this does not solve
 
-- **There is no membership-mutation endpoint.** No `change-role`, no `invite-member`, no way to
-  remove someone from a business at all. `revokeSessionsForUser` therefore has no caller today; it
-  is written and tested for the endpoint that does not yet exist. The session bug and the missing
-  endpoint are both real, and the second is the larger one.
+- **A membership can be created but not suspended.** `POST /v1/merchants/:merchantId/members`,
+  `PUT` and `DELETE` exist and revoke sessions on both the removal and the role-change path, so
+  rotation on privilege change is live. What is still missing is disabling the account itself: there
+  is no route that sets `identity.users.disabled_at`, so a person removed from every business keeps
+  a login.
 - **No session fingerprinting.** `docs/api/auth.md` records user agent and IP range on issue;
   nothing binds to them on use, so a stolen cookie that outlives its window works anywhere.
 - **Password hashing is still scrypt.** `docs/domains/identity.md` promises argon2id; it is not

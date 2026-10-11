@@ -9,7 +9,6 @@
  */
 
 import { ApiProperty } from '@nestjs/swagger';
-import { MoneyMinorString } from './money.ts';
 
 export class ErrorEnvelopeDto {
   @ApiProperty({
@@ -44,37 +43,3 @@ export class ErrorEnvelopeDto {
   })
   request_id!: string;
 }
-
-/**
- * The envelope of a partially applied bulk write.
- *
- * Money uses the string form: these are aggregates, and a batch's rejected total can exceed what a
- * JSON number represents exactly.
- */
-export class BulkRowErrorDto {
-  @ApiProperty({ example: 12, description: '1-based line number in the uploaded file.' })
-  line!: number;
-
-  @ApiProperty({ example: 'VALIDATION_FAILED' })
-  code!: string;
-
-  @ApiProperty({ example: 'Recipient phone must be 8801XXXXXXXXX.' })
-  message!: string;
-}
-
-export class BulkRejectionDto {
-  @ApiProperty({ example: 980, description: 'Rows that were accepted and enqueued.' })
-  accepted!: number;
-
-  @ApiProperty({ type: BulkRowErrorDto, isArray: true, description: 'Rows that were rejected.' })
-  rejected!: readonly BulkRowErrorDto[];
-
-  @ApiProperty({
-    example: '1250500',
-    description: 'Money carried by the rejected rows, in poisha.',
-  })
-  rejectedMinor?: string;
-}
-
-/** Re-export so DTO files can import all their shared property decorators from one place. */
-export { MoneyMinorString };

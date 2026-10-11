@@ -63,6 +63,49 @@ export class ResourceNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+/**
+ * No such member of this business.
+ *
+ * A 404 rather than a 403, and for the same reason `assertTenant` hides a merchant id: a 403
+ * confirms the person is a member of the business, which is an oracle for who works there. Callers
+ * reaching this with a merchant id they do not belong to get the same answer as callers reaching it
+ * with one they do.
+ */
+export class MembershipNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'MEMBERSHIP_NOT_FOUND',
+    status: 404,
+    title: 'Not a member',
+  } satisfies DomainErrorSpec;
+}
+
+/** This person is already a member of this business. */
+export class MembershipExistsError extends DomainError {
+  readonly spec = {
+    code: 'MEMBERSHIP_EXISTS',
+    status: 409,
+    title: 'Already a member',
+  } satisfies DomainErrorSpec;
+}
+
+/** The account being invited is disabled, so inviting it would silently reactivate it. */
+export class MemberDisabledError extends DomainError {
+  readonly spec = {
+    code: 'MEMBER_DISABLED',
+    status: 409,
+    title: 'Account disabled',
+  } satisfies DomainErrorSpec;
+}
+
+/** The business named by the path does not exist (or does not belong to this principal). */
+export class MerchantNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'MERCHANT_NOT_FOUND',
+    status: 404,
+    title: 'Business not found',
+  } satisfies DomainErrorSpec;
+}
+
 export class CommandQueueFullError extends DomainError {
   readonly spec = {
     code: 'COMMAND_QUEUE_FULL',

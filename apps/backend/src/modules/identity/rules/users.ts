@@ -5,9 +5,10 @@
  * thing until `identity.users` existed, which is why one login could not act inside two businesses:
  * there was nowhere to put the second one.
  *
- * `ponytail:` there is no role assignment UI, no invitation flow, and no password reset. Every
- * membership in the database today was written by the seed. Add the write path when a human being
- * other than the seed has to create one — an admin surface is the trigger, not a date.
+ * Membership HAS a write path since 2026-10-11: `membership.controller.ts` invites by email, changes
+ * a role, and removes a member, and all three revoke the target's sessions. What is still absent is
+ * a password reset and account suspension — see `rules/membership.ts` for the two rules that keep the
+ * write path from escalating past a merchant's own tenancy.
  */
 
 import { PermissionDeniedError } from '../../../common/domain-error.ts';
