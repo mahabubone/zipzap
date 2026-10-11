@@ -8,7 +8,7 @@
 
 import { Body, Controller, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
@@ -45,7 +45,25 @@ export class ReportExceptionController {
   @Post(':id/exception')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Report a LOST or DAMAGED exception for one of your shipments' })
-  @ApiOkResponse({ type: ReportedExceptionDto })
+  @ApiParam({
+    name: 'id',
+    description:
+      "The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the " +
+      '404 never confirms the parcel exists.',
+  })
+  @ApiBody({
+    type: ReportExceptionDto,
+    description:
+      'Which exception, and an optional note for whoever investigates it. The reason doubles as the ' +
+      'target status, so only what the shipment can legally become is accepted.',
+  })
+  @ApiOkResponse({
+    type: ReportedExceptionDto,
+    description:
+      'The shipment is now in the reported state, entered through the real state machine — so a report ' +
+      'from a state the edge does not leave is a 409, and reporting the same exception twice is a ' +
+      'second transition, not a double write. No money moves here; finance reacts to the event.',
+  })
   async report(
     @Param('id') id: string,
     @Body() body: ReportExceptionDto,

@@ -131,7 +131,10 @@ export interface paths {
         /** List your webhook endpoints */
         get: operations["WebhookController_list"];
         put?: never;
-        /** Register a webhook endpoint; secret returned once */
+        /**
+         * Register a webhook endpoint; secret returned once
+         * @description Registers a delivery URL and an event list, and returns the signing secret once. An event outside the `x-webhook-events` catalogue is rejected with 404 rather than accepted quietly, and the body carries no business identity at all — that comes from your credential.
+         */
         post: operations["WebhookController_create"];
         delete?: never;
         options?: never;
@@ -197,7 +200,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every webhook delivery attempt for your endpoints, newest first */
+        /**
+         * Every webhook delivery attempt for your endpoints, newest first
+         * @description The evidence trail that makes replay reachable: every attempt, the status code your server answered with, the error when it answered none, and whether the retry ladder has ended. Scoped to your business in the query itself, not filtered afterwards, and never mutated here.
+         */
         get: operations["WebhookController_deliveryLog"];
         put?: never;
         post?: never;
@@ -216,7 +222,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Replay a terminal delivery with a fresh delivery id */
+        /**
+         * Replay a terminal delivery with a fresh delivery id
+         * @description Re-enqueues a terminal delivery, so a merchant can pause, fix the endpoint and replay instead of reconciling by hand. A delivery still climbing its ladder is refused: it will arrive on its own, and re-firing it now would double-deliver.
+         */
         post: operations["WebhookController_replayDelivery"];
         delete?: never;
         options?: never;
@@ -233,7 +242,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a scoped API key (secret shown once) */
+        /**
+         * Create a scoped API key (secret shown once)
+         * @description Mints a machine credential for your own business, so no business is named in the request. You can only grant what you already hold: anything outside your scopes is dropped from the key rather than refused, and a scope outside the vocabulary is a 400.
+         */
         post: operations["CreateApiKeyController_create"];
         delete?: never;
         options?: never;
@@ -268,7 +280,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Public tracking by unguessable token (26 chars, 130 bits) — not enumerable */
+        /**
+         * Public tracking by unguessable token (26 chars, 130 bits) — not enumerable
+         * @description The strong form of the public route, for links sent in a message rather than printed on a label: 130 bits, so it cannot be walked. Resolves the shipment behind the link, then reads the same projection the code route reads. Rate limited identically.
+         */
         get: operations["PublicTrackingController_trackByToken"];
         put?: never;
         post?: never;
@@ -285,7 +300,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Public shipment tracking by tracking code */
+        /**
+         * Public shipment tracking by tracking code
+         * @description The route every printed label and inbox link points at, so it is rate limited hard: enough to stop a walk, not enough to stop a customer. Codes are short enough to guess, which is why nothing a courier should not publish is in the projection it reads.
+         */
         get: operations["PublicTrackingController_track"];
         put?: never;
         post?: never;
@@ -1456,13 +1474,22 @@ export interface components {
         };
         LoginDto: {
             /**
+             * Format: email
+             * @description The address the account is registered under.
+             * @example owner@example.com
+             */
+            email: string;
+            /**
+             * @description The account password, checked against a scrypt hash. An unknown address, a disabled user, a wrong password and an inactive business all answer the same 401.
+             * @example correct horse battery staple
+             */
+            password: string;
+            /**
              * Format: uuid
              * @description Business to open the session against
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
              */
             merchantId?: string;
-            /** Format: email */
-            email: string;
-            password: string;
         };
         AuthSessionResponseDto: {
             /**
@@ -1541,8 +1568,19 @@ export interface components {
             createdAt: string;
         };
         CreateWebhookDto: {
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description The URL deliveries are POSTed to. Only its being a URL is checked here — TLS and reachability are not, so a plain-http URL is accepted and then fails delivery.
+             * @example https://hooks.example.com/zipzap
+             */
             url: string;
+            /**
+             * @description Event types to subscribe to, from the wire catalogue on the `webhooks` tag. One that is not in the catalogue is rejected rather than silently accepted.
+             * @example [
+             *       "shipment.delivered",
+             *       "cod.collected"
+             *     ]
+             */
             events: string[];
         };
         CreatedEndpointDto: {
@@ -1594,6 +1632,13 @@ export interface components {
             wireEvent: string;
         };
         CreateApiKeyDto: {
+            /**
+             * @description The scopes the key should hold, from the `API_SCOPES` vocabulary. A scope you do not hold yourself is dropped rather than refused, so read the returned scopes.
+             * @example [
+             *       "shipments:read",
+             *       "tracking:read"
+             *     ]
+             */
             scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "network:read")[];
         };
         CreatedApiKeyDto: {
@@ -1660,7 +1705,7 @@ export interface components {
              * @example OUT_FOR_DELIVERY
              */
             status: string | null;
-            /** @description Ordered by occurredAt then id — a deterministic sort, because `sequence` alone is a partial order and the status is read off the last row. */
+            /** @description Ordered by sequence, then occurredAt, then id — a total order, because `sequence` alone is not one and `status` is read off the last row. */
             timeline: components["schemas"]["PublicTimelineEventDto"][];
         };
         CreateShipmentDto: {
@@ -3467,6 +3512,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The process is up, and for how long, in whole seconds. Nothing is checked and nothing can fail here, so this route has no error responses at all — use /readyz for dependencies. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3486,6 +3532,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description `ready`, once a `SELECT 1` round-trip to Postgres has succeeded. Redis and NATS are deliberately absent from the answer: the system degrades without them, and refusing traffic here would turn a cache or rate-limit outage into an availability one. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3568,6 +3615,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The principal this request proved itself as, read off the credential and off nothing else in the request: its kind, the business it is acting inside, every business it may act inside, the scopes it holds, and its per-minute ceiling. `merchantId` is null only for a platform administrative key. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3648,6 +3696,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description Email and password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginDto"];
@@ -3735,6 +3784,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description Email and password, and optionally which business to act inside. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginDto"];
@@ -3905,6 +3955,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every endpoint registered to your business, oldest first and never paginated — a merchant has a handful, not thousands. No signing secret is in here: the secret exists in the create and rotate responses and nowhere else. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3985,12 +4036,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The URL to POST deliveries to, and the events to send it. Any other field is rejected, so there is nothing here through which to name a business. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateWebhookDto"];
             };
         };
         responses: {
+            /** @description The endpoint as it was stored, and its signing secret this one time. The secret is kept to sign deliveries and is never returned again — there is no route that shows it, so store it now or rotate to get a fresh one. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4069,12 +4122,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint whose signing secret is replaced. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The new signing secret, returned exactly once, as at create. Deliveries dispatched from now on are signed with it, while jobs already queued keep the old secret until their retry ladder ends — so expect both to verify until the ladder drains. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4153,12 +4208,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint to stop delivering to. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The endpoint with status PAUSED. New events stop being dispatched to it immediately, and replay refuses while it is paused; attempts already queued still run their ladder out. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4237,12 +4294,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint to resume delivering to. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The endpoint back to status ACTIVE, receiving events again from the next dispatch. Pause and resume are the only statuses this route writes. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4319,8 +4378,11 @@ export interface operations {
     WebhookController_deliveryLog: {
         parameters: {
             query?: {
+                /** @description Restrict the log to one endpoint. Omit for every endpoint you own. */
                 endpointId?: string;
+                /** @description A `nextCursor` from the previous page — the id of the last row you saw. The next page continues strictly below it, so no row is returned twice and none is skipped as the log grows. */
                 cursor?: string;
+                /** @description Page size, 1 to 200. Defaults to 50, and anything larger is clamped to 200. */
                 limit?: number;
             };
             header?: never;
@@ -4329,6 +4391,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description A page of attempts, newest first: status code, error, delivered, and whether the row is terminal. Follow `nextCursor` rather than an offset — the log grows while it is being read, and `null` means there is nothing after this page. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4407,12 +4470,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description A delivery id from the delivery log. It must be terminal — delivered, permanently failed, or out of retries. */
                 deliveryId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The fresh delivery id the replay was enqueued under, with the endpoint and event it repeats. The original id is deliberately not reused: a receiver that deduplicates on `ZipZap-Delivery` would drop the replay as a duplicate. The payload carries `replayOf` pointing at the original. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4493,12 +4558,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The scopes to grant, at least one and all from the `API_SCOPES` vocabulary. Everything the returned key can do is in `scopes` — nothing broader leaks in. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateApiKeyDto"];
             };
         };
         responses: {
+            /** @description The key id to send, and its raw secret, returned exactly once. Only a scrypt hash is stored, so a lost secret cannot be recovered — make another key. The mint is audited in the same transaction as the insert. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4577,6 +4644,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The tracking code whose events are streamed. Emits nothing until one occurs. */
                 trackingCode: string;
             };
             cookie?: never;
@@ -4613,12 +4681,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The 26-character token from the tracking link a customer is sent. Unknowable without it, so an unknown token gets the same 404 as a known one — this route is not a validity oracle. */
                 token: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The public timeline for the shipment the link names. Read from `public_timeline` rather than the tracking log, so the internal detail that must not be public is absent by construction rather than by a filter — and it can trail the live log by a beat, because a consumer builds it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4697,12 +4767,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The ZZ- code printed on the label, e.g. ZZ-7F3K9Q2M. */
                 trackingCode: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The public timeline for that tracking code, or 404 when no shipment has it. Ordering is sequence, then occurredAt, then id, so it is stable across identical requests even though `sequence` alone is not unique — the last row of that order is what `status` reports. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4779,7 +4851,12 @@ export interface operations {
     ListShipmentsController_listShipments: {
         parameters: {
             query?: {
+                /** @description How many rows to ask for. Anything above 200, or below 1, is clamped rather than refused. */
                 limit?: string;
+                /**
+                 * @description The opaque position from the previous page's `nextCursor`. Unsigned on purpose — it only
+                 *     repositions inside your own list, which the merchant scope has already fenced.
+                 */
                 cursor?: string;
                 /** @description A shipment status, or several — `?status=CREATED,IN_TRANSIT`. */
                 status?: string;
@@ -4798,6 +4875,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own shipments, newest first, each carrying the cash the rider is to collect for it (integer minor units). `nextCursor` is null on the last page, and a filter value the machine does not recognise is a 400 naming every bad field at once, never a silently wider list. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4875,17 +4953,20 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required here (ADR-0010): the same key replayed returns the original response rather than creating a duplicate parcel. The same key with a different body is rejected as key reuse. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description Both contacts, the parcel, and the three surcharge flags — everything the price and the serviceability check depend on. The merchant comes from the credential, never from here. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateShipmentDto"];
             };
         };
         responses: {
+            /** @description The shipment as stored: its tracking code, its status, and the cash the rider will be asked to collect (integer minor units). A retried Idempotency-Key returns this same body with `replayed: true` instead of a second parcel. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4964,12 +5045,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The whole parcel record: both contacts, the parcel, the COD amount, and the tracking timeline oldest first. This is the only read that returns personal data, so it leaves an audit trail — the read is recorded whether or not the caller ever sees that row. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5048,12 +5131,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Confirms the parcel is CANCELLED. Only states that may still stop can be cancelled: a delivered parcel is a return, not a cancel, and the state machine refuses the edge with 409. A retried cancel hits the same 409 rather than applying twice. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5134,6 +5219,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The CSV text itself plus the filename it came from. The column names decide the mapping, so a file with a stray header is refused with the missing columns named rather than silently imported as empty fields. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UploadBulkDto"];
@@ -5221,6 +5307,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The job id from the preview checkpoint. Acceptance is the moment rows become shipments, so it only works on a job still sitting in PREVIEW. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AcceptBulkDto"];
@@ -5313,6 +5400,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Row counters for one import job: how many rows are done, and of those how many produced a shipment, how many failed, and how many were skipped as duplicate invoices. The counters only move forward — poll until `status` is terminal, because nothing pushes. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5477,16 +5565,19 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Which exception, and an optional note for whoever investigates it. The reason doubles as the target status, so only what the shipment can legally become is accepted. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReportExceptionDto"];
             };
         };
         responses: {
+            /** @description The shipment is now in the reported state, entered through the real state machine — so a report from a state the edge does not leave is a 409, and reporting the same exception twice is a second transition, not a double write. No money moves here; finance reacts to the event. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5565,16 +5656,19 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Optional one-sentence reason, recorded on the tracking event. A hold without one is still honoured, just unexplained. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HoldDto"];
             };
         };
         responses: {
+            /** @description The shipment is now ON_HOLD, and `status` says so. Only states that can be interrupted accept a hold — a parcel still in line-haul is physically moving and gets 409 INVALID_TRANSITION instead of a parkable state it does not have. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5653,12 +5747,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The shipment is moving again, and `status` is the state it was interrupted from — not ON_HOLD. Releasing a parcel that was never held is a 409, because there is no recorded state to resume. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5739,12 +5835,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment facts that change the price: weight, the cash the rider would collect, the zone, and the surcharge flags. The merchant plan is read from the credential and cannot be named here, so a caller cannot quote themselves a better plan. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["QuoteDto"];
             };
         };
         responses: {
+            /** @description An itemised quote priced against exactly one frozen version, with `total` the sum of the lines in integer minor units including the COD fee and tax, minus the plan discount. Nothing is written and quoting twice with the same inputs returns the same numbers; keep `version` — it is the version a shipment is charged against, and the evidence a later dispute is settled on. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -5827,6 +5925,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description This merchant's own active card: the frozen version it was read from, the plan they are on, every fee and rate as integer minor units or basis points, and four worked examples so the card can be read without holding a parcel in the hand. Read-only. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5904,17 +6003,20 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the original response instead of collecting twice. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment being collected against and the cash actually taken, in integer poisha — a decimal amount is rejected here, never rounded. The `Idempotency-Key` header is what makes a retried collection safe. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CollectCodDto"];
             };
         };
         responses: {
+            /** @description What was actually taken beside the frozen quote that promised it: `expectedMinor` is never rewritten by a collection, so `shortfallMinor` is the gap between promise and reality, recorded rather than smoothed over. Partial collection is a recorded outcome, not an error, and a replay of the same `Idempotency-Key` returns this same body with `replayed: true`. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5995,12 +6097,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment being reviewed and the note explaining what was seen — at least ten characters, because a resolution without a reason is indistinguishable from a cover-up. No amounts are accepted here: this records a human decision, it does not correct one. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReconcileCodDto"];
             };
         };
         responses: {
+            /** @description The reviewed record moves to `COD_RECONCILED` with your note and identity attached, and no amount changes — a mismatch is resolved by decision, not by arithmetic. This is the only transition that clears an exception, which is what unblocks the next settlement freeze. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6077,7 +6181,9 @@ export interface operations {
     ListCodRecordsController_listCodRecords: {
         parameters: {
             query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
                 limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every list is merchant-scoped, so a forged cursor only repositions within its owner's own records. */
                 cursor?: string;
             };
             header?: never;
@@ -6086,6 +6192,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own COD records, newest first, each carrying the frozen quote's `expectedMinor` beside whatever was collected, in integer poisha. Cursor-paginated and scoped to your credential, so a stranger's cursor only repositions within their own list. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6162,7 +6269,9 @@ export interface operations {
     ListCodExceptionsController_list: {
         parameters: {
             query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
                 limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every queue is merchant-scoped, so a forged cursor only repositions within its owner's own queue. */
                 cursor?: string;
             };
             header?: never;
@@ -6171,6 +6280,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The reconciliation work queue: COD records stuck in `RECONCILIATION_EXCEPTION`, newest first, each row carrying the two figures that disagree — the frozen quote's `expectedMinor` beside what the rider actually took. A negative `differenceMinor` is a shortfall: the server records the gap rather than overwriting the promise, and clearing this queue is what lets a settlement freeze proceed. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6247,6 +6357,7 @@ export interface operations {
     CoverageController_coverage: {
         parameters: {
             query: {
+                /** @description The zone code to ask about, e.g. `dhaka-metro`. Unknown codes are answered `false`, not 404. */
                 zone: string;
             };
             header?: never;
@@ -6255,6 +6366,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Whether this zone can be shipped to, and how: `serviceable` false with a human `reason` when it cannot, plus the estimated days and whether pickup, delivery and COD are available when it can. A zone with no coverage row answers false — absence is never a default allow. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6337,6 +6449,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every serviceable zone the network is currently configured with, sorted, for a picker. Read this list rather than hardcoding one: a retired or newly added zone is configuration here. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6413,6 +6526,7 @@ export interface operations {
     ManifestController_list: {
         parameters: {
             query?: {
+                /** @description Show only manifests in this state — one of the five the machine knows. Omit for every manifest; an unrecognised value matches nothing rather than everything, so a typo reads as an empty work list the operator notices. */
                 status?: string;
             };
             header?: never;
@@ -6421,6 +6535,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest work list, newest first — `created_at` then `id` descending, because a timestamp alone is not unique and a console that skips a row loses cargo. Not cursor-paginated: the newest-first tail is the working set. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6501,12 +6616,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The trip this cargo travels on and the shipment ids riding it. At least one shipment, none repeated, and a trip that exists. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateManifestDto"];
             };
         };
         responses: {
+            /** @description The new DRAFT manifest, with its dock-facing code. It only ever moves through the validated transitions from here — nothing updates `status` directly. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6585,13 +6702,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Manifest id */
+                /** @description The manifest to read, with its cargo list. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest, its cargo list in load order, and per parcel whether the destination hub has scanned it in. `missingCount` is 0 before RECEIVED because nobody has looked yet — "not checked" and "nothing missing" must not render as the same number. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6672,12 +6790,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The code of the seeded route to run once more. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TripDto"];
             };
         };
         responses: {
+            /** @description The scheduled trip and the route it runs — one actual movement, carrying the trip id a manifest is then created against. An unknown route code is a 404. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6756,13 +6876,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Manifest id */
+                /** @description The DRAFT manifest to seal. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest in SEALED: the cargo list is now evidence of what left the dock. Only a DRAFT can be sealed — any other state is a 409 naming both. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6841,13 +6962,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Manifest id */
+                /** @description The SEALED manifest to dispatch. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest in DISPATCHED. Only a SEALED manifest can be dispatched; any other state is a 409 naming both. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6926,13 +7048,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Manifest id */
+                /** @description The DISPATCHED manifest to receive. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest in RECEIVED. Only a DISPATCHED manifest can be received; any other state is a 409 naming both. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7011,13 +7134,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Manifest id */
+                /** @description The RECEIVED manifest to reconcile. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The manifest in RECONCILED — every cargo item confirmed arrived. If any shipment has not arrived the call fails with 422 MANIFEST_INCOMPLETE naming them and the manifest stays RECEIVED, visibly un-reconciled, until the parcel shows up. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7094,7 +7218,9 @@ export interface operations {
     ListPickupsController_listPickups: {
         parameters: {
             query?: {
+                /** @description Rows to return, clamped to at most 200; omit or send 0 for the default of 50. */
                 limit?: string;
+                /** @description Opaque position from a previous page's `pagination.nextCursor`. It is unsigned and only repositions within your own list; a malformed value is a 400 with a named reason, never a SQL error. */
                 cursor?: string;
             };
             header?: never;
@@ -7103,6 +7229,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One merchant-scoped page of your pickups, newest first — each row is the batch, its rider (null until assigned), and its status. `pagination.nextCursor` is opaque and repositions within your own list; `hasMore` says whether another page exists. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7180,17 +7307,20 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Reuse with the same body replays this pickup; reuse with a different body is a 400, so a retried request never dispatches a second rider. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The batch of shipment ids to collect (1 to 50) and the declared batch weight in grams. The merchant is taken from the credential, never from the body. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequestPickupDto"];
             };
         };
         responses: {
+            /** @description The pickup as born: its id, REQUESTED status, the full member-shipment batch, and createdAt. Every shipment is advanced to PICKUP_REQUESTED in the same transaction, but no rider is attached — that is the separate assign call. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7268,6 +7398,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Reuse with the same candidates replays the assignment rather than re-scoring and reassigning; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
@@ -7276,12 +7407,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description The candidate rider pool with the signals scoring needs — id plus optional distance in metres, active jobs, capacity, and recent refusals. The rider contract scores the pool deterministically; an omitted signal defaults to a neutral zero. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssignPickupDto"];
             };
         };
         responses: {
+            /** @description The assignment decision: the chosen rider, the deterministic score that picked them (the same candidates always score the same), and the scoring breakdown in words for the audit trail. It moves the pickup to ASSIGNED and advances every member shipment to PICKUP_ASSIGNED; a pickup that is not in REQUESTED or SCHEDULED is a 409. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7362,12 +7495,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The rider's name and E.164 phone, plus an optional parcel capacity — 3 when omitted. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RegisterRiderDto"];
             };
         };
         responses: {
+            /** @description The new rider's id and the status it was born with — AVAILABLE unless suspended at creation. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7444,7 +7579,9 @@ export interface operations {
     RiderSyncController_pull: {
         parameters: {
             query?: {
+                /** @description The rider\'s last acknowledged device sequence — replay only what is newer than this. */
                 sinceSeq?: string;
+                /** @description Cap on the returned window. Defaults to the queue cap. */
                 limit?: string;
             };
             header?: never;
@@ -7456,6 +7593,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every command still pending for this rider, in the server's total order — `createdAt`, then `deviceSequence` to break ties. A command the server did not mention stays queued, so the device acks rather than assumes; `queueSize` and `capWarning` say how near the queue is to the cap. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7539,12 +7677,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description The device's day of work. The server re-sorts by `createdAt` then `deviceSequence` regardless of the order sent, and dedupes on `(rider, deviceSequence)` — a re-sent batch converges on what the first one recorded. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReplayDto"];
             };
         };
         responses: {
+            /** @description One outcome per command, in the order the server applied them — the device's `createdAt`, tie-broken by `deviceSequence`. `duplicate` means that `(rider, deviceSequence)` was already submitted and `reason` carries what happened then; a command whose `expectedState` no longer matches is rejected with a reason, not applied. A batch that would overflow the queue is refused whole with 409 COMMAND_QUEUE_FULL, so nothing is half-applied and the device keeps everything to retry. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7622,6 +7762,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Dedupe key for the acknowledgement. Replaying the same key returns the outcome the first ack recorded rather than deciding again. */
                 "Idempotency-Key": string;
             };
             path: {
@@ -7630,12 +7771,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description The id of the queued command being acknowledged. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AckDto"];
             };
         };
         responses: {
+            /** @description The verdict on the command, and the same verdict again if the key is replayed — an already-acked command comes back `already_delivered`, never a second delivery. A pending command whose `expectedState` no longer matches is recorded as `rejected` with a reason, never silently dropped. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7719,12 +7862,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description Where the rider is: latitude, longitude, and the device's clock. The write overwrites the present tense only — the event it publishes is what the network's history keeps. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordPositionDto"];
             };
         };
         responses: {
+            /** @description The position now on file, and `ageSeconds` — how old it is. A ping older than the stored one is refused rather than applied, so the response carries the position already on file with its real age instead of letting a phone flushing its buffer rewind the map. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7810,6 +7955,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The rider's current load — capacity, the job in hand, and the 0..1 load factor they represent. Null when the rider is unknown. A projection: reading it never mutates state or makes a dispatch decision. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7892,6 +8038,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Pool-wide utilisation: capacity in use against total capacity, plus the mean, max and min per-rider load factor. Read-only — the KPI is a projection, never a decision. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7969,19 +8116,23 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. A rider confirming twice from a flaky connection must not produce two attempts — replaying the key collapses them; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The delivery job whose failed attempt is being recorded. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description The failure reason from the closed vocabulary — an unknown reason is rejected here, not recorded — and an optional note up to 500 characters. Whether the reason retries the job or ends it into returns is decided server-side by policy, not by the caller. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordAttemptDto"];
             };
         };
         responses: {
+            /** @description Records the failed attempt and moves the job by the reason: a retryable reason (CUSTOMER_UNAVAILABLE, PHONE_UNREACHABLE, ADDRESS_INCOMPLETE, WEATHER, or OPERATIONAL_EXCEPTION) with attempts left returns it to OUT_FOR_DELIVERY with `retryScheduled: true`; a terminal reason, or a third failed attempt, ends it at FAILED and hands the parcel to returns. `status` is where the job sits after that decision. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8059,17 +8210,20 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Replaying the key returns the stored job rather than opening a second one; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment to deliver, optionally with the rider to attach now. Omit riderId to open the job as CREATED for assignment later. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateDeliveryDto"];
             };
         };
         responses: {
+            /** @description Opens a delivery job for one shipment — born ASSIGNED when a rider is attached now, CREATED when it is not. The job covers exactly that shipment, and replaying this Idempotency-Key returns the stored job with `replayed: true` instead of opening a second. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -8148,12 +8302,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The delivery job the rider is accepting. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Moves the job ASSIGNED → ACCEPTED and returns the new status. It takes no body and no Idempotency-Key because it is idempotent by construction: accepting an already-accepted job is an illegal edge and 409s rather than applying twice. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8232,12 +8388,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The delivery job the rider is dispatching. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Moves the accepted job to OUT_FOR_DELIVERY — the rider has the parcel and is heading out — and returns the new status, also advancing the shipment and writing an OUT_FOR_DELIVERY tracking event. Idempotent by construction: a repeat dispatch 409s instead of applying twice. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8315,19 +8473,23 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required. A retried delivery confirmation must replay the delivery and its proof, never trigger a second COD collection; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The delivery job being confirmed delivered. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description How much was collected at the door, in integer minor units (poisha): 125050 is 1250.50 taka. A decimal here is a bug, and 0 is correct for a prepaid or zero-COD parcel. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CompleteDeliveryDto"];
             };
         };
         responses: {
+            /** @description Marks the job DELIVERED and returns the new status, but only with evidence: without a verified proof (code + photo + location, minted by the proof endpoints) it 409s rather than confirming a bare tap. The Idempotency-Key is mandatory because completing drives COD collection through the cod module — a retry must replay the delivery, never collect twice. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8405,15 +8567,18 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Optional here: issuing a code is a reissue, not a duplicate effect, and each issue replaces the previous code. Send it only if the client needs replay protection on the issue itself. */
                 "Idempotency-Key"?: string;
             };
             path: {
+                /** @description The delivery job to mint a recipient confirmation code for. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Mints (or replaces) the recipient's confirmation code and returns it once, in plaintext — it is stored only as a salted SHA-256 hash, so this response is the only moment the code exists. It is valid for ten minutes or five attempts, whichever comes first, and only while the job is OUT_FOR_DELIVERY or ATTEMPTED; reissuing kills the previous code immediately. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8491,19 +8656,23 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required. A guess is evidence: resending the same key re-runs that guess instead of recording a second proof or spending the attempt budget twice; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The delivery job whose proof is being submitted. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description The four-digit code the recipient read out; the photo as raw base64 (no data: prefix; JPEG, PNG, or WebP; at most 2 MB); and the handover coordinates, checked against Bangladesh rather than trusted as a number. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SubmitProofDto"];
             };
         };
         responses: {
+            /** @description Writes an immutable proof and returns it as VERIFIED — the photo's SHA-256 and its measured byte length, plus when the code was confirmed. The code is checked before the photo is hashed, so a wrong guess costs one of five and never the upload; the delivery itself (POST /:id/complete) will not run until this has succeeded. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8580,7 +8749,9 @@ export interface operations {
     ListSettlementsController_listSettlements: {
         parameters: {
             query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
                 limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every list is merchant-scoped, so a forged cursor only repositions within its owner's own settlements. */
                 cursor?: string;
             };
             header?: never;
@@ -8589,6 +8760,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own settlements, newest first, with `frozenNetMinor` — the integer-poisha net each one pays — frozen at creation and never recalculated afterwards. Cursor-paginated and scoped to your credential, so a stranger's cursor only repositions within their own list. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8671,6 +8843,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Your unsettled COD collections frozen into a settlement: `items` is every ledger entry it contains and `netMinor` their integer-poisha sum, which any later statement must reproduce. The freeze is refused while any collection is still unreviewed, and there is no Idempotency-Key — it reads whatever is unsettled right now, so two identical calls can legitimately produce different settlements. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -8748,19 +8921,23 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for the money-moving decision: a replay with the same key returns the recorded approval instead of approving twice. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Who is approving, as a subject id. The approval is audited against it — a payout nobody can attribute is the thing approvals exist to prevent. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApproveSettlementDto"];
             };
         };
         responses: {
+            /** @description The settlement moves `CREATED` → `APPROVED` and becomes immutable: the approver and the instant are recorded on the row and audited, and a late COD lands in the next settlement instead. A retry with the same `Idempotency-Key` returns this recorded decision with `replayed: true` — never a second approval. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8838,15 +9015,18 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the recorded payment instead of initiating a second one. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id. It must be in `APPROVED` status — an unapproved freeze is not payable. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The payout is initiated for the frozen `netMinor` in integer poisha and the settlement moves to `PAYMENT_INITIATED`; `paymentReference` is the provider's handle on that payout. A retry with the same `Idempotency-Key` returns the recorded payment rather than initiating a second one — the invoice number is derived from the reference, so the provider converges on one payout. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8924,15 +9104,18 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the recorded outcome instead of settling twice. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id. A payment must already be initiated against it, so it is in `PAYMENT_INITIATED` status. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The provider's terminal answer for the initiated payout, and what the server did with it: `providerStatus` `succeeded` posts the `SETTLEMENT_PAYOUT` ledger entry and moves the settlement to `SETTLED`; anything else leaves it in `PAYMENT_INITIATED` with no ledger entry, because money did not move. A retry returns the recorded outcome rather than confirming twice. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9015,6 +9198,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description What you are owed right now, derived from the ledger and never stored: `balanceMinor` is the one signed integer-poisha figure (negative means we owe you), `lines` itemises every entry behind it, and `asOf` is the exact instant it was true. `blocked` says what is withholding a payout, if anything — an unreviewed COD exception blocks a freeze rather than quietly shrinking it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9093,13 +9277,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Settlement id. */
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The frozen snapshot, itemised: `lines` carries every entry in the settlement with its memo, timestamp and shipment id, and the service refuses to return one whose lines do not sum back to the frozen `netMinor` in integer poisha. The CSV endpoint renders exactly these lines, so the screen and the download cannot disagree. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9178,7 +9363,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Settlement id. */
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
                 id: string;
             };
             cookie?: never;
@@ -9262,7 +9447,9 @@ export interface operations {
     ListReturnsController_listReturns: {
         parameters: {
             query?: {
+                /** @description Rows to return, clamped to at most 200; omit or send 0 for the default of 50. */
                 limit?: string;
+                /** @description Opaque position from a previous page's `pagination.nextCursor`. It is unsigned and only repositions within your own list; a malformed value is a 400 with a named reason, never a SQL error. */
                 cursor?: string;
             };
             header?: never;
@@ -9271,6 +9458,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One merchant-scoped page of your returns, newest first — enough of each to recognise the parcel and read its state. `pagination.nextCursor` is opaque and repositions within your own list; `hasMore` says whether another page exists. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9348,17 +9536,20 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. One return per shipment: replaying the key returns the original, and reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The original shipment to return and the reason, drawn from the closed RETURN_REASONS vocabulary. Merchant scope comes from the credential, not the body. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequestReturnDto"];
             };
         };
         responses: {
+            /** @description The return as opened, in RETURN_REQUESTED — the decision has not been made yet. Exactly one return can ever exist per shipment, so a shipment that already has one is rejected, and replaying this Idempotency-Key returns the stored body with `replayed: true`. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9442,12 +9633,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description Who decided (approverId) and a note of at least 10 characters explaining what they saw — a decision without an explanation is rejected, by design. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DecideReturnDto"];
             };
         };
         responses: {
+            /** @description Records the merchant's approval: the return moves from RETURN_REQUESTED to RETURN_APPROVED, with the reviewer and note stamped on it. Approving moves no money itself — it unblocks the return to travel toward RETURNED, where finance emits the compensating adjustment. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9531,12 +9724,14 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description Who decided (approverId) and a note of at least 10 characters explaining what they saw — a decision without an explanation is rejected, by design. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DecideReturnDto"];
             };
         };
         responses: {
+            /** @description Records the merchant's rejection: the return moves to terminal RETURN_REJECTED, with the reviewer and note stamped on it. Rejection ends this return and moves no money; the parcel stays with the customer, and a fresh request is filed rather than reopening this one. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9622,6 +9817,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Walks the return one transit leg — RETURN_APPROVED → INITIATED → IN_TRANSIT → AT_HUB → OUT_FOR_DELIVERY → RETURNED — and returns the new state. It only advances a return already approved or in transit (a pending or terminal return is a 404); on the RETURNED leg it emits ReturnCompleted carrying the COD amount finance reverses. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9704,6 +9900,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every event that can notify this merchant's customers, answered either way. A row is an opt-out and no row means send, so an untouched event reports enabled with `isDefault` true — and an event switched off sends nothing, which means no SMS to pay for. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9784,12 +9981,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The event to switch and whether it should notify, per event type for the merchant on the credential. The event must be one the consumer honours — the vocabulary is closed, so an unknown one is a 400 before it can become a row nothing will ever read. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SetNotificationPreferenceDto"];
             };
         };
         responses: {
+            /** @description The event as it now stands. `enabled: true` deletes the row rather than storing "on", so absence stays the single way to say default — which the response reports as `isDefault` true. No Idempotency-Key: repeating this is repeating the instruction, not duplicating an effect. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9870,12 +10069,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The gesture and what it is about: the shipment, one of INBOUND, SORT, OUTBOUND, DEPARTED or ARRIVED, and optionally the hub performing it — a hub that is named must exist, and a scan with no hub leaves the parcel at no hub rather than inventing one. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HubScanDto"];
             };
         };
         responses: {
+            /** @description The scan as recorded and the shipment status it moved to. The state machine, the tracking event and the outbox row ran in one transaction — a wrong-order scan is a 409 naming both states, an unknown scan kind a 400. DEPARTED deliberately writes no timeline event; DISPATCHED already told the customer. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -9958,6 +10159,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every hub in the network, ordered by name, each with how many parcels are waiting there right now. An empty hub reads 0, not null — "nothing waiting" and "we could not find out" are different answers. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10034,6 +10236,7 @@ export interface operations {
     HubConsoleController_parcels: {
         parameters: {
             query?: {
+                /** @description Cap on the parcel list. Defaults to 100, newest scan first. */
                 limit?: string;
             };
             header?: never;
@@ -10045,6 +10248,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10127,6 +10331,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One snapshot of the whole network — shipments, pickups, deliveries, COD, riders and hubs — every count read in the same micro-batch, so the numbers describe one instant. `outstandingAmountMinor` is poisha as a decimal string, because the network-wide sum can outgrow what a JSON number holds exactly. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10214,6 +10419,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Two time-views in one response: KPIs summed from the analytics projections over the inclusive Asia/Dhaka day range, and the live hub, exception, rider and pool-utilisation numbers as of `live.timestamp`. Defaults to the last 30 days ending today; the COD money is poisha, one entry per currency. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10296,6 +10502,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10459,8 +10666,9 @@ export interface operations {
     };
     RiderJobsController_jobs: {
         parameters: {
-            query: {
-                limit: string;
+            query?: {
+                /** @description Cap on each list. Defaults to 20, maximum 100 — the rider app merges the two itself. */
+                limit?: string;
             };
             header?: never;
             path: {
@@ -10471,6 +10679,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The rider's home feed: pickup batches and delivery jobs assigned to this rider, each list newest first, both capped by the same limit. The rider app sorts and merges the two client-side — this endpoint hands them over without joining across schemas. */
             200: {
                 headers: {
                     [name: string]: unknown;

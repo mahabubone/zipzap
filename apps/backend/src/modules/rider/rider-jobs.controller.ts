@@ -11,6 +11,7 @@ import { Controller, Get, Inject, Param, Query, UseGuards } from '@nestjs/common
 import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
+import { IsOptional, IsString } from 'class-validator';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
 import { PickupRepository } from '../pickup/pickup.repository.ts';
@@ -19,6 +20,13 @@ import { RiderJobsDto } from './rider-response.dto.ts';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+
+export class RiderJobsQuery {
+  /** Cap on each list. Defaults to 20, maximum 100 — the rider app merges the two itself. */
+  @IsOptional()
+  @IsString()
+  limit?: string;
+}
 
 function parseLimit(raw: string | undefined): number {
   if (raw === undefined) return DEFAULT_LIMIT;
@@ -44,13 +52,19 @@ export class RiderJobsController {
     name: 'riderId',
     description: 'The rider whose pickup and delivery jobs are listed.',
   })
-  @ApiOkResponse({ type: RiderJobsDto })
+  @ApiOkResponse({
+    type: RiderJobsDto,
+    description:
+      "The rider's home feed: pickup batches and delivery jobs assigned to this rider, each " +
+      'list newest first, both capped by the same limit. The rider app sorts and merges the two ' +
+      'client-side — this endpoint hands them over without joining across schemas.',
+  })
   @ApiErrors()
   async jobs(
     @Param('riderId') riderId: string,
-    @Query('limit') limit?: string,
+    @Query() query: RiderJobsQuery,
   ): Promise<RiderJobsDto> {
-    const take = parseLimit(limit);
+    const take = parseLimit(query.limit);
     const [pickups, deliveries] = await Promise.all([
       this.pickups.listByRider(this.pickupDs.manager, riderId, take),
       this.deliveries.listByRider(this.deliveryDs.manager, riderId, take),

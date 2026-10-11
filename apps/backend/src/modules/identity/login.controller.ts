@@ -1,5 +1,12 @@
 import { Body, Controller, Inject, Post, Req, Res } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
 import type { Request, Response } from 'express';
 import { AuthenticationRequiredError } from '../../common/domain-error.ts';
@@ -9,14 +16,28 @@ import { MerchantAuthService } from '../merchant/sessions.service.ts';
 import { setSessionCookie, SESSION_IDLE_TTL_HOURS } from './session-cookie.ts';
 
 export class LoginDto {
+  @ApiProperty({
+    example: 'owner@example.com',
+    description: 'The address the account is registered under.',
+  })
   @IsEmail()
   email!: string;
 
+  @ApiProperty({
+    example: 'correct horse battery staple',
+    description:
+      'The account password, checked against a scrypt hash. An unknown address, a disabled user, ' +
+      'a wrong password and an inactive business all answer the same 401.',
+  })
   @IsString()
   password!: string;
 
   /** Which business to act inside. Omitted = the first membership, chosen deterministically. */
-  @ApiPropertyOptional({ format: 'uuid', description: 'Business to open the session against' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Business to open the session against',
+    example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+  })
   @IsOptional()
   @IsUUID('4')
   merchantId?: string;
@@ -49,6 +70,12 @@ export class LoginController {
   @ApiCreatedResponse({
     type: AuthSessionResponseDto,
     description: 'Session issued. The token is in the Set-Cookie header, not in this body.',
+  })
+  @ApiBody({
+    type: LoginDto,
+    description:
+      'Email and password, and optionally which business to act inside. Omit `merchantId` and the ' +
+      'first membership is chosen deterministically.',
   })
   @ApiErrors()
   async login(
@@ -95,6 +122,12 @@ export class LoginController {
   @ApiCreatedResponse({
     type: AuthTokenResponseDto,
     description: 'Session issued. The token is in this body — store it securely.',
+  })
+  @ApiBody({
+    type: LoginDto,
+    description:
+      'Email and password, and optionally which business to act inside. Nothing is set as a cookie, ' +
+      'so this is the flow for a client with nowhere to keep one.',
   })
   @ApiErrors()
   async token(

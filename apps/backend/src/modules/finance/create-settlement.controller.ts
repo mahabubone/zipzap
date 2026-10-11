@@ -40,7 +40,15 @@ export class CreateSettlementController {
   @Post()
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Freeze your unsettled entries into a settlement' })
-  @ApiCreatedResponse({ type: CreatedSettlementDto })
+  @ApiCreatedResponse({
+    type: CreatedSettlementDto,
+    description:
+      'Your unsettled COD collections frozen into a settlement: `items` is every ledger entry it ' +
+      'contains and `netMinor` their integer-poisha sum, which any later statement must ' +
+      'reproduce. The freeze is refused while any collection is still unreviewed, and there is ' +
+      'no Idempotency-Key — it reads whatever is unsettled right now, so two identical calls can ' +
+      'legitimately produce different settlements.',
+  })
   async create(@Req() request: AuthenticatedRequest): Promise<CreatedSettlementDto> {
     return this.createSettlement.execute({
       merchantId: request.principal!.merchantId!,

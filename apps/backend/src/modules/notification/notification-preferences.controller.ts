@@ -10,7 +10,7 @@
  */
 
 import { Body, Controller, Get, Inject, Put, Req, UseGuards } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsString } from 'class-validator';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -49,7 +49,14 @@ export class NotificationPreferencesController {
       'Every event that can notify, answered either way. Absent means on: a merchant is opted ' +
       'out of an event by writing a row, never by leaving one out.',
   })
-  @ApiOkResponse({ type: NotificationPreferenceDto, isArray: true })
+  @ApiOkResponse({
+    type: NotificationPreferenceDto,
+    isArray: true,
+    description:
+      "Every event that can notify this merchant's customers, answered either way. A row is " +
+      'an opt-out and no row means send, so an untouched event reports enabled with `isDefault` ' +
+      'true — and an event switched off sends nothing, which means no SMS to pay for.',
+  })
   @ApiErrors()
   async list(@Req() request: AuthenticatedRequest): Promise<NotificationPreferenceDto[]> {
     return this.preferences.list(this.merchantId(request));
@@ -63,7 +70,21 @@ export class NotificationPreferencesController {
       'Setting enabled=true removes the row rather than storing "on", so absence stays the single ' +
       'way to say "default".',
   })
-  @ApiOkResponse({ type: NotificationPreferenceDto })
+  @ApiOkResponse({
+    type: NotificationPreferenceDto,
+    description:
+      'The event as it now stands. `enabled: true` deletes the row rather than storing "on", so ' +
+      'absence stays the single way to say default — which the response reports as `isDefault` ' +
+      'true. No Idempotency-Key: repeating this is repeating the instruction, not duplicating ' +
+      'an effect.',
+  })
+  @ApiBody({
+    type: SetNotificationPreferenceDto,
+    description:
+      'The event to switch and whether it should notify, per event type for the merchant on the ' +
+      'credential. The event must be one the consumer honours — the vocabulary is closed, so an ' +
+      'unknown one is a 400 before it can become a row nothing will ever read.',
+  })
   @ApiErrors()
   async set(
     @Body() body: SetNotificationPreferenceDto,

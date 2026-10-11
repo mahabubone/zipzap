@@ -8,7 +8,7 @@
 
 import { Controller, Headers, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
 import { ConfirmSettlementPaymentService } from './confirm-settlement-payment.service.ts';
 import { InitiateSettlementPaymentService } from './initiate-settlement-payment.service.ts';
@@ -40,8 +40,27 @@ export class SettlementPaymentController {
   @Post(':id/initiate-payment')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Initiate the provider payout for an approved settlement' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOkResponse({ type: InitiatedSettlementPaymentDto })
+  @ApiParam({
+    name: 'id',
+    description:
+      'Settlement id. It must be in `APPROVED` status — an unapproved freeze is not payable.',
+  })
+  @ApiOkResponse({
+    type: InitiatedSettlementPaymentDto,
+    description:
+      'The payout is initiated for the frozen `netMinor` in integer poisha and the settlement ' +
+      "moves to `PAYMENT_INITIATED`; `paymentReference` is the provider's handle on that payout. " +
+      'A retry with the same `Idempotency-Key` returns the recorded payment rather than ' +
+      'initiating a second one — the invoice number is derived from the reference, so the ' +
+      'provider converges on one payout.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Retry guard for a money-moving call: a replay with the same key returns the recorded ' +
+      'payment instead of initiating a second one.',
+  })
   async initiatePayment(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -57,8 +76,27 @@ export class SettlementPaymentController {
   @Post(':id/confirm-payment')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Confirm the provider payout and settle' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOkResponse({ type: ConfirmedSettlementPaymentDto })
+  @ApiParam({
+    name: 'id',
+    description:
+      'Settlement id. A payment must already be initiated against it, so it is in `PAYMENT_INITIATED` status.',
+  })
+  @ApiOkResponse({
+    type: ConfirmedSettlementPaymentDto,
+    description:
+      "The provider's terminal answer for the initiated payout, and what the server did with " +
+      'it: `providerStatus` `succeeded` posts the `SETTLEMENT_PAYOUT` ledger entry and moves the ' +
+      'settlement to `SETTLED`; anything else leaves it in `PAYMENT_INITIATED` with no ledger ' +
+      'entry, because money did not move. A retry returns the recorded outcome rather than ' +
+      'confirming twice.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Retry guard for a money-moving call: a replay with the same key returns the recorded ' +
+      'outcome instead of settling twice.',
+  })
   async confirmPayment(
     @Param('id') id: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

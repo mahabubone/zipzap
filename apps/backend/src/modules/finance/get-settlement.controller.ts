@@ -30,8 +30,18 @@ export class GetSettlementController {
   @Get(':id')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'One settlement, itemised' })
-  @ApiParam({ name: 'id', description: 'Settlement id.' })
-  @ApiOkResponse({ type: SettlementStatementDto })
+  @ApiParam({
+    name: 'id',
+    description: 'Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`.',
+  })
+  @ApiOkResponse({
+    type: SettlementStatementDto,
+    description:
+      'The frozen snapshot, itemised: `lines` carries every entry in the settlement with its ' +
+      'memo, timestamp and shipment id, and the service refuses to return one whose lines do ' +
+      'not sum back to the frozen `netMinor` in integer poisha. The CSV endpoint renders exactly ' +
+      'these lines, so the screen and the download cannot disagree.',
+  })
   @ApiErrors()
   async one(
     @Param('id') id: string,
@@ -45,7 +55,10 @@ export class GetSettlementController {
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @ApiProduces('text/csv')
   @ApiOperation({ summary: 'Download the itemised statement' })
-  @ApiParam({ name: 'id', description: 'Settlement id.' })
+  @ApiParam({
+    name: 'id',
+    description: 'Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`.',
+  })
   // CSV, not JSON: the api-client fetches this with `.text()` and hands the caller a Blob, so the
   // spec must advertise text/csv or a generated client would try to parse the CSV as an envelope.
   @ApiOkResponse({

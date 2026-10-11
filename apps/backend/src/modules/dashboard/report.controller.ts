@@ -39,7 +39,14 @@ export class ReportController {
   @Get('report')
   @UseGuards(new ScopeGuard('network:read'))
   @ApiOperation({ summary: 'Operational KPI report: projection ranges plus live snapshot' })
-  @ApiOkResponse({ type: OperationsReportDto })
+  @ApiOkResponse({
+    type: OperationsReportDto,
+    description:
+      'Two time-views in one response: KPIs summed from the analytics projections over the ' +
+      'inclusive Asia/Dhaka day range, and the live hub, exception, rider and pool-utilisation ' +
+      'numbers as of `live.timestamp`. Defaults to the last 30 days ending today; the COD money ' +
+      'is poisha, one entry per currency.',
+  })
   @ApiErrors()
   async getReport(@Query() query: ControlTowerReportQuery): Promise<OperationsReportDto> {
     return this.report.getReport(query.from, query.to);

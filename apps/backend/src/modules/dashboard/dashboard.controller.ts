@@ -24,7 +24,14 @@ export class DashboardController {
   @Get('live-counts')
   @UseGuards(new ScopeGuard('network:read'))
   @ApiOperation({ summary: 'Live network counts, one snapshot in time' })
-  @ApiOkResponse({ type: LiveCountsDto })
+  @ApiOkResponse({
+    type: LiveCountsDto,
+    description:
+      'One snapshot of the whole network — shipments, pickups, deliveries, COD, riders and hubs ' +
+      '— every count read in the same micro-batch, so the numbers describe one instant. ' +
+      '`outstandingAmountMinor` is poisha as a decimal string, because the network-wide sum can ' +
+      'outgrow what a JSON number holds exactly.',
+  })
   @ApiErrors()
   async getLiveCounts(): Promise<LiveCountsDto> {
     const counts = await this.dashboard.getLiveCounts();

@@ -8,7 +8,14 @@
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiCreatedResponse, ApiHeader, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -79,8 +86,26 @@ export class CreateShipmentController {
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a shipment' })
-  @ApiCreatedResponse({ type: CreatedShipmentDto })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    type: CreateShipmentDto,
+    description:
+      'Both contacts, the parcel, and the three surcharge flags — everything the price and the ' +
+      'serviceability check depend on. The merchant comes from the credential, never from here.',
+  })
+  @ApiCreatedResponse({
+    type: CreatedShipmentDto,
+    description:
+      'The shipment as stored: its tracking code, its status, and the cash the rider will be asked ' +
+      'to collect (integer minor units). A retried Idempotency-Key returns this same body with ' +
+      '`replayed: true` instead of a second parcel.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required here (ADR-0010): the same key replayed returns the original response rather than ' +
+      'creating a duplicate parcel. The same key with a different body is rejected as key reuse.',
+  })
   async create(
     @Body() body: CreateShipmentDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

@@ -4,7 +4,7 @@
 
 import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
 import { RegisterRiderService } from './register-rider.service.ts';
@@ -33,7 +33,16 @@ export class RegisterRiderController {
   @ApiErrors()
   @Post()
   @ApiOperation({ summary: 'Register a rider' })
-  @ApiCreatedResponse({ type: RegisteredRiderDto })
+  @ApiCreatedResponse({
+    type: RegisteredRiderDto,
+    description:
+      "The new rider's id and the status it was born with — AVAILABLE unless suspended at creation.",
+  })
+  @ApiBody({
+    type: RegisterRiderDto,
+    description:
+      "The rider's name and E.164 phone, plus an optional parcel capacity — 3 when omitted.",
+  })
   async register(@Body() body: RegisterRiderDto): Promise<RegisteredRiderDto> {
     return this.registerRider.execute({
       displayName: body.displayName,

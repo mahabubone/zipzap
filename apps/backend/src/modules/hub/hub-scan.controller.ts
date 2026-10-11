@@ -14,7 +14,7 @@
  */
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
@@ -44,7 +44,21 @@ export class HubScanController {
   @Post('scans')
   @UseGuards(new ScopeGuard('hub:scan'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Record a hub scan for a shipment' })
-  @ApiCreatedResponse({ type: HubScanResultDto })
+  @ApiCreatedResponse({
+    type: HubScanResultDto,
+    description:
+      'The scan as recorded and the shipment status it moved to. The state machine, the tracking ' +
+      'event and the outbox row ran in one transaction — a wrong-order scan is a 409 naming both ' +
+      'states, an unknown scan kind a 400. DEPARTED deliberately writes no timeline event; ' +
+      'DISPATCHED already told the customer.',
+  })
+  @ApiBody({
+    type: HubScanDto,
+    description:
+      'The gesture and what it is about: the shipment, one of INBOUND, SORT, OUTBOUND, DEPARTED ' +
+      'or ARRIVED, and optionally the hub performing it — a hub that is named must exist, and a ' +
+      'scan with no hub leaves the parcel at no hub rather than inventing one.',
+  })
   @ApiErrors()
   async scan(
     @Body() body: HubScanDto,

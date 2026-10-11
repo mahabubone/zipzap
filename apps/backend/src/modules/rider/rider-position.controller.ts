@@ -10,7 +10,7 @@
  */
 
 import { Body, Controller, HttpCode, Inject, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { IsISO8601, IsLatitude, IsLongitude, IsNumber, IsOptional } from 'class-validator';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
@@ -44,7 +44,19 @@ export class RiderPositionController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Record a rider position. Never visible on public tracking.' })
   @ApiParam({ name: 'riderId', description: 'The rider whose position is recorded.' })
-  @ApiOkResponse({ type: RiderPositionDto })
+  @ApiOkResponse({
+    type: RiderPositionDto,
+    description:
+      'The position now on file, and `ageSeconds` — how old it is. A ping older than the stored ' +
+      'one is refused rather than applied, so the response carries the position already on file ' +
+      'with its real age instead of letting a phone flushing its buffer rewind the map.',
+  })
+  @ApiBody({
+    type: RecordPositionDto,
+    description:
+      "Where the rider is: latitude, longitude, and the device's clock. The write overwrites the " +
+      "present tense only — the event it publishes is what the network's history keeps.",
+  })
   @ApiErrors()
   async record(
     @Param('riderId') riderId: string,

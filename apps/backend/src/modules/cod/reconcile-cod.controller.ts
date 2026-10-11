@@ -9,7 +9,7 @@
 
 import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { ReconcileCodService } from './reconcile-cod.service.ts';
@@ -34,7 +34,21 @@ export class ReconcileCodController {
   @ApiErrors()
   @Post('reconcile')
   @ApiOperation({ summary: 'Resolve a COD mismatch after human review' })
-  @ApiOkResponse({ type: ReconciledCodDto })
+  @ApiBody({
+    type: ReconcileCodDto,
+    description:
+      'The shipment being reviewed and the note explaining what was seen — at least ten ' +
+      'characters, because a resolution without a reason is indistinguishable from a cover-up. ' +
+      'No amounts are accepted here: this records a human decision, it does not correct one.',
+  })
+  @ApiOkResponse({
+    type: ReconciledCodDto,
+    description:
+      'The reviewed record moves to `COD_RECONCILED` with your note and identity attached, and ' +
+      'no amount changes — a mismatch is resolved by decision, not by arithmetic. This is the ' +
+      'only transition that clears an exception, which is what unblocks the next settlement ' +
+      'freeze.',
+  })
   async reconcile(
     @Body() body: ReconcileCodDto,
     @Req() request: AuthenticatedRequest,

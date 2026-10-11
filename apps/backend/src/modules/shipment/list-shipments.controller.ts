@@ -23,10 +23,15 @@ import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentPageDto } from './shipment-response.dto.ts';
 
 export class ListShipmentsQuery {
+  /** How many rows to ask for. Anything above 200, or below 1, is clamped rather than refused. */
   @IsOptional()
   @IsString()
   limit?: string;
 
+  /**
+   * The opaque position from the previous page's `nextCursor`. Unsigned on purpose — it only
+   * repositions inside your own list, which the merchant scope has already fenced.
+   */
   @IsOptional()
   @IsString()
   cursor?: string;
@@ -67,7 +72,13 @@ export class ListShipmentsController {
   @Get()
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your shipments, newest first' })
-  @ApiOkResponse({ type: ShipmentPageDto })
+  @ApiOkResponse({
+    type: ShipmentPageDto,
+    description:
+      'One page of your own shipments, newest first, each carrying the cash the rider is to collect ' +
+      'for it (integer minor units). `nextCursor` is null on the last page, and a filter value the ' +
+      'machine does not recognise is a 400 naming every bad field at once, never a silently wider list.',
+  })
   async listShipments(
     @Query() query: ListShipmentsQuery,
     @Req() request: AuthenticatedRequest,

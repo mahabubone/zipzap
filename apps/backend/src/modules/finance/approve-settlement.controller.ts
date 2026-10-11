@@ -8,7 +8,14 @@
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { ApproveSettlementService } from './approve-settlement.service.ts';
@@ -32,8 +39,31 @@ export class ApproveSettlementController {
   @Post(':id/approve')
   @UseGuards(new ScopeGuard('settlements:approve'))
   @ApiOperation({ summary: 'Approve a settlement — the point of no return' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOkResponse({ type: ApprovedSettlementDto })
+  @ApiParam({
+    name: 'id',
+    description: 'Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`.',
+  })
+  @ApiBody({
+    type: ApproveSettlementDto,
+    description:
+      'Who is approving, as a subject id. The approval is audited against it — a payout nobody ' +
+      'can attribute is the thing approvals exist to prevent.',
+  })
+  @ApiOkResponse({
+    type: ApprovedSettlementDto,
+    description:
+      'The settlement moves `CREATED` → `APPROVED` and becomes immutable: the approver and the ' +
+      'instant are recorded on the row and audited, and a late COD lands in the next settlement ' +
+      'instead. A retry with the same `Idempotency-Key` returns this recorded decision with ' +
+      '`replayed: true` — never a second approval.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Retry guard for the money-moving decision: a replay with the same key returns the ' +
+      'recorded approval instead of approving twice.',
+  })
   async approve(
     @Param('id') id: string,
     @Body() body: ApproveSettlementDto,

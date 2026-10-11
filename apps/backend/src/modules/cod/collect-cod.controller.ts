@@ -8,7 +8,14 @@
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsInt, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { CollectCodService } from './collect-cod.service.ts';
@@ -38,8 +45,29 @@ export class CollectCodController {
   @ApiErrors()
   @Post('collect')
   @ApiOperation({ summary: 'Record a COD collection' })
-  @ApiOkResponse({ type: CollectedCodDto })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    type: CollectCodDto,
+    description:
+      'The shipment being collected against and the cash actually taken, in integer poisha — ' +
+      'a decimal amount is rejected here, never rounded. The `Idempotency-Key` header is what ' +
+      'makes a retried collection safe.',
+  })
+  @ApiOkResponse({
+    type: CollectedCodDto,
+    description:
+      'What was actually taken beside the frozen quote that promised it: `expectedMinor` is ' +
+      'never rewritten by a collection, so `shortfallMinor` is the gap between promise and ' +
+      'reality, recorded rather than smoothed over. Partial collection is a recorded outcome, ' +
+      'not an error, and a replay of the same `Idempotency-Key` returns this same body with ' +
+      '`replayed: true`.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Retry guard for a money-moving call: a replay with the same key returns the original ' +
+      'response instead of collecting twice.',
+  })
   async collect(
     @Body() body: CollectCodDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

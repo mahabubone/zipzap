@@ -12,7 +12,14 @@
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsIn, IsLatitude, IsLongitude, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { DeliveryProofService } from './delivery-proof.service.ts';
@@ -57,8 +64,25 @@ export class DeliveryProofController {
       'Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is ' +
       'valid for ten minutes or five attempts, whichever comes first.',
   })
-  @ApiHeader({ name: 'Idempotency-Key', required: false })
-  @ApiOkResponse({ type: IssuedDeliveryCodeDto })
+  @ApiParam({
+    name: 'id',
+    description: 'The delivery job to mint a recipient confirmation code for.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional here: issuing a code is a reissue, not a duplicate effect, and each issue replaces ' +
+      'the previous code. Send it only if the client needs replay protection on the issue itself.',
+  })
+  @ApiOkResponse({
+    type: IssuedDeliveryCodeDto,
+    description:
+      "Mints (or replaces) the recipient's confirmation code and returns it once, in plaintext — it " +
+      'is stored only as a salted SHA-256 hash, so this response is the only moment the code exists. ' +
+      'It is valid for ten minutes or five attempts, whichever comes first, and only while the job is ' +
+      'OUT_FOR_DELIVERY or ATTEMPTED; reissuing kills the previous code immediately.',
+  })
   async issueCode(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -78,8 +102,29 @@ export class DeliveryProofController {
       'Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete ' +
       'refuses to mark a parcel delivered until this has succeeded.',
   })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOkResponse({ type: SubmittedDeliveryProofDto })
+  @ApiParam({ name: 'id', description: 'The delivery job whose proof is being submitted.' })
+  @ApiBody({
+    type: SubmitProofDto,
+    description:
+      'The four-digit code the recipient read out; the photo as raw base64 (no data: prefix; JPEG, ' +
+      'PNG, or WebP; at most 2 MB); and the handover coordinates, checked against Bangladesh rather ' +
+      'than trusted as a number.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required. A guess is evidence: resending the same key re-runs that guess instead of recording ' +
+      'a second proof or spending the attempt budget twice; reuse with a different body is a 400.',
+  })
+  @ApiOkResponse({
+    type: SubmittedDeliveryProofDto,
+    description:
+      "Writes an immutable proof and returns it as VERIFIED — the photo's SHA-256 and its measured " +
+      'byte length, plus when the code was confirmed. The code is checked before the photo is hashed, ' +
+      'so a wrong guess costs one of five and never the upload; the delivery itself ' +
+      '(POST /:id/complete) will not run until this has succeeded.',
+  })
   async submit(
     @Param('id') id: string,
     @Body() body: SubmitProofDto,

@@ -10,6 +10,7 @@
 import { Body, Controller, Get, Header, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -50,6 +51,13 @@ export class BulkImportController {
   @Post('upload')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Upload CSV, get the human preview checkpoint' })
+  @ApiBody({
+    type: UploadBulkDto,
+    description:
+      'The CSV text itself plus the filename it came from. The column names decide the mapping, so a ' +
+      'file with a stray header is refused with the missing columns named rather than silently ' +
+      'imported as empty fields.',
+  })
   @ApiAcceptedResponse({
     type: BulkPreviewDto,
     description:
@@ -67,6 +75,12 @@ export class BulkImportController {
   @Post('accept')
   @UseGuards(new ScopeGuard('shipments:write'))
   @ApiOperation({ summary: 'Accept the preview — enqueue chunked processing' })
+  @ApiBody({
+    type: AcceptBulkDto,
+    description:
+      'The job id from the preview checkpoint. Acceptance is the moment rows become shipments, so it ' +
+      'only works on a job still sitting in PREVIEW.',
+  })
   @ApiAcceptedResponse({
     type: BulkJobViewDto,
     description: 'The job is now PROCESSING. Poll it; there is no push.',
@@ -86,7 +100,13 @@ export class BulkImportController {
     description: 'Returns the job view in its current state. Poll it; there is no push.',
   })
   @ApiParam({ name: 'jobId', description: 'The job id returned by `upload`.' })
-  @ApiOkResponse({ type: BulkJobViewDto })
+  @ApiOkResponse({
+    type: BulkJobViewDto,
+    description:
+      'Row counters for one import job: how many rows are done, and of those how many produced a ' +
+      'shipment, how many failed, and how many were skipped as duplicate invoices. The counters only ' +
+      'move forward — poll until `status` is terminal, because nothing pushes.',
+  })
   @ApiErrors()
   async progress(
     @Param('jobId') jobId: string,

@@ -27,14 +27,25 @@ export class HealthController {
       'Deliberately checks nothing: a Postgres blip must not restart every process at once. ' +
       'Use /readyz for dependency health. Never returns an error envelope.',
   })
-  @ApiOkResponse({ type: HealthzDto })
+  @ApiOkResponse({
+    type: HealthzDto,
+    description:
+      'The process is up, and for how long, in whole seconds. Nothing is checked and nothing can ' +
+      'fail here, so this route has no error responses at all — use /readyz for dependencies.',
+  })
   healthz(): HealthzDto {
     return { status: 'ok', uptimeSeconds: Math.trunc(process.uptime()) };
   }
 
   @Get('readyz')
   @ApiOperation({ summary: 'Readiness — Postgres is reachable' })
-  @ApiOkResponse({ type: ReadyzDto })
+  @ApiOkResponse({
+    type: ReadyzDto,
+    description:
+      '`ready`, once a `SELECT 1` round-trip to Postgres has succeeded. Redis and NATS are ' +
+      'deliberately absent from the answer: the system degrades without them, and refusing traffic ' +
+      'here would turn a cache or rate-limit outage into an availability one.',
+  })
   @ApiErrors()
   async readyz(): Promise<ReadyzDto> {
     try {

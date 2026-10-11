@@ -29,7 +29,14 @@ export class MapController {
     summary:
       'Hubs and rider positions for the live map. Rider positions never reach public tracking.',
   })
-  @ApiOkResponse({ type: NetworkMapDto })
+  @ApiOkResponse({
+    type: NetworkMapDto,
+    description:
+      'Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from ' +
+      'twenty minutes ago can be rendered as stale rather than believed. Parcels are never ' +
+      'plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of ' +
+      'placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness.',
+  })
   @ApiErrors()
   getMap(): Promise<NetworkMapDto> {
     return this.map.getMap();

@@ -23,7 +23,15 @@ export class MerchantBalanceController {
   @Get('balance')
   @UseGuards(new ScopeGuard('settlements:read'))
   @ApiOperation({ summary: 'Your derived balance, itemised, with anything blocking a payout' })
-  @ApiOkResponse({ type: MerchantBalanceDto })
+  @ApiOkResponse({
+    type: MerchantBalanceDto,
+    description:
+      'What you are owed right now, derived from the ledger and never stored: `balanceMinor` is ' +
+      'the one signed integer-poisha figure (negative means we owe you), `lines` itemises every ' +
+      'entry behind it, and `asOf` is the exact instant it was true. `blocked` says what is ' +
+      'withholding a payout, if anything — an unreviewed COD exception blocks a freeze rather ' +
+      'than quietly shrinking it.',
+  })
   async mine(@Req() request: AuthenticatedRequest): Promise<MerchantBalanceDto> {
     return this.balance.execute(request.principal!.merchantId!);
   }

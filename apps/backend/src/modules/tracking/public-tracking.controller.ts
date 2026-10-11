@@ -14,6 +14,7 @@ import {
   ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiProperty,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -106,7 +107,8 @@ export class PublicTrackingViewDto {
     type: PublicTimelineEventDto,
     isArray: true,
     description:
-      'Ordered by occurredAt then id — a deterministic sort, because `sequence` alone is a partial order and the status is read off the last row.',
+      'Ordered by sequence, then occurredAt, then id — a total order, because `sequence` alone is ' +
+      'not one and `status` is read off the last row.',
   })
   timeline!: PublicTimelineEventDto[];
 }
@@ -143,6 +145,10 @@ export class PublicTrackingController {
   })
   @ApiBadRequestResponse({ description: 'The tracking code is malformed.' })
   @ApiTooManyRequestsResponse({ description: 'Rate limited. Honour `Retry-After`.' })
+  @ApiParam({
+    name: 'trackingCode',
+    description: 'The tracking code whose events are streamed. Emits nothing until one occurs.',
+  })
   events(@Param('trackingCode') trackingCode: string): Observable<MessageEvent> {
     return this.fanout.observable().pipe(
       filter((event) => event.trackingCode === trackingCode),
@@ -171,8 +177,25 @@ export class PublicTrackingController {
   @UseGuards(new RateLimitGuard('public', false))
   @ApiOperation({
     summary: 'Public tracking by unguessable token (26 chars, 130 bits) — not enumerable',
+    description:
+      'The strong form of the public route, for links sent in a message rather than printed on a ' +
+      'label: 130 bits, so it cannot be walked. Resolves the shipment behind the link, then reads ' +
+      'the same projection the code route reads. Rate limited identically.',
   })
-  @ApiOkResponse({ type: PublicTrackingViewDto })
+  @ApiParam({
+    name: 'token',
+    description:
+      'The 26-character token from the tracking link a customer is sent. Unknowable without it, so ' +
+      'an unknown token gets the same 404 as a known one — this route is not a validity oracle.',
+  })
+  @ApiOkResponse({
+    type: PublicTrackingViewDto,
+    description:
+      'The public timeline for the shipment the link names. Read from `public_timeline` rather than ' +
+      'the tracking log, so the internal detail that must not be public is absent by construction ' +
+      'rather than by a filter — and it can trail the live log by a beat, because a consumer builds ' +
+      'it.',
+  })
   @ApiErrors()
   async trackByToken(@Param('token') token: string): Promise<PublicTrackingView> {
     const rows: Array<{ shipment_id: string }> = await this.tracking.query(
@@ -189,8 +212,24 @@ export class PublicTrackingController {
 
   @Get(':trackingCode')
   @UseGuards(new RateLimitGuard('public', false))
-  @ApiOperation({ summary: 'Public shipment tracking by tracking code' })
-  @ApiOkResponse({ type: PublicTrackingViewDto })
+  @ApiOperation({
+    summary: 'Public shipment tracking by tracking code',
+    description:
+      'The route every printed label and inbox link points at, so it is rate limited hard: enough ' +
+      'to stop a walk, not enough to stop a customer. Codes are short enough to guess, which is why ' +
+      'nothing a courier should not publish is in the projection it reads.',
+  })
+  @ApiParam({
+    name: 'trackingCode',
+    description: 'The ZZ- code printed on the label, e.g. ZZ-7F3K9Q2M.',
+  })
+  @ApiOkResponse({
+    type: PublicTrackingViewDto,
+    description:
+      'The public timeline for that tracking code, or 404 when no shipment has it. Ordering is ' +
+      'sequence, then occurredAt, then id, so it is stable across identical requests even though ' +
+      '`sequence` alone is not unique — the last row of that order is what `status` reports.',
+  })
   @ApiErrors()
   async track(@Param('trackingCode') trackingCode: string): Promise<PublicTrackingView> {
     const rows: TimelineRow[] = await this.timelineFor(trackingCode);

@@ -31,6 +31,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBody,
   ApiCreatedResponse,
   ApiHeader,
   ApiOkResponse,
@@ -59,10 +60,12 @@ import { OfflineSyncService } from './offline-sync.service.ts';
 import { AckResultDto, PullResultDto, ReplayResultDto } from './rider-response.dto.ts';
 
 class PullDto {
+  /** The rider\'s last acknowledged device sequence — replay only what is newer than this. */
   @IsOptional()
   @IsString()
   sinceSeq?: string;
 
+  /** Cap on the returned window. Defaults to the queue cap. */
   @IsOptional()
   @IsString()
   limit?: string;
@@ -122,7 +125,14 @@ export class RiderSyncController {
   @UseGuards(new ScopeGuard('rider:sync'))
   @ApiOperation({ summary: 'Pull pending commands for an offline rider' })
   @ApiParam({ name: 'riderId', description: 'The rider whose offline command queue is pulled.' })
-  @ApiOkResponse({ type: PullResultDto })
+  @ApiOkResponse({
+    type: PullResultDto,
+    description:
+      "Every command still pending for this rider, in the server's total order — `createdAt`, " +
+      'then `deviceSequence` to break ties. A command the server did not mention stays queued, ' +
+      'so the device acks rather than assumes; `queueSize` and `capWarning` say how near the ' +
+      'queue is to the cap.',
+  })
   @ApiErrors()
   async pull(@Param('riderId') riderId: string, @Query() dto: PullDto): Promise<PullResultDto> {
     const since = dto.sinceSeq !== undefined ? Number(dto.sinceSeq) : undefined;
@@ -137,7 +147,23 @@ export class RiderSyncController {
     summary: 'A device pushing its own offline commands back, in device order, exactly once each',
   })
   @ApiParam({ name: 'riderId', description: 'The rider whose device is replaying its commands.' })
-  @ApiOkResponse({ type: ReplayResultDto })
+  @ApiOkResponse({
+    type: ReplayResultDto,
+    description:
+      "One outcome per command, in the order the server applied them — the device's `createdAt`, " +
+      'tie-broken by `deviceSequence`. `duplicate` means that `(rider, deviceSequence)` was ' +
+      'already submitted and `reason` carries what happened then; a command whose `expectedState` ' +
+      'no longer matches is rejected with a reason, not applied. A batch that would overflow the ' +
+      'queue is refused whole with 409 COMMAND_QUEUE_FULL, so nothing is half-applied and the ' +
+      'device keeps everything to retry.',
+  })
+  @ApiBody({
+    type: ReplayDto,
+    description:
+      "The device's day of work. The server re-sorts by `createdAt` then `deviceSequence` " +
+      'regardless of the order sent, and dedupes on `(rider, deviceSequence)` — a re-sent batch ' +
+      'converges on what the first one recorded.',
+  })
   @ApiErrors()
   async replay(
     @Param('riderId') riderId: string,
@@ -158,9 +184,23 @@ export class RiderSyncController {
   @Post(':riderId/sync/ack')
   @UseGuards(new ScopeGuard('rider:sync'))
   @ApiOperation({ summary: 'Acknowledge one queued command' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Dedupe key for the acknowledgement. Replaying the same key returns the outcome the ' +
+      'first ack recorded rather than deciding again.',
+  })
   @ApiParam({ name: 'riderId', description: 'The rider who owns the command being acknowledged.' })
-  @ApiCreatedResponse({ type: AckResultDto })
+  @ApiCreatedResponse({
+    type: AckResultDto,
+    description:
+      'The verdict on the command, and the same verdict again if the key is replayed — an ' +
+      'already-acked command comes back `already_delivered`, never a second delivery. A pending ' +
+      'command whose `expectedState` no longer matches is recorded as `rejected` with a reason, ' +
+      'never silently dropped.',
+  })
+  @ApiBody({ description: 'The id of the queued command being acknowledged.', type: AckDto })
   @ApiErrors()
   async ack(
     @Param('riderId') riderId: string,

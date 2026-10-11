@@ -31,9 +31,19 @@ import { TAG_DESCRIPTIONS } from './openapi.ts';
 
 interface Operation {
   operationId?: string;
+  summary?: string;
   tags?: string[];
   security?: Array<Record<string, string[]>>;
-  parameters?: Array<{ name?: string; in?: string; required?: boolean }>;
+  parameters?: Array<{
+    name?: string;
+    in?: string;
+    required?: boolean;
+    description?: string;
+  }>;
+  requestBody?: {
+    description?: string;
+    content?: Record<string, { schema?: { $ref?: string; properties?: unknown } }>;
+  };
   responses: Record<
     string,
     { content?: Record<string, unknown>; description?: string; schema?: unknown } | undefined
@@ -328,6 +338,58 @@ describe('openapi.json structure', () => {
       // A 204 with no body can still set headers, and a client that reads only the body would
       // never learn the cookie was cleared.
       expect(operation.responses['204']?.description?.length ?? 0).toBeGreaterThan(20);
+    });
+  });
+
+  describe('nothing is left undocumented', () => {
+    // "Wiring DTOs ... with full details" is the requirement, and the way this regressed was
+    // subtle: adding `@ApiBody({ description })` WITHOUT a `type` emits `{"type": "string"}` and
+    // silently drops the DTO from `components.schemas`. The description looked better, the api-client
+    // got worse, and nothing complained for a whole pass. So each of these is a real check.
+    const problems: string[] = [];
+
+    for (const { path, method, operation } of operations) {
+      const id = operation.operationId ?? `${method} ${path}`;
+
+      if (!(operation.summary as string | undefined)?.trim()) problems.push(`${id}: no summary`);
+
+      for (const [code, response] of Object.entries(operation.responses)) {
+        if (!(response?.description ?? '').trim()) problems.push(`${id} ${code}: no description`);
+      }
+
+      for (const parameter of operation.parameters ?? []) {
+        if (!(parameter.description ?? '').trim()) {
+          problems.push(`${id}: param ${String(parameter.name)} has no description`);
+        }
+      }
+
+      if (operation.requestBody) {
+        if (!(operation.requestBody.description ?? '').trim())
+          problems.push(`${id}: request body has no description`);
+        const first = Object.values(operation.requestBody.content ?? {})[0] as
+          { schema?: { $ref?: string; properties?: unknown } } | undefined;
+        if (!first?.schema?.$ref && !first?.schema?.properties) {
+          // A body that describes itself but names no DTO is a body the api-client types as an
+          // opaque string, which is the failure mode this whole file exists to prevent.
+          problems.push(`${id}: request body has no schema`);
+        }
+      }
+    }
+
+    it('describes every response', () => {
+      expect(problems.filter((p) => p.includes('no description'))).toEqual([]);
+    });
+
+    it('describes every parameter', () => {
+      expect(problems.filter((p) => p.includes('param'))).toEqual([]);
+    });
+
+    it('describes and schematises every request body', () => {
+      expect(problems.filter((p) => p.includes('request body'))).toEqual([]);
+    });
+
+    it('summarises every operation', () => {
+      expect(problems.filter((p) => p.includes('no summary'))).toEqual([]);
     });
   });
 

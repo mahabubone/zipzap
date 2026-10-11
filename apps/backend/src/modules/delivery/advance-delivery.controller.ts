@@ -11,7 +11,15 @@
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsInt, Min } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { AdvanceDeliveryService } from './advance-delivery.service.ts';
@@ -39,7 +47,14 @@ export class AdvanceDeliveryController {
   @Post(':id/accept')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Rider accepts a delivery job' })
-  @ApiOkResponse({ type: DeliveryStatusDto })
+  @ApiParam({ name: 'id', description: 'The delivery job the rider is accepting.' })
+  @ApiOkResponse({
+    type: DeliveryStatusDto,
+    description:
+      'Moves the job ASSIGNED → ACCEPTED and returns the new status. It takes no body and no ' +
+      'Idempotency-Key because it is idempotent by construction: accepting an already-accepted job ' +
+      'is an illegal edge and 409s rather than applying twice.',
+  })
   async accept(@Param('id') id: string): Promise<DeliveryStatusDto> {
     const status = await this.advance.accept(id);
     return { id, status };
@@ -49,7 +64,14 @@ export class AdvanceDeliveryController {
   @Post(':id/dispatch')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Rider heads out for delivery' })
-  @ApiOkResponse({ type: DeliveryStatusDto })
+  @ApiParam({ name: 'id', description: 'The delivery job the rider is dispatching.' })
+  @ApiOkResponse({
+    type: DeliveryStatusDto,
+    description:
+      'Moves the accepted job to OUT_FOR_DELIVERY — the rider has the parcel and is heading out — ' +
+      'and returns the new status, also advancing the shipment and writing an OUT_FOR_DELIVERY ' +
+      'tracking event. Idempotent by construction: a repeat dispatch 409s instead of applying twice.',
+  })
   async dispatch(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -62,8 +84,28 @@ export class AdvanceDeliveryController {
   @Post(':id/complete')
   @UseGuards(new ScopeGuard('delivery:complete'))
   @ApiOperation({ summary: 'Confirm delivery and collect COD' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
-  @ApiOkResponse({ type: DeliveryStatusDto })
+  @ApiParam({ name: 'id', description: 'The delivery job being confirmed delivered.' })
+  @ApiBody({
+    type: CompleteDeliveryDto,
+    description:
+      'How much was collected at the door, in integer minor units (poisha): 125050 is 1250.50 ' +
+      'taka. A decimal here is a bug, and 0 is correct for a prepaid or zero-COD parcel.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required. A retried delivery confirmation must replay the delivery and its proof, never ' +
+      'trigger a second COD collection; reuse with a different body is a 400.',
+  })
+  @ApiOkResponse({
+    type: DeliveryStatusDto,
+    description:
+      'Marks the job DELIVERED and returns the new status, but only with evidence: without a ' +
+      'verified proof (code + photo + location, minted by the proof endpoints) it 409s rather than ' +
+      'confirming a bare tap. The Idempotency-Key is mandatory because completing drives COD ' +
+      'collection through the cod module — a retry must replay the delivery, never collect twice.',
+  })
   async complete(
     @Param('id') id: string,
     @Body() body: CompleteDeliveryDto,

@@ -7,6 +7,7 @@
 
 import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import {
+  ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
@@ -75,7 +76,21 @@ export class PricingController {
 
   @Post('quote')
   @ApiOperation({ summary: 'Quote a shipment price' })
-  @ApiCreatedResponse({ type: QuoteResponseDto })
+  @ApiBody({
+    type: QuoteDto,
+    description:
+      'The shipment facts that change the price: weight, the cash the rider would collect, the zone, ' +
+      'and the surcharge flags. The merchant plan is read from the credential and cannot be named ' +
+      'here, so a caller cannot quote themselves a better plan.',
+  })
+  @ApiCreatedResponse({
+    type: QuoteResponseDto,
+    description:
+      'An itemised quote priced against exactly one frozen version, with `total` the sum of the lines ' +
+      'in integer minor units including the COD fee and tax, minus the plan discount. Nothing is ' +
+      'written and quoting twice with the same inputs returns the same numbers; keep `version` — it is ' +
+      'the version a shipment is charged against, and the evidence a later dispute is settled on.',
+  })
   @ApiErrors()
   async quote(
     @Body() body: QuoteDto,
@@ -98,7 +113,13 @@ export class PricingController {
 
   @Get('rate-card')
   @ApiOperation({ summary: 'Your rate card, with worked examples' })
-  @ApiOkResponse({ type: RateCardResponseDto })
+  @ApiOkResponse({
+    type: RateCardResponseDto,
+    description:
+      "This merchant's own active card: the frozen version it was read from, the plan they are on, " +
+      'every fee and rate as integer minor units or basis points, and four worked examples so the ' +
+      'card can be read without holding a parcel in the hand. Read-only.',
+  })
   @ApiErrors()
   async rateCard(@Req() request: AuthenticatedRequest): Promise<RateCardResponseDto> {
     return this.pricing.rateCard(request.principal!.merchantId!);

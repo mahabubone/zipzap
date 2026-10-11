@@ -24,7 +24,14 @@ export class MeController {
       'it may act inside, and the scopes it holds. `merchantId` is the ACTIVE business and is ' +
       'derived from the credential, never taken from the request.',
   })
-  @ApiOkResponse({ type: ApiPrincipalResponseDto })
+  @ApiOkResponse({
+    type: ApiPrincipalResponseDto,
+    description:
+      'The principal this request proved itself as, read off the credential and off nothing else in ' +
+      'the request: its kind, the business it is acting inside, every business it may act inside, the ' +
+      'scopes it holds, and its per-minute ceiling. `merchantId` is null only for a platform ' +
+      'administrative key.',
+  })
   @ApiErrors()
   me(@Req() request: AuthenticatedRequest): ApiPrincipal {
     return request.principal!;

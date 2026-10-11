@@ -17,10 +17,12 @@ import { ListSettlementsService } from './list-settlements.service.ts';
 import { SettlementPageDto } from './finance-response.dto.ts';
 
 export class ListSettlementsQuery {
+  /** Page size. Defaults to 50, capped at 200. */
   @IsOptional()
   @IsString()
   limit?: string;
 
+  /** Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every list is merchant-scoped, so a forged cursor only repositions within its owner's own settlements. */
   @IsOptional()
   @IsString()
   cursor?: string;
@@ -36,7 +38,14 @@ export class ListSettlementsController {
   @Get()
   @UseGuards(new ScopeGuard('settlements:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'List your settlements, newest first' })
-  @ApiOkResponse({ type: SettlementPageDto })
+  @ApiOkResponse({
+    type: SettlementPageDto,
+    description:
+      'One page of your own settlements, newest first, with `frozenNetMinor` — the integer-poisha ' +
+      'net each one pays — frozen at creation and never recalculated afterwards. Cursor-paginated ' +
+      "and scoped to your credential, so a stranger's cursor only repositions within their own " +
+      'list.',
+  })
   async listSettlements(
     @Query() query: ListSettlementsQuery,
     @Req() request: AuthenticatedRequest,

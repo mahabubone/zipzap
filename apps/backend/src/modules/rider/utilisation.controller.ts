@@ -22,7 +22,14 @@ export class UtilisationController {
   @Get(':riderId/utilisation')
   @ApiOperation({ summary: "Rider's current load factor" })
   @ApiParam({ name: 'riderId', description: 'The rider whose current load factor is read.' })
-  @ApiOkResponse({ type: RiderLoadDto, nullable: true })
+  @ApiOkResponse({
+    type: RiderLoadDto,
+    nullable: true,
+    description:
+      "The rider's current load — capacity, the job in hand, and the 0..1 load factor they " +
+      'represent. Null when the rider is unknown. A projection: reading it never mutates state ' +
+      'or makes a dispatch decision.',
+  })
   @ApiErrors()
   async riderUtilisation(@Param('riderId') riderId: string): Promise<RiderLoadDto | null> {
     const load = await this.util.getRiderLoad(riderId);
@@ -31,7 +38,12 @@ export class UtilisationController {
 
   @Get('pool-utilisation')
   @ApiOperation({ summary: 'Pool-wide rider utilisation KPI' })
-  @ApiOkResponse({ type: PoolUtilisationDto })
+  @ApiOkResponse({
+    type: PoolUtilisationDto,
+    description:
+      'Pool-wide utilisation: capacity in use against total capacity, plus the mean, max and ' +
+      'min per-rider load factor. Read-only — the KPI is a projection, never a decision.',
+  })
   @ApiErrors()
   async poolUtilisation(): Promise<PoolUtilisationDto> {
     return this.util.getPoolLoad();
