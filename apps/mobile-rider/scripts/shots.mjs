@@ -17,17 +17,22 @@
  *       node apps/mobile-rider/scripts/shots.mjs   (serves dist-web itself)
  */
 const corePath = process.env.PLAYWRIGHT_CORE ?? 'playwright-core';
-const coreUrl = corePath.startsWith('.') || corePath.startsWith('/') ? (corePath.endsWith('.js') ? corePath : `${corePath}/index.js`) : corePath;
-const { chromium } = await import(coreUrl).then(
-  (m) => m.default ?? m,
-);
+const coreUrl =
+  corePath.startsWith('.') || corePath.startsWith('/')
+    ? corePath.endsWith('.js')
+      ? corePath
+      : `${corePath}/index.js`
+    : corePath;
+const { chromium } = await import(coreUrl).then((m) => m.default ?? m);
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
 const DIST = new URL('../dist-web/', import.meta.url).pathname;
 if (!fs.existsSync(path.join(DIST, 'index.html'))) {
-  console.error('dist-web/ missing — run `expo export --platform web --output-dir dist-web` first.');
+  console.error(
+    'dist-web/ missing — run `expo export --platform web --output-dir dist-web` first.',
+  );
   process.exit(1);
 }
 
@@ -40,7 +45,14 @@ const PHONE = { width: 375, height: 812 };
 const DAY = '2026-10-10';
 
 // --- static server for the export --------------------------------------------
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.map': 'application/json' };
+const MIME = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.map': 'application/json',
+};
 const server = http.createServer((req, res) => {
   const urlPath = new URL(req.url, 'http://x').pathname;
   const file = path.join(DIST, urlPath === '/' ? 'index.html' : urlPath.slice(1));
@@ -65,10 +77,7 @@ const JOBS = {
     {
       id: '11111111-1111-4111-8111-111111111111',
       merchantId: 'm-1',
-      shipmentIds: [
-        '22222222-2222-4222-8222-222222222222',
-        '33333333-3333-4333-8333-333333333333',
-      ],
+      shipmentIds: ['22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333'],
       riderId: 'rider-7',
       status: 'ASSIGNED',
       totalWeightGrams: 2000,
@@ -151,12 +160,25 @@ await page.route('**/v1/**', async (route) => {
     });
   }
   if (url.endsWith('/v1/me')) {
-    return json({ kind: 'human', subjectId: 'rider-7', merchantId: null, merchantIds: [], scopes: ['rider:sync', 'delivery:complete'], credentialId: 'cred-1', rateLimitPerMin: null });
+    return json({
+      kind: 'human',
+      subjectId: 'rider-7',
+      merchantId: null,
+      merchantIds: [],
+      scopes: ['rider:sync', 'delivery:complete'],
+      credentialId: 'cred-1',
+      rateLimitPerMin: null,
+    });
   }
   if (url.endsWith('/sync/replay') && route.request().method() === 'POST') {
     const sent = route.request().postDataJSON()?.commands ?? [];
     return json({
-      results: sent.map((c) => ({ deviceSequence: c.deviceSequence, commandId: `cmd-${c.deviceSequence}`, kind: 'applied', reason: null })),
+      results: sent.map((c) => ({
+        deviceSequence: c.deviceSequence,
+        commandId: `cmd-${c.deviceSequence}`,
+        kind: 'applied',
+        reason: null,
+      })),
       queueSize: 0,
       capWarning: false,
     });
@@ -195,13 +217,19 @@ await settle();
 await shoot('job-pickup');
 
 // Queue a scan: the detail screen confirms with the device sequence.
-await page.getByText('Shipment ID').locator('..').getByRole('textbox').fill('22222222-2222-4222-8222-222222222222');
+await page
+  .getByText('Shipment ID')
+  .locator('..')
+  .getByRole('textbox')
+  .fill('22222222-2222-4222-8222-222222222222');
 await page.getByRole('button', { name: 'Queue pickup scan' }).click();
 await page.waitForTimeout(600);
 await shoot('job-pickup-queued');
 
 // No manual back button: React Navigation's stack header renders one. Clicking it is the
 // same interaction a rider makes, which is the point of using a real navigator.
+// Back to the list. The tab bar's "Jobs" is the reliable target: the stack header's back arrow
+// is an unlabelled icon, and pressing the tab pops the whole stack, which is what a rider does.
 await page.getByRole('button', { name: 'Jobs' }).first().click();
 await settle();
 // The delivery with one prior attempt → reason chips + COD form.

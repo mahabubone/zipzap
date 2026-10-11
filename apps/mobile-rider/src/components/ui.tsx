@@ -73,7 +73,11 @@ export function Field({
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
+      {/* `accessibilityLabel` is not decoration. Without it a screen reader announces the field by
+          its value — so a rider who is blind hears "rider at example dot com" rather than "Email,
+          text field", and cannot tell one blank field from another. */}
       <TextInput
+        accessibilityLabel={label}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}

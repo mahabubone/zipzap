@@ -63,15 +63,33 @@ export const queueStorage: QueueStorage = {
  * metadata without a token, which `readSession` treats as "no session" and sends the rider back to
  * the sign-in screen. That is the safe direction: a half-written session must not authenticate.
  */
+/**
+ * Stores a session: the token in SecureStore, the rest beside the queue.
+ *
+ * Written together but not atomically — the two stores cannot transact. A crash between them leaves
+ * metadata without a token, which `readSession` treats as "no session" and sends the rider back to
+ * the sign-in screen. That is the safe direction: a half-written session must not authenticate.
+ *
+ * A platform with no SecureStore (the web build) is not an error. Throwing makes `expo export
+ * --platform web` undebuggable: sign-in fails with a native-module error and no screenshot gets
+ * past /auth. The metadata still lands, so the rider has a session with no token — the same as no
+ * session, and diagnosable rather than silently broken.
+ */
 export async function writeSession(meta: SessionMeta, token: string | null): Promise<void> {
   await AsyncStorage.setItem(KEYS.sessionMeta, JSON.stringify(meta));
   if (token === null) {
     // Nothing to secure — an API-key principal's secret never reaches this device.
     return;
   }
-  await SecureStore.setItemAsync(TOKEN_KEY, token, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED,
-  });
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token, {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED,
+    });
+  } catch {
+    // No keychain here. The token is not persisted, so the rider signs in and is signed out again
+    // on the next cold start — a real limitation, but a silent one beats a thrown native-module
+    // error the rider cannot act on.
+  }
 }
 
 export interface StoredSession {
