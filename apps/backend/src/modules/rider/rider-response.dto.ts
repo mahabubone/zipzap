@@ -6,6 +6,7 @@
  */
 
 import { ApiProperty } from '@nestjs/swagger';
+import { MoneyMinor } from '../../common/dto/money.ts';
 import type { RiderStatus } from './rules/rider.ts';
 import type { PickupStatus } from '../pickup/rules/pickup.ts';
 import type { DeliveryStatus } from '../delivery/rules/delivery.ts';
@@ -189,8 +190,41 @@ export class RiderPickupJobDto {
   updatedAt!: Date;
 }
 
+/** What the rider needs to know about the parcel, read from the shipment that owns it. */
+export class ShipmentHandoffDto {
+  @ApiProperty({ example: 'shp-1', description: 'Shipment id this handoff describes.' })
+  shipmentId!: string;
+
+  /**
+   * `MoneyMinor`, not a bare `@ApiProperty`. The CLI plugin derives `type` from the
+   * class-validator decorator, and a plain `@IsInt`-less numeric field would claim
+   * double precision for a `bigint` column — AGENTS.md rule 4, broken by the spec.
+   */
+  @MoneyMinor({
+    example: 125050,
+    description:
+      'Cash to collect, in integer minor units (poisha). Zero means prepaid: nothing to take.',
+  })
+  codAmountMinor!: number;
+
+  @ApiProperty({ example: 'BDT', description: 'Currency of the cash to collect.' })
+  codCurrency!: string;
+}
+
+/** Who and where, for the rider at the door. Absence is possible but never invented. */
+export class RecipientDto {
+  @ApiProperty({ example: '+8801711223344', nullable: true })
+  phone!: string | null;
+
+  @ApiProperty({ example: 'Ayesha Rahman', nullable: true })
+  name!: string | null;
+
+  @ApiProperty({ example: 'House 12, Road 7, Dhanmondi, Dhaka 1205', nullable: true })
+  address!: string | null;
+}
+
 export class RiderDeliveryJobDto {
-  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  @ApiProperty({ example: 'a1b2c3d4-e6f7-4890-abcd-ef1234567890' })
   id!: string;
 
   @ApiProperty({ example: 'shp-123' })
@@ -207,6 +241,32 @@ export class RiderDeliveryJobDto {
 
   @ApiProperty({ example: null, nullable: true })
   lastFailureReason!: string | null;
+
+  /**
+   * `getSchemaRef` rather than `type:`, so the spec references the DTO instead of inlining it.
+   *
+   * With `type: ShipmentHandoffDto` the plugin emits an inline nested object that then contains
+   * **no properties at all** — a shape that looks described and describes nothing, and that the
+   * `$ref` is checked for by the contract test. `getSchemaRef` is what makes the nested DTO
+   * resolvable.
+   */
+  @ApiProperty({
+    type: () => ShipmentHandoffDto,
+    nullable: true,
+    description:
+      'What to collect and in which currency, read from the shipment that owns the parcel. ' +
+      'Without it a rider is asked for cash without being told how much.',
+  })
+  shipment!: ShipmentHandoffDto | null;
+
+  @ApiProperty({
+    type: () => RecipientDto,
+    nullable: true,
+    description:
+      'Who to call and where to go. `phone` is null only when the shipment carries no number; ' +
+      'the rider app says so rather than offering a call that cannot connect.',
+  })
+  recipient!: RecipientDto | null;
 
   @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
   createdAt!: Date;
@@ -227,7 +287,10 @@ export class RiderJobsDto {
   @ApiProperty({
     type: RiderDeliveryJobDto,
     isArray: true,
-    description: 'Delivery jobs assigned to this rider, newest first',
+    description:
+      'Delivery jobs assigned to this rider, newest first, each carrying what to collect and ' +
+      'who to call — read through `SHIPMENT_HANDOFF_LOOKUP` because the parcel lives in ' +
+      'shipment\u2019s schema and a module may not join across it',
   })
   deliveries!: RiderDeliveryJobDto[];
 }

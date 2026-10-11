@@ -20,6 +20,7 @@ function pickup(status: string): JobRow {
     status,
     detail: '2000g · 2 shipments',
     createdAt: '2026-10-11T08:00:00.000Z',
+    shipment: null,
   };
 }
 
@@ -33,6 +34,7 @@ function delivery(status: string, attemptsMade = 0): JobRow {
     status,
     detail: attemptsMade > 0 ? `Attempt ${attemptsMade}` : 'Not yet attempted',
     createdAt: '2026-10-11T08:00:00.000Z',
+    shipment: null,
   };
 }
 

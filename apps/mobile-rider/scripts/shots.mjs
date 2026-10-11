@@ -91,6 +91,14 @@ const JOBS = {
     {
       id: '44444444-4444-4444-8444-444444444444',
       shipmentId: '55555555-5555-4555-8555-555555555555',
+      shipment: {
+        shipmentId: '55555555-5555-4555-8555-555555555555',
+        codAmountMinor: 125050,
+        codCurrency: 'BDT',
+        recipientPhone: '+8801711223344',
+        recipientName: 'Nafis Ahmed',
+        recipientAddress: 'Plot 4, Road 12, Banani, Dhaka 1213',
+      },
       riderId: 'rider-7',
       status: 'OUT_FOR_DELIVERY',
       attemptsMade: 0,
@@ -100,6 +108,14 @@ const JOBS = {
     {
       id: '66666666-6666-4666-8666-666666666666',
       shipmentId: '77777777-7777-4777-8777-777777777777',
+      shipment: {
+        shipmentId: '77777777-7777-4777-8777-777777777777',
+        codAmountMinor: 0,
+        codCurrency: 'BDT',
+        recipientPhone: '+8801811998877',
+        recipientName: 'Sabrina Karim',
+        recipientAddress: 'Plot 4, Road 12, Banani, Dhaka 1213',
+      },
       riderId: 'rider-7',
       status: 'OUT_FOR_DELIVERY',
       attemptsMade: 1,
@@ -109,6 +125,14 @@ const JOBS = {
     {
       id: '88888888-8888-4888-8888-888888888888',
       shipmentId: '99999999-9999-4999-8999-999999999999',
+      shipment: {
+        shipmentId: '99999999-9999-4999-8999-999999999999',
+        codAmountMinor: 2375500,
+        codCurrency: 'BDT',
+        recipientPhone: '+8801716550011',
+        recipientName: 'Rafiqul Islam',
+        recipientAddress: 'Plot 4, Road 12, Banani, Dhaka 1213',
+      },
       riderId: 'rider-7',
       status: 'DELIVERED',
       attemptsMade: 1,

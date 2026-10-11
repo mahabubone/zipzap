@@ -7,8 +7,9 @@ import { defineConfig } from 'vitest/config';
  * helpers, none of which need a renderer. A component test needs react-native-testing-library and
  * a mock of everything native, which would be testing the mocks.
  *
- * The `include` is deliberately narrow. A wide glob picks up the `scripts/*.mjs` proofs, which are
- * standalone programs that call `process.exit` and would abort the run.
+ * The `include` is `.spec.ts` only. The RN screens are deliberately not imported: they pull
+ * `react-native` and `expo-*` in, which the node environment cannot parse — a spec for a screen's
+ * projection belongs to pure code, not to the view.
  */
 export default defineConfig({
   test: {

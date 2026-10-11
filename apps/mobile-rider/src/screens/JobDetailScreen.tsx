@@ -4,9 +4,10 @@ import { Badge, Button, Card, Field, Icon, Muted } from '../components/ui.tsx';
 import { JobMissing } from '../navigation.tsx';
 import { actionsFor, isFinalAttempt, primaryAction, type JobAction } from '../rules/job-actions.ts';
 import { contactHint, contactLabel, contactStateFor, telHref } from '../rules/contact.ts';
+import { formatCash } from '../rules/cash.ts';
 import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
-import type { JobRow } from './JobsScreen.tsx';
+import type { JobRow, ShipmentHandoff } from './JobsScreen.tsx';
 
 /** Statuses a rider cannot act on at all. */
 const TERMINAL = new Set(['DELIVERED', 'COMPLETED', 'COLLECTED', 'CANCELLED', 'RETURNED']);
@@ -80,6 +81,7 @@ export function JobDetailScreen({
   const primary = primaryAction(job);
   const supporting = actionsFor(job).filter((action) => action.weight === 'secondary');
   const attempts = attemptsMadeOf(job);
+  const handoff = job.shipment;
   const final = isFinalAttempt(attempts);
 
   const run = async (command: () => Promise<unknown>, success: string) => {
@@ -185,9 +187,9 @@ export function JobDetailScreen({
           </View>
         )}
 
-        {/* The one action a rider cannot do their job without. Present on every delivery, honest
-            about the state: a button that dials nothing is worse than no button. */}
-        <ContactRow job={job} />
+        {/* The one action a rider cannot do their job without. Present on every delivery,
+            and now live: the job carries a phone number (revmap R6), so this dials. */}
+        <ContactRow job={job} handoff={job.shipment} />
       </Card>
 
       {primary !== null && (
@@ -235,13 +237,21 @@ export function JobDetailScreen({
             {primary.id === 'deliver' && (
               <>
                 <Field
-                  label="Cash collected (poisha)"
+                  label={
+                    handoff && handoff.codAmountMinor > 0
+                      ? `Cash collected — ${formatCash(handoff.codAmountMinor)} due`
+                      : 'Cash collected (poisha)'
+                  }
                   icon="wallet-outline"
                   value={cash}
                   onChange={setCash}
                   placeholder="125050 — blank means prepaid"
                   keyboardType="numeric"
-                  hint="Whole poisha only. A decimal is refused rather than rounded, because a rider hands over cash, not a float."
+                  hint={
+                    handoff && handoff.codAmountMinor > 0
+                      ? `This parcel is prepaid up to ${formatCash(handoff.codAmountMinor)}. Collecting less than that is fine; collecting more is not.`
+                      : 'Blank means prepaid. Whole poisha only — a decimal is refused rather than rounded, because a rider hands over cash, not a float.'
+                  }
                 />
                 <Button
                   label="Capture proof of delivery"
@@ -474,28 +484,30 @@ function AttemptForm({
 /**
  * The customer contact row.
  *
- * `Linking.openURL` is the web-safe way to hand a number to the phone app, and it degrades to a
- * link on the exported bundle the screenshots run in. The state machine lives in `rules/contact.ts`
- * so the copy — "there is nobody to dial", not a silent no-op — is testable without a handset.
- *
- * The number is `null` today because `RiderDeliveryJobDto` carries none; that is R6 in the revmap,
- * and this row is built to start dialling the day that lands rather than being rebuilt for it.
+ * Now live: revmap R6 put a phone number on the delivery job, so `telHref` returns something and
+ * the button dials. The three-state model survives because it is still the honest one — a pickup
+ * has no customer, and a job whose parcel vanished has no number — but the common case is a working
+ * call rather than an apology.
  */
-function ContactRow({ job }: { job: JobRow }) {
-  const state = contactStateFor(job, null, false);
+function ContactRow({ job, handoff }: { job: JobRow; handoff: ShipmentHandoff | null }) {
+  const state = contactStateFor(job, handoff?.recipientPhone ?? null, handoff === null);
   const href = telHref(state);
 
   return (
     <View style={styles.contactRow}>
       <View style={styles.contactText}>
         <Text style={styles.contactLabel}>{contactLabel(state)}</Text>
-        <Text style={styles.contactHint}>{contactHint(state)}</Text>
+        <Text style={styles.contactHint}>
+          {handoff?.recipientName !== null && handoff?.recipientName !== undefined
+            ? `${handoff.recipientName} · ${state.kind === 'ready' ? handoff.recipientPhone : ''}`
+            : contactHint(state)}
+        </Text>
       </View>
       {href !== null ? (
         <TouchableOpacity
           onPress={() => void Linking.openURL(href)}
           accessibilityRole="button"
-          accessibilityLabel={`Call customer on ${state.kind === 'ready' ? state.phone : ''}`}
+          accessibilityLabel={`Call customer on ${handoff?.recipientPhone ?? ''}`}
           style={styles.contactButton}
         >
           <Icon name="call" size="sm" color={colors.onBrand} />

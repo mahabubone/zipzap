@@ -3567,8 +3567,33 @@ export interface components {
              */
             updatedAt: string;
         };
+        ShipmentHandoffDto: {
+            /**
+             * @description Shipment id this handoff describes.
+             * @example shp-1
+             */
+            shipmentId: string;
+            /**
+             * @description Cash to collect, in integer minor units (poisha). Zero means prepaid: nothing to take.
+             * @example 125050
+             */
+            codAmountMinor: number;
+            /**
+             * @description Currency of the cash to collect.
+             * @example BDT
+             */
+            codCurrency: string;
+        };
+        RecipientDto: {
+            /** @example +8801711223344 */
+            phone: string | null;
+            /** @example Ayesha Rahman */
+            name: string | null;
+            /** @example House 12, Road 7, Dhanmondi, Dhaka 1205 */
+            address: string | null;
+        };
         RiderDeliveryJobDto: {
-            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            /** @example a1b2c3d4-e6f7-4890-abcd-ef1234567890 */
             id: string;
             /** @example shp-123 */
             shipmentId: string;
@@ -3583,6 +3608,10 @@ export interface components {
             attemptsMade: number;
             /** @example null */
             lastFailureReason: string | null;
+            /** @description What to collect and in which currency, read from the shipment that owns the parcel. Without it a rider is asked for cash without being told how much. */
+            shipment: components["schemas"]["ShipmentHandoffDto"] | null;
+            /** @description Who to call and where to go. `phone` is null only when the shipment carries no number; the rider app says so rather than offering a call that cannot connect. */
+            recipient: components["schemas"]["RecipientDto"] | null;
             /**
              * Format: date-time
              * @example 2026-10-10T06:00:00.000Z
@@ -3597,7 +3626,7 @@ export interface components {
         RiderJobsDto: {
             /** @description Pickup batches assigned to this rider, newest first */
             pickups: components["schemas"]["RiderPickupJobDto"][];
-            /** @description Delivery jobs assigned to this rider, newest first */
+            /** @description Delivery jobs assigned to this rider, newest first, each carrying what to collect and who to call — read through `SHIPMENT_HANDOFF_LOOKUP` because the parcel lives in shipment’s schema and a module may not join across it */
             deliveries: components["schemas"]["RiderDeliveryJobDto"][];
         };
     };

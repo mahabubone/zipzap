@@ -19,7 +19,8 @@ import { CASH_LIMIT_MINOR, computeCashInHand, formatCash } from '../rules/cash.t
 import { formatDuration, useShift } from '../hooks/useShift.ts';
 import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
-import type { JobRow, RiderJobs } from './JobsScreen.tsx';
+import { toJobRows } from '../handoff/job-rows.ts';
+import type { JobRow, RiderJobs } from '../handoff/job-rows.ts';
 
 /** The jobs query key, shared with the feed so both read one cache. */
 const JOBS_QUERY_KEY = 'rider-jobs';
@@ -55,7 +56,9 @@ export function HomeScreen({
     },
   });
 
-  const all = query.data ? toRows(query.data) : [];
+  // One projection, in one place. The home feed and the jobs feed render the same rows from the
+  // same server response, so they read the same mapping rather than each keeping its own.
+  const all = toJobRows(query.data as RiderJobs | undefined);
   // No shift means nothing is filtered: a rider who has not started one still sees the whole
   // feed, because hiding work from someone who has not been offered the choice to start is worse
   // than showing it.
@@ -293,33 +296,6 @@ function JobPreview({ job, onPress }: { job: JobRow; onPress: () => void }) {
  * `createdAt` is when the server assigned the job, not when the rider looked at it — the
  * distinction the shift rule is built on.
  */
-function toRows(data: RiderJobs): JobRow[] {
-  const pickups: JobRow[] = (data.pickups ?? []).map((p) => ({
-    key: `pickup-${p.id}`,
-    kind: 'pickup',
-    id: p.id,
-    shipmentId: p.shipmentIds?.[0] ?? null,
-    title: `Pickup ${p.shipmentIds?.length ?? 0} parcel${(p.shipmentIds?.length ?? 0) === 1 ? '' : 's'}`,
-    status: p.status,
-    detail: `${(p.totalWeightGrams ?? 0) / 1000} kg`,
-    createdAt: p.createdAt,
-  }));
-  const deliveries: JobRow[] = (data.deliveries ?? []).map((d) => ({
-    key: `delivery-${d.id}`,
-    kind: 'delivery',
-    id: d.id,
-    shipmentId: d.shipmentId,
-    title: `Delivery ${d.shipmentId?.slice(0, 8) ?? ''}`,
-    status: d.status,
-    detail: d.attemptsMade > 0 ? `Attempt ${d.attemptsMade}` : 'Not yet attempted',
-    createdAt: d.createdAt,
-  }));
-
-  return [...pickups, ...deliveries].sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-  );
-}
-
 const styles = StyleSheet.create({
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl },
   separator: { height: space.md },

@@ -38,7 +38,7 @@ import { colors, typography, space } from './theme.ts';
 import type { AutoSync } from './hooks/useAutoSync.ts';
 import { RiderTabBar } from './components/RiderTabBar.tsx';
 import { HomeScreen } from './screens/HomeScreen.tsx';
-import { toJobRows, type JobRow, type RiderJobs } from './screens/JobsScreen.tsx';
+import { toJobRows, type JobRow, type RiderJobs } from './handoff/job-rows.ts';
 import { JobDetailScreen } from './screens/JobDetailScreen.tsx';
 import { ProofScreen } from './screens/ProofScreen.tsx';
 import { SyncScreen } from './screens/SyncScreen.tsx';

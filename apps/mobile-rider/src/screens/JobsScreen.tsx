@@ -4,6 +4,14 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { Badge, Card, EmptyState, ErrorState, Icon, Skeleton, Title } from '../components/ui.tsx';
 import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
+import { toJobRows } from '../handoff/job-rows.ts';
+import type { JobRow, RiderJobs, ShipmentHandoff } from '../handoff/job-rows.ts';
+
+/**
+ * Re-exported so screens that already import from this module keep importing from here, and so
+ * there is one definition of a job row rather than a view layer and a pure layer that must agree.
+ */
+export type { JobRow, RiderJobs, ShipmentHandoff } from '../handoff/job-rows.ts';
 
 /**
  * The rider's home feed: today's pickups and delivery jobs in one
@@ -114,87 +122,6 @@ function greeting(): string {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
-}
-
-/**
- * One row in the merged feed. `kind` decides which actions the job screen offers.
- *
- * Exported because the job and proof screens resolve their route param back into this row — see
- * `useJobFromRoute` in navigation.tsx. The alternative, passing the row as a navigation param, would
- * copy a projection into navigation state where it goes stale silently.
- */
-export interface JobRow {
-  readonly key: string;
-  readonly kind: 'pickup' | 'delivery';
-  readonly id: string;
-  readonly shipmentId: string | null;
-  readonly title: string;
-  readonly status: string;
-  readonly detail: string;
-  readonly createdAt: string;
-}
-
-/**
- * The jobs query's cached value, as the raw server response.
- *
- * Exported so the navigation layer can re-read this query and resolve a route's `{ jobId }` back
- * into a row, rather than carrying rows through navigation params.
- */
-export interface RiderJobs {
-  readonly pickups: ReadonlyArray<{
-    id: string;
-    shipmentIds: readonly string[];
-    status: string;
-    totalWeightGrams: number;
-    createdAt: string;
-  }>;
-  readonly deliveries: ReadonlyArray<{
-    id: string;
-    shipmentId: string;
-    status: string;
-    attemptsMade: number;
-    lastFailureReason: string | null;
-    createdAt: string;
-  }>;
-}
-
-/** Projects the query into rows. Exported so the job screens do not re-implement the mapping. */
-export function toJobRows(data: RiderJobs | undefined): JobRow[] {
-  if (!data || !Array.isArray(data.pickups) || !Array.isArray(data.deliveries)) return [];
-  const pickups: JobRow[] = data.pickups.map((p) => ({
-    key: `pickup-${p.id}`,
-    kind: 'pickup',
-    id: p.id,
-    shipmentId: p.shipmentIds[0] ?? null,
-    title: `Pickup ${p.shipmentIds.length} ${p.shipmentIds.length === 1 ? 'parcel' : 'parcels'}`,
-    status: p.status,
-    detail: `${p.totalWeightGrams}g · ${p.shipmentIds.length} shipment${
-      p.shipmentIds.length === 1 ? '' : 's'
-    }`,
-    createdAt: p.createdAt,
-  }));
-  const deliveries: JobRow[] = data.deliveries.map((d) => ({
-    key: `delivery-${d.id}`,
-    kind: 'delivery',
-    id: d.id,
-    shipmentId: d.shipmentId,
-    title: `Delivery ${shortId(d.shipmentId)}`,
-    status: d.status,
-    detail:
-      d.attemptsMade > 0
-        ? `Attempt ${d.attemptsMade}${d.lastFailureReason ? ` · ${d.lastFailureReason}` : ''}`
-        : 'Not yet attempted',
-    createdAt: d.createdAt,
-  }));
-  // Newest first across both kinds — the order the server already
-  // returns each list in, merged by timestamp.
-  return [...pickups, ...deliveries].sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-  );
-}
-
-function shortId(id: string): string {
-  return id.length > 8 ? id.slice(0, 8) : id;
 }
 
 function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {

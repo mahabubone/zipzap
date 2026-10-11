@@ -15093,12 +15093,62 @@
           "updatedAt"
         ]
       },
+      "ShipmentHandoffDto": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "example": "shp-1",
+            "description": "Shipment id this handoff describes."
+          },
+          "codAmountMinor": {
+            "type": "integer",
+            "description": "Cash to collect, in integer minor units (poisha). Zero means prepaid: nothing to take.",
+            "example": 125050
+          },
+          "codCurrency": {
+            "type": "string",
+            "example": "BDT",
+            "description": "Currency of the cash to collect."
+          }
+        },
+        "required": [
+          "shipmentId",
+          "codAmountMinor",
+          "codCurrency"
+        ]
+      },
+      "RecipientDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+8801711223344"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "example": "Ayesha Rahman"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "example": "House 12, Road 7, Dhanmondi, Dhaka 1205"
+          }
+        },
+        "required": [
+          "phone",
+          "name",
+          "address"
+        ]
+      },
       "RiderDeliveryJobDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            "example": "a1b2c3d4-e6f7-4890-abcd-ef1234567890"
           },
           "shipmentId": {
             "type": "string",
@@ -15130,6 +15180,26 @@
             "nullable": true,
             "example": null
           },
+          "shipment": {
+            "nullable": true,
+            "description": "What to collect and in which currency, read from the shipment that owns the parcel. Without it a rider is asked for cash without being told how much.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShipmentHandoffDto"
+              }
+            ]
+          },
+          "recipient": {
+            "nullable": true,
+            "description": "Who to call and where to go. `phone` is null only when the shipment carries no number; the rider app says so rather than offering a call that cannot connect.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecipientDto"
+              }
+            ]
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string",
@@ -15148,6 +15218,8 @@
           "status",
           "attemptsMade",
           "lastFailureReason",
+          "shipment",
+          "recipient",
           "createdAt",
           "updatedAt"
         ]
@@ -15163,7 +15235,7 @@
             }
           },
           "deliveries": {
-            "description": "Delivery jobs assigned to this rider, newest first",
+            "description": "Delivery jobs assigned to this rider, newest first, each carrying what to collect and who to call — read through `SHIPMENT_HANDOFF_LOOKUP` because the parcel lives in shipment’s schema and a module may not join across it",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RiderDeliveryJobDto"
