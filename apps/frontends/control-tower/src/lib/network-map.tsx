@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { MapHub, MapRider } from '@zipzap/api-client';
 import { Badge, Button } from '@zipzap/ui';
 import { isInBounds, markerSize, project, tilesForBounds } from './map-projection.ts';
+import { placeLabels } from './label-placement.ts';
 import { tileUrl, tilesHaveFailed, type TileOutcome } from './tiles.ts';
 
 const WIDTH = 800;
@@ -57,6 +58,25 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
     }
   }, [outcomes, tilesOn, onFallback]);
 
+  /**
+   * Hub labels, placed biggest-load-first so the busy sorting centres win the contested positions,
+   * and with the suppressed count carried into the footer. See `label-placement.ts` for why this is
+   * a greedy ring rather than a layout library.
+   */
+  const labels = useMemo(() => {
+    const byLoad = [...placed.hubs].sort(
+      (a, b) => (b.hub.parcelsWaiting ?? 0) - (a.hub.parcelsWaiting ?? 0),
+    );
+    return placeLabels(
+      byLoad,
+      (entry) => entry.at,
+      (entry) =>
+        entry.hub.parcelsWaiting > 0
+          ? `${entry.hub.code} · ${entry.hub.parcelsWaiting}`
+          : entry.hub.code,
+    );
+  }, [placed.hubs]);
+
   return (
     <div>
       <svg
@@ -86,21 +106,42 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
             })
           : null}
 
+        {/* Markers, then labels on top: the label ring is computed against marker positions, so
+            drawing them in one pass keeps the two in the order the placer assumed. */}
         {placed.hubs.map(({ hub, at }) => (
-          <g key={hub.id} data-marker="hub">
-            <rect
-              x={at.x - markerSize(hub.parcelsWaiting) / 2}
-              y={at.y - markerSize(hub.parcelsWaiting) / 2}
-              width={markerSize(hub.parcelsWaiting)}
-              height={markerSize(hub.parcelsWaiting)}
-              className="fill-brand-600/80"
-              rx={2}
-            />
-            <text x={at.x + 10} y={at.y + 4} className="fill-slate-700 text-[11px]">
-              {hub.code}
-              {hub.parcelsWaiting > 0 ? ` · ${hub.parcelsWaiting}` : ''}
-            </text>
-          </g>
+          <rect
+            key={hub.id}
+            data-marker="hub"
+            x={at.x - markerSize(hub.parcelsWaiting) / 2}
+            y={at.y - markerSize(hub.parcelsWaiting) / 2}
+            width={markerSize(hub.parcelsWaiting)}
+            height={markerSize(hub.parcelsWaiting)}
+            className="fill-brand-600/80"
+            rx={2}
+          />
+        ))}
+
+        {labels.placed.map(({ item, at }) => (
+          <text
+            key={item.hub.id}
+            data-marker="hub-label"
+            x={at!.x}
+            y={at!.y}
+            // A negative offset means the placer positioned this label to the LEFT of its marker,
+            // so the text has to grow leftwards too. Without this the string renders on the wrong
+            // side of the x it was given and covers the very hub the ring was avoiding.
+            textAnchor={at!.x < item.at.x ? 'end' : 'start'}
+            className="fill-slate-700 text-[11px]"
+            // A white stroke under the glyphs: labels now sit over tile imagery as well as over
+            // markers, and 11px text on a road is unreadable without a halo.
+            stroke="white"
+            strokeWidth={2.5}
+            paintOrder="stroke"
+          >
+            {item.hub.parcelsWaiting > 0
+              ? `${item.hub.code} · ${item.hub.parcelsWaiting}`
+              : item.hub.code}
+          </text>
         ))}
 
         {placed.riders.map(({ rider, at }) => (
@@ -125,6 +166,9 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
           <Badge tone="warning">
             {placed.droppedRiders + placed.droppedHubs} off-map and not drawn
           </Badge>
+        ) : null}
+        {labels.suppressed > 0 ? (
+          <Badge tone="warning">{labels.suppressed} hubs too close to label</Badge>
         ) : null}
         {!tilesOn ? (
           <span className="text-slate-400">No tile server configured — markers only.</span>
