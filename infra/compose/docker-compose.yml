@@ -1,6 +1,14 @@
 # Local infrastructure. Never used in production — see docs/operations/deployment.md.
 #
-#   pnpm infra:up      pnpm infra:logs      pnpm infra:down
+#   pnpm infra:up      pnpm infra:logs      pnpm infra:down        # postgres · redis · nats
+#   pnpm demo:up       pnpm demo:logs       pnpm demo:down         # + the whole application
+#
+# Two profiles. `fakes` and `observability` add local stand-ins and metrics to the infrastructure.
+# `app` is the other axis entirely: the backend's three entrypoints and two web surfaces, built
+# from source in infra/docker and wired to the infrastructure above. It is a separate profile so
+# that `pnpm infra:up` stays a two-second command and a cold Postgres, and because the app tier
+# builds four images and a reviewer who wants to debug a connection string should not wait for
+# that to be how they get a database.
 #
 # Host ports are overridable via .env so this can coexist with another stack on the same
 # machine. Defaults are the conventional ports; override when 5432/6379/4222 are taken.
@@ -9,6 +17,82 @@
 # (docs/ADR/0011-postgis.md).
 
 name: zipzap
+
+# ------------------------------------------------------------------------------------------
+# Fragment definitions for the `app` profile, below.
+#
+# These are top-level `x-` fields, not services. Compose reserves the prefix for exactly this:
+# a shared block that several services merge in with `<<: *name`, so the thing they agree on is
+# written once. Defining them under `services:` instead makes Compose read them as services with
+# invalid keys, which is a confusing way to learn that.
+# ------------------------------------------------------------------------------------------
+
+# One environment, three processes. Anchored rather than repeated: a divergence between the
+# API's view of the world and the worker's is the kind of bug that shows up as a shipment that
+# never arrives and never as an error.
+x-backend-env: &backend-env
+  # `production` because this is a container, which is what NODE_ENV is for. It drops the
+  # interactive Swagger UI at /docs — deliberately, since that UI is a debugger and not an
+  # interface. `/docs-json` and `/docs-yaml` are served in every environment regardless, because
+  # the generated client and CI are built from them.
+  #
+  # Override with APP_NODE_ENV=development to get /docs back while poking at the API.
+  NODE_ENV: '${APP_NODE_ENV:-production}'
+  DATABASE_URL: postgresql://zipzap:zipzap@postgres:5432/zipzap
+  REDIS_URL: redis://redis:6379
+  NATS_URL: nats://nats:4222
+  NATS_STREAM: ZIPZAP
+  # Outbound calls stay off in a demo. A reviewer without a PayStation account should not be
+  # woken by a payout webhook timeout, and the mock rails say so in the response.
+  NOTIFICATIONS_ENABLED: 'false'
+  # Production requires these (docs/operations/deployment.md, Configuration) and nothing reads
+  # them yet — the session store is Postgres and the API-key cipher is not built. Passed through
+  # empty rather than given invented defaults so the day they are wired, a demo that "worked" with
+  # a committed constant is not what ships.
+  API_SECRET_ENCRYPTION_KEY: '${API_SECRET_ENCRYPTION_KEY:-}'
+  SESSION_SECRET: '${SESSION_SECRET:-}'
+  # Nothing in this profile makes a cross-origin browser request — every console proxies /api to
+  # the API (ADR-0016), so the session cookie is first-party. It is set anyway, to the two
+  # published ports, so the API does not log a "cross-origin requests will be rejected" warning
+  # on every boot that a reviewer will read as a misconfiguration.
+  WEB_ORIGIN: '${WEB_ORIGIN:-http://localhost:5173,http://localhost:5174}'
+
+# Startup order, and the reason for it. `service_healthy` rather than `service_started` because a
+# Postgres that is up but has not finished init refuses connections for a second or two, and a
+# worker that loses that race dies before it subscribes.
+x-infra-depends-on: &infra-depends-on
+  postgres: { condition: service_healthy }
+  redis: { condition: service_healthy }
+  nats: { condition: service_healthy }
+
+x-backend-depends-on: &backend-depends-on
+  <<: *infra-depends-on
+  # Migrations run to completion before any process starts. Not "before" as a sleep or a retry
+  # loop: `service_completed_successfully` is the only condition that means the schema is
+  # actually at the version this image expects, and a release that migrated onto an older schema
+  # is the failure this project cannot have (docs/operations/deployment.md, Migrations).
+  migrate: { condition: service_completed_successfully }
+
+x-backend: &backend
+  build:
+    # Repository root, not infra/: a pnpm workspace installs from the root.
+    context: ../..
+    dockerfile: infra/docker/backend.Dockerfile
+  # Built once and reused by all three services. They differ by `command` alone — one image,
+  # three entrypoints — which is the architecture, stated as a compose file.
+  image: zipzap/backend:dev
+  profiles: ['app']
+  restart: unless-stopped
+  environment: *backend-env
+  depends_on: *backend-depends-on
+
+x-web: &web
+  profiles: ['app']
+  restart: unless-stopped
+  # The API, not migrate or postgres. The web tier needs something that answers /readyz; the
+  # schema being current is already implied by that, transitively.
+  depends_on:
+    api: { condition: service_healthy }
 
 services:
   postgres:
@@ -119,6 +203,134 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     profiles: ['observability']
+
+  # ------------------------------------------------------------------------------------------
+  # The application. Profile `app`, so `pnpm infra:up` on its own still means "infrastructure
+  # only" and stays fast. Bring the whole product up with:
+  #
+  #   pnpm demo:up      migrate + seed · api · worker · publisher · merchant web · public tracking
+  #
+  # Everything below talks to the others by SERVICE NAME, never by host port. `postgres:5432` is
+  # Postgres on this network; `localhost:5432` is whatever the reviewer already had running.
+  # ------------------------------------------------------------------------------------------
+
+  # Migrations and seed. One-shot, and the only service in this file that is meant to exit.
+  migrate:
+    <<: *backend
+    # Dropped from the inherited dependency list on purpose: `migrate` cannot wait for itself, and
+    # Compose resolves that as a cycle rather than as an error you can read. Nothing here waits on
+    # migrate being *healthy* either — it has no listeners, so a healthcheck would only report that
+    # a container which is meant to exit already has.
+    depends_on: *infra-depends-on
+    restart: 'no'
+    # The image's ENTRYPOINT is `node` with no CMD, precisely so the choice of entrypoint is the
+    # deployer's. Two CLI invocations need a shell, so both are replaced here.
+    entrypoint: ['sh', '-c']
+    command:
+      - |
+        node apps/backend/dist/database/cli.js migrate
+        # The default seed is credential-only and APPENDS: it creates a merchant, one operator and
+        # one hub operator, prints their login, and nothing about it collides on a second run.
+        # `--profile=demo` is deliberately not used — that fixture set keys rider phones uniquely
+        # and a second `demo:up` would fail loudly on data it inserted itself.
+        #
+        # The printed email and password are the demo login. Read them once:
+        #   docker compose --env-file .env -f infra/compose/docker-compose.yml logs migrate
+        node apps/backend/dist/database/cli.js seed
+
+  api:
+    <<: *backend
+    command: ['apps/backend/dist/main.js']
+    ports:
+      - '${API_PORT:-3000}:3000'
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    # The image probes /healthz, which checks nothing on purpose: a Postgres blip must not restart
+    # all three entrypoints at once. A startup GATE wants the opposite question — is this API able
+    # to serve traffic yet — so it asks /readyz, which round-trips a `SELECT 1`.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://127.0.0.1:3000/readyz'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 5s
+      timeout: 5s
+      # Generous: the API opens a Postgres connection per domain module on boot, and on a cold
+      # laptop that is slower than five retries would allow.
+      start_period: 40s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: ['apps/backend/dist/worker.js']
+    ports:
+      # Host 9092, not 9090: the image's METRICS_PORT is 9090 and prometheus already publishes
+      # that host port. The container port and the published port are different namespaces, and
+      # conflating them is how a dev ends up scraping Grafana's login page.
+      - '${WORKER_METRICS_PORT:-9092}:9090'
+    environment:
+      <<: *backend-env
+      METRICS_PORT: '9090'
+    # The image's HEALTHCHECK asks /healthz, which only main.ts serves — the worker exposes /metrics
+    # and nothing else (apps/backend/src/worker.ts). Left enabled it would fail this container
+    # forever and `docker compose ps` would show a permanently unhealthy process.
+    healthcheck: { disable: true }
+
+  publisher:
+    <<: *backend
+    command: ['apps/backend/dist/publisher.js']
+    ports:
+      - '${PUBLISHER_METRICS_PORT:-9093}:9091'
+    environment:
+      <<: *backend-env
+      PUBLISHER_METRICS_PORT: '9091'
+    healthcheck: { disable: true }
+
+  # The web tier: two surfaces from ONE Dockerfile, differing only by build ARG — the same
+  # relationship the three backend processes have with their image.
+  merchant-web:
+    <<: *web
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        APP: '@zipzap/merchant-web'
+        APP_DIR: apps/frontends/merchant-web
+    image: zipzap/web:merchant-web
+    environment:
+      # The backend, by service name. Read at RUNTIME by the host, not at build time — that is
+      # why this image is not stale when the API moves.
+      API_ORIGIN: http://api:3000
+      # Must equal the published port on both sides. `routes/app.tsx`'s server-side guard fetches
+      # `/api` back from the origin the browser used, so the app must be able to reach itself on
+      # the port it is published on. See infra/docker/web-host.mjs.
+      PORT: '${MERCHANT_WEB_PORT:-5173}'
+    ports:
+      - '${MERCHANT_WEB_PORT:-5173}:${MERCHANT_WEB_PORT:-5173}'
+
+  # The public one: no session, no account, a tracking code. Enough to see the whole event pipeline
+  # work end to end — a shipped parcel's timeline here is proof the worker and publisher ran.
+  customer-tracking:
+    <<: *web
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        APP: '@zipzap/customer-tracking'
+        APP_DIR: apps/frontends/customer-tracking
+        # customer-tracking predates the same-origin proxy and still reads VITE_API_URL. Pointing
+        # it at `/api` puts this surface on the same contract as the consoles — one origin, no
+        # CORS, no WEB_ORIGIN entry to keep in sync — instead of leaving one app in the stack
+        # quietly depending on a cross-origin allowance.
+        VITE_API_URL: '/api'
+    image: zipzap/web:customer-tracking
+    environment:
+      API_ORIGIN: http://api:3000
+      PORT: '${TRACKING_WEB_PORT:-5174}'
+    ports:
+      - '${TRACKING_WEB_PORT:-5174}:${TRACKING_WEB_PORT:-5174}'
 
 volumes:
   postgres-data:
