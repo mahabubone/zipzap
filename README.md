@@ -67,35 +67,6 @@ above is true and not aspirational.
 
 ---
 
-## :construction: Our Technology Stack
-
-**Architecture**: Event-Driven Architecture (EDA) with CQRS logically separated, Transactional outbox pattern & premature microservices ready to extract when needed. Also, this codebase is monorepo with tools like pnpm & turbo.
-
-**Authentication**: JWT based
-
-**Authorization**: Role-based access control (RBAC) with scoped permissions
-
-**Frontend**: React, TanStack Start, Expo (React Native), and Astro.js (for content site only), TailwindCSS.
-
-**Backend**: NestJS, TypeORM, OpenAPI & RESTful APIs
-
-**Database**: PostgreSQL x PostGIS, Redis, NATS JetStream
-
-**Event Bus**: NATS JetStream
-
-**Message Queue**: BullMQ
-
-**Cache**: Redis
-
-**Monitoring**: OpenTelemetry compatible
-
-**Logging**: OpenTelemetry compatible
-
-**Version Control**: Git
-
-> [!NOTE]
-> This repository is a demonstration of the architecture. It is not a production-ready system. Also, I did care about backend much more than our frontends and mobile etc. applications in terms of UI-design to UX enriching. Focusing on them cloud take a lot of time I don't have right now.
-
 ---
 
 ## 🚀 Run it
@@ -278,7 +249,39 @@ flowchart LR
 
 ---
 
-## 🛠️ Stack, and why each choice
+## 🏗️ Technology Stack
+
+**Architecture**: Event-Driven Architecture (EDA) with CQRS logically separated, Transactional outbox pattern & premature microservices ready to extract when needed. Also, this codebase is monorepo with tools like pnpm & turbo.
+
+**Authentication**: JWT based
+
+**Authorization**: Role-based access control (RBAC) with scoped permissions
+
+**Frontend**: React, TanStack Start, Expo (React Native), and Astro.js (for content site only), TailwindCSS.
+
+**Backend**: NestJS, TypeORM, OpenAPI & RESTful APIs
+
+**Database**: PostgreSQL x PostGIS, Redis, NATS JetStream
+
+**Event Bus**: NATS JetStream
+
+**Message Queue**: BullMQ
+
+**Cache**: Redis
+
+**Monitoring**: OpenTelemetry compatible
+
+**Logging**: OpenTelemetry compatible
+
+**Version Control**: Git
+
+> [!NOTE]
+> This repository is a demonstration of the architecture. It is not a production-ready system. Also, I did care about backend much more than our frontends and mobile etc. applications in terms of UI-design to UX enriching. Focusing on them cloud take a lot of time I don't have right now.
+
+### Why each choice, not just what
+
+A list of names says nothing a search engine cannot. The table below is the part that is hard to
+find elsewhere, because most of these decisions are invisible until they go wrong.
 
 | Layer             | Choice                                      | The reason, not the list                                                                                                                                                                          |
 | ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
