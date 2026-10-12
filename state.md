@@ -228,6 +228,36 @@ api-client 36 · control-tower 8 · merchant-web 8 — plus **106 integration as
 > so turbo refused to dispatch it. Running it exposed three hand-wired DI graphs that had drifted
 > out of date and two production bugs — see [ADR-0017](docs/ADR/0017-integration-test-harness.md).
 
+## Shots — the visual memory, and how to regenerate it
+
+`shots/` holds **40 screenshots across 5 surfaces**, every one a real route against a real
+database. They are **generated, not hand-curated**: `pnpm shots` rebuilds the lot.
+
+```bash
+eval "$(pnpm db:seed | sed -n '/^export /p')"   # every login, sourceable — no transcription
+pnpm seed:shots                                   # parcels driven through real lifecycles
+pnpm shots                                        # web · hub · ops · site · mobile
+```
+
+`seed:shots` advances six parcels through six different end states (DELIVERED, DELIVERED-after-a-
+failed-attempt, RETURN_INITIATED, RETURNED, DAMAGED, LOST) using the same services the API uses,
+then runs a settlement from create through approve, initiate and confirm. It is what makes the
+screenshots show a product rather than an empty state — and a screenshot of an empty table proves
+nothing, because it looks identical whether the feature works or not.
+
+Two things about this that were fixed rather than worked around, because both recur:
+
+- **The seed could not produce an operations account.** `network:read` is an OPERATIONS_MANAGER
+  scope and MERCHANT_OWNER deliberately does not hold it, so the control tower was unreachable to
+  anyone seeding a dev environment — and a shots run using the merchant photographed a
+  PERMISSION_DENIED box. `seed.mjs` now mints `network+<tag>@ayesha.test`.
+- **A shots script that only works once is useless.** The notification script assumed a fresh
+  database and failed its own assertion on the second run of the day with `switch 1 never became
+false` — which reads like a regression. It now restores the known state before asserting.
+
+All five app servers must be running for `pnpm shots`. The Vite dev servers pick non-default ports
+when 5173 is taken; pass the actual port as `WEB_URL` / `CONSOLE_URL` / `TRACKING_URL` / `APP_URL`.
+
 Two scripts assert what the terminal cannot:
 
 ```bash
