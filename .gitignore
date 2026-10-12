@@ -59,3 +59,14 @@ apps/site/dist/
 apps/site/.astro/
 apps/site/public/openapi.json
 
+# Agent worktrees. A nested checkout of the same repo — committing it would either duplicate the
+# whole history or record thousands of files that belong to a throwaway branch. See the note in
+# state.md about running agents out of tree.
+.kilo/
+
+# A `dist/` a build ran as root could not delete. `nest build` moves the old output dir aside
+# before writing (`deleteOutDir: true`) and gives up quietly when it lacks permission, so the
+# renamed original is left behind as `dist.<something>`. It is build output that happens to have
+# escaped the `dist/` rule above.
+apps/backend/dist.*/
+

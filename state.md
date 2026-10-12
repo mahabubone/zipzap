@@ -193,14 +193,17 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ### Environment debt — worth fixing, nobody has
 
-- **23 commits unpushed.** `origin` exists now (`git@github.com:mahabububone/zipzap.git`) — the old
-  "no git remote" note was itself stale — but nothing since the enrichment branch has been pushed.
+- **The GitHub repo is `PRIVATE`.** `origin` is `git@github.com:mahabubone/zipzap.git`. Everything
+  described in this file is invisible to anyone who is not you, which defeats the point of the
+  exercise. `gh repo edit --visibility public` is the highest-ROI command available to this repo.
+- **[OLD note, superseded]** commits were unpushed at one point. `origin` is configured and the
+  branch tracks it. **Push before sharing a link.**
 - **`ROADMAP.md` line "apps/ holds `backend` only" is stale**, and `docs/product/surfaces.md`'s
-  surface list is now honest but mostly unbuilt: `control-tower`, `hub-console`,
-  `support-console`, `admin-console` and `developer-portal` have no package.
+  surface list is now honest but mostly unbuilt: `support-console`, `admin-console`,
+  `developer-portal` and `apps/desktop` have no package. `control-tower` and `hub-console` exist.
 - **Phase 2's section boxes are marked stale in ROADMAP itself** and still need an audit.
-- **113 unticked roadmap boxes**, concentrated in surfaces (7 of 10 unbuilt), security (6, none
-  started), observability dashboards/alerts, and load-test phases.
+- **113 unticked roadmap boxes**, concentrated in surfaces, security (6, none started),
+  observability dashboards/alerts, and load-test phases.
 
 ---
 
@@ -208,10 +211,22 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ```bash
 export PATH="$HOME/.local/share/fnm/node-versions/v24.16.0/installation/bin:$PATH"
-pnpm verify          # format:check && typecheck && test — must be green
+pnpm infra:up        # postgres :5433 · redis :6381 · nats :4224 (ports are in .env)
+pnpm db:migrate
+pnpm verify          # boundaries:check && format:check && typecheck && test — must be green
+pnpm test:integration   # 106 assertions against real Postgres/Redis/NATS
 ```
 
-Last run: **1188 backend tests across 51 files**, plus the api-client suite. Green.
+Last run: **2,396 unit tests across 115 files** — backend 1,913 · ui 338 · rider 93 ·
+api-client 36 · control-tower 8 · merchant-web 8 — plus **106 integration assertions**. Green.
+
+> An earlier version of this file claimed 1,188 across 51 files. It was stale, and it
+> understated the suite by 60%. Corrected 2026-10-12 — if you are comparing numbers against
+> older notes, this line is the one that moved.
+
+> **`pnpm test:integration` had never run.** CI invokes it, but no package defined the turbo task,
+> so turbo refused to dispatch it. Running it exposed three hand-wired DI graphs that had drifted
+> out of date and two production bugs — see [ADR-0017](docs/ADR/0017-integration-test-harness.md).
 
 Two scripts assert what the terminal cannot:
 
