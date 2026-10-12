@@ -10,5 +10,5 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src", ".storybook"]
+  "include": ["src", ".storybook", "vitest.config.ts"]
 }
