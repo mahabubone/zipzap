@@ -63,6 +63,16 @@ export class ApiPrincipalResponseDto {
   subjectId!: string;
 
   @ApiProperty({
+    example: 'Ayesha Begum',
+    nullable: true,
+    description:
+      'A human-readable name for a human principal, so a console can render who is signed in ' +
+      'without showing a UUID. Falls back to the login email when no display name is set. ' +
+      'Always null for a machine principal — an API key has no person to name.',
+  })
+  displayName!: string | null;
+
+  @ApiProperty({
     example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     nullable: true,
     description:

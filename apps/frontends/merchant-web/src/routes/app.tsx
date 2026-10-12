@@ -138,7 +138,13 @@ function ConsoleLayout() {
       renderLink={renderLink}
       sidebarFooter={
         <div className="flex flex-col gap-2">
-          <p className="truncate text-xs text-slate-500">{principal.subjectId}</p>
+          {/* The person's name, not `subjectId`. A UUID is correct and unreadable, and it was
+              rendered above a sign-out button in every authenticated screenshot — the one place
+              on the screen whose entire job is to answer "who am I, and am I about to lose my
+              session". Falls back to the kind badge so a machine key is still identifiable. */}
+          <p className="truncate text-xs font-medium text-slate-700">
+            {principal.displayName ?? (principal.kind === 'machine' ? 'API key' : 'Signed in')}
+          </p>
           <Button variant="secondary" size="sm" onClick={logout}>
             Sign out
           </Button>

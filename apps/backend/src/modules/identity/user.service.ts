@@ -15,6 +15,7 @@ import type { Membership, PrincipalMemberships } from './rules/users.ts';
 
 export interface FoundUser extends PrincipalMemberships {
   readonly passwordHash: string;
+  readonly displayName: string | null;
   readonly disabledAt: Date | null;
 }
 
@@ -36,7 +37,7 @@ export class UserService {
 
   private async load(predicate: string, params: unknown[]): Promise<FoundUser | null> {
     const rows = await this.identity.query(
-      `SELECT u.id, u.email, u.password_hash, u.disabled_at, um.merchant_id, um.role
+      `SELECT u.id, u.email, u.password_hash, u.display_name, u.disabled_at, um.merchant_id, um.role
          FROM identity.users u
          LEFT JOIN identity.user_merchants um ON um.user_id = u.id
         ${predicate}
@@ -48,6 +49,7 @@ export class UserService {
           id: string;
           email: string;
           password_hash: string;
+          display_name: string | null;
           disabled_at: Date | null;
           merchant_id: string | null;
           role: string | null;
@@ -73,8 +75,32 @@ export class UserService {
       userId: first.id,
       email: first.email,
       passwordHash: first.password_hash,
+      displayName: first.display_name,
       disabledAt: first.disabled_at,
       memberships,
     };
+  }
+
+  /**
+   * The name to render for a person, and nothing else.
+   *
+   * A console has to answer "who am I" from somewhere. It used to answer it with
+   * `principal.subjectId`, which is a UUID — technically correct, and unreadable, so every
+   * screenshot of every authenticated screen carried a row of hex in its sidebar.
+   *
+   * Deliberately NOT `load()`: that joins every membership and reads the password hash to return a
+   * name. `GET /v1/me` runs on every console render, and dragging the credential material across
+   * that boundary to get one string would be the wrong trade. Falls back to the email rather than
+   * null, because "no display name" should still render as a person and not as an empty corner.
+   */
+  async findDisplayName(userId: string): Promise<string | null> {
+    const rows = await this.identity.query(
+      `SELECT u.display_name, u.email FROM identity.users u WHERE u.id = $1`,
+      [userId],
+    );
+    const row = rows[0] as { display_name: string | null; email: string } | undefined;
+    if (!row) return null;
+    const name = row.display_name?.trim();
+    return name ? name : row.email;
   }
 }

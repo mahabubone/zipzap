@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DomainExceptionFilter, isDependencyFailure } from './exception.filter.ts';
+import { AuthenticationRequiredError, InvalidTransitionError } from './domain-error.ts';
 
 /**
  * The dependency-failure mapping. Reliability matrix row one: Postgres down
@@ -78,5 +79,47 @@ describe('DomainExceptionFilter dependency branch', () => {
 
     expect(captured.status).toBe(500);
     expect(captured.body?.code).toBe('INTERNAL_ERROR');
+  });
+});
+
+/**
+ * What a class name does not look like in a response body.
+ *
+ * `DomainError`'s constructor defaults `message` to the class name, so a bare
+ * `throw new AuthenticationRequiredError()` produced `detail: "AuthenticationRequiredError"` —
+ * which reached the console UI as `AUTHENTICATION_REQUIRED: AuthenticationRequiredError` and was
+ * visible in the error-state screenshots. Found by looking at the image, not by a test: the
+ * mapping was correct against the spec and still wrong for a person.
+ */
+describe('DomainExceptionFilter detail is written for a reader', () => {
+  it('replaces a bare class-name message with the spec title', () => {
+    const filter = new DomainExceptionFilter();
+    const { host, captured } = fakeHost();
+    filter.catch(new AuthenticationRequiredError(), host);
+
+    expect(captured.status).toBe(401);
+    expect(captured.body?.code).toBe('AUTHENTICATION_REQUIRED');
+    expect(captured.body?.detail).toBe('Authentication required');
+    // The regression itself: a constructor name must never reach the wire.
+    expect(String(captured.body?.detail)).not.toContain('AuthenticationRequiredError');
+  });
+
+  it('passes a written message through untouched — the detail is what makes it actionable', () => {
+    const filter = new DomainExceptionFilter();
+    const { host, captured } = fakeHost();
+    filter.catch(new InvalidTransitionError('DELIVERED', 'PICKED_UP'), host);
+
+    expect(captured.body?.detail).toContain('DELIVERED');
+    expect(captured.body?.detail).toContain('PICKED_UP');
+  });
+
+  it('keeps the machine code intact regardless of what the message says', () => {
+    // The client branches on `code`, never on `detail` — so the humanising must not touch it.
+    const filter = new DomainExceptionFilter();
+    const { host, captured } = fakeHost();
+    filter.catch(new AuthenticationRequiredError(), host);
+
+    expect(captured.body?.code).toBe('AUTHENTICATION_REQUIRED');
+    expect(captured.body?.request_id).toBe('req-drill');
   });
 });

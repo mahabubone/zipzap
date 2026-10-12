@@ -1493,6 +1493,11 @@ export interface components {
              */
             subjectId: string;
             /**
+             * @description A human-readable name for a human principal, so a console can render who is signed in without showing a UUID. Falls back to the login email when no display name is set. Always null for a machine principal — an API key has no person to name.
+             * @example Ayesha Begum
+             */
+            displayName: string | null;
+            /**
              * @description The ACTIVE business — the one this request acts inside, always one of merchantIds. Null for a platform administrative key.
              * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
              */

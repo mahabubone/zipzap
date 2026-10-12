@@ -13,6 +13,7 @@ import {
   DependencyUnavailableError,
   isDomainError,
   type DomainErrorClass,
+  type DomainErrorSpec,
 } from './domain-error';
 import { INTERNAL_ERROR_SPEC, toEnvelope } from './error-envelope';
 import { resolveRequestId } from './request-id.ts';
@@ -49,6 +50,31 @@ export function isDependencyFailure(error: unknown): boolean {
   );
 }
 
+/**
+ * What the client is told, which is not always what the error said.
+ *
+ * `DomainError`'s constructor defaults `message` to the class name when a caller throws one
+ * bare — `throw new AuthenticationRequiredError()`. That default is right for a log line and
+ * wrong for a response body: it shipped `detail: "AuthenticationRequiredError"` to the console,
+ * where a merchant saw a class name from the server's internals rendered as if it were an
+ * explanation. Every screenshot of a failed load carried it.
+ *
+ * So: when the message is only the class name, answer with the spec's `title`, which is written
+ * for a human. A message someone actually wrote is passed through untouched — those carry the
+ * detail that makes an error actionable ("Cannot move from DRAFT to DELIVERED.").
+ */
+function publicDetail(exception: Error, spec: DomainErrorSpec): string {
+  const message = exception.message.trim();
+  if (
+    message.length === 0 ||
+    message === exception.name ||
+    message === exception.constructor.name
+  ) {
+    return spec.title;
+  }
+  return message;
+}
+
 @Catch()
 export class DomainExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(DomainExceptionFilter.name);
@@ -64,7 +90,7 @@ export class DomainExceptionFilter implements ExceptionFilter {
     if (isDomainError(exception)) {
       const spec =
         DOMAIN_ERROR_SPECS.get(exception.constructor as DomainErrorClass) ?? INTERNAL_ERROR_SPEC;
-      response.status(spec.status).json(toEnvelope(spec, exception.message, requestId));
+      response.status(spec.status).json(toEnvelope(spec, publicDetail(exception, spec), requestId));
       return;
     }
 

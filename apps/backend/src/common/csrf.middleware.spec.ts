@@ -111,7 +111,18 @@ describe('the session cookie', () => {
     expect(value).toContain('HttpOnly');
     expect(value).toContain('Secure');
     expect(value).toContain('SameSite=Lax');
-    expect(value).toContain('Max-Age=3600');
+    // The Max-Age is a FLOOR of the remaining lifetime, so an expiry of exactly "now + one hour"
+    // legitimately renders as 3599 whenever the millisecond tick lands between building the Date
+    // and reading `Date.now()` inside the helper. Asserting `3600` here tested the clock, not the
+    // cookie — it failed roughly once per thousand runs, passed in isolation, and only surfaced
+    // under the parallel load of a full turbo run.
+    //
+    // What the browser actually needs is a positive integer close to an hour, so that is what is
+    // asserted: the property, not a value that races the test runner.
+    const maxAge = Number(/Max-Age=(\d+)/.exec(String(value))?.[1]);
+    expect(Number.isInteger(maxAge)).toBe(true);
+    expect(maxAge).toBeGreaterThan(3595);
+    expect(maxAge).toBeLessThanOrEqual(3600);
     // `Path=/` matters more than it looks: without it the cookie is scoped to the directory it
     // was set from, and a later navigation to a sibling route arrives unauthenticated.
     expect(value).toContain('Path=/');

@@ -6734,6 +6734,14 @@ components:
           type: string
           example: 9f8e7d6c-5b4a-3210-fedc-ba9876543210
           description: The user behind a human principal, or the API key behind a machine one.
+        displayName:
+          type: string
+          nullable: true
+          example: Ayesha Begum
+          description: >-
+            A human-readable name for a human principal, so a console can render who is signed in
+            without showing a UUID. Falls back to the login email when no display name is set.
+            Always null for a machine principal — an API key has no person to name.
         merchantId:
           type: string
           nullable: true
@@ -6767,6 +6775,7 @@ components:
       required:
         - kind
         - subjectId
+        - displayName
         - merchantId
         - merchantIds
         - scopes
