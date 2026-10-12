@@ -168,6 +168,33 @@ async function seed() {
   );
   await client.query('COMMIT');
 
+  // The operations account. There was none, which quietly made two thirds of the product
+  // unreachable to anyone seeding a dev environment: the control tower needs `network:read`,
+  // an OPERATIONS_MANAGER scope, and MERCHANT_OWNER deliberately does not hold it (see
+  // `MERCHANT_GRANTABLE_ROLES` — a merchant may only grant roles over their own tenancy).
+  //
+  // So every reviewer and every shots run either skipped the control tower or logged in as the
+  // merchant and captured a PERMISSION_DENIED error box, which looks like a broken product.
+  // A seed that cannot produce an account for a surface it ships is an incomplete seed.
+  const opsEmail = `network+${runTag}@ayesha.test`;
+  const opsUserId = randomUUID();
+  const opsPassword = `op_${createHash('sha256')
+    .update(String(Date.now()) + 'opspassword')
+    .digest('base64url')
+    .slice(0, 24)}`;
+  await client.query('BEGIN');
+  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
+    opsUserId,
+    opsEmail,
+    hashSecret(opsPassword),
+  ]);
+  await client.query(
+    `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
+     VALUES ($1, $2, 'OPERATIONS_MANAGER')`,
+    [opsUserId, merchantId],
+  );
+  await client.query('COMMIT');
+
   console.log(`merchant_id : ${merchantId}`);
   console.log(`key_id      : ${keyId}`);
   console.log(`secret      : ${secret}`);
@@ -178,8 +205,38 @@ async function seed() {
   console.log(`hub_email   : ${hubEmail}`);
   console.log(`hub_password: ${hubPassword}`);
   console.log();
+  console.log('Operations console login (network:read — the control tower):');
+  console.log(`ops_email   : ${opsEmail}`);
+  console.log(`ops_password: ${opsPassword}`);
+  console.log();
+  console.log('   (named network+ rather than ops+ because the merchant owner above is already');
+  console.log('    ops+<tag> — they are different principals with deliberately different scopes)');
+  console.log();
   console.log('Authorization: ApiKey <key_id>.<secret>');
   console.log('Login:       POST /v1/auth/login { email, password }');
+
+  // The same values again, in a form a script can consume.
+  //
+  // Passwords are hashed, so they are unrecoverable after this line — which made every shots run
+  // depend on someone copying four values out of a terminal by hand. Getting one wrong produced a
+  // login screen with no explanation, and the natural reading was "the seed is broken" rather than
+  // "the password was transcribed incorrectly". Printing a sourceable block means
+  // `eval "$(pnpm db:seed | sed -n '/^export /p')"` sets the environment correctly, and a
+  // transcription error stops being possible.
+  //
+  // Dev-only by construction: this only runs against a database you just seeded, and these
+  // accounts exist only there. `.env` is gitignored; nothing here is ever committed.
+  console.log();
+  console.log('# eval this to get every seeded login into the environment:');
+  console.log(`#   eval "$(pnpm db:seed | sed -n '/^export /p')"`);
+  console.log(`export SEED_CONSOLE_EMAIL=${email}`);
+  console.log(`export SEED_CONSOLE_PASSWORD=${password}`);
+  console.log(`export SEED_HUB_EMAIL=${hubEmail}`);
+  console.log(`export SEED_HUB_PASSWORD=${hubPassword}`);
+  console.log(`export SEED_OPS_EMAIL=${opsEmail}`);
+  console.log(`export SEED_OPS_PASSWORD=${opsPassword}`);
+  console.log(`export SEED_API_KEY_ID=${keyId}`);
+  console.log(`export SEED_API_SECRET=${secret}`);
 }
 
 async function seedProfile(counts, name, runTag, credentialMerchantId) {

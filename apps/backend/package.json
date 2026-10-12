@@ -17,6 +17,8 @@
     "db:migrate": "node --env-file-if-exists=../../.env dist/database/cli.js migrate",
     "db:revert": "node --env-file-if-exists=../../.env dist/database/cli.js revert",
     "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed",
+    "seed:console": "node --env-file-if-exists=../../.env scripts/seed-console.mjs",
+    "seed:shots": "node --env-file-if-exists=../../.env scripts/seed-shots.mjs",
     "analytics:rebuild": "node --env-file-if-exists=../../.env dist/database/cli.js rebuild",
     "simulate": "node --env-file-if-exists=../../.env dist/simulate.js",
     "test:load": "node --env-file-if-exists=../../.env scripts/load-test.mjs",

@@ -47,8 +47,18 @@ async function settle(page) {
   await page.waitForTimeout(400);
 }
 
+/**
+ * The capture date, read once.
+ *
+ * It was a literal `2026-10-08` in this file until 2026-10-12, which meant every re-shoot silently
+ * overwrote the original images under the same name and the directory's date prefix stopped
+ * meaning anything — the one thing the prefix is for. A shot from last week and a shot from today
+ * looked identical in a filename. Overridable with SHOT_DATE for a deliberate backfill.
+ */
+const DATE = process.env.SHOT_DATE ?? new Date().toISOString().slice(0, 10);
+
 async function shoot(page, name, fullPage = true) {
-  const file = `${OUT}2026-10-08_web_${name}.png`;
+  const file = `${OUT}${DATE}_web_${name}.png`;
   await page.screenshot({ path: file, fullPage });
   console.log(`shot  ${file}`);
 }
@@ -108,9 +118,36 @@ await page.fill('#password', PASSWORD);
 await page.click('button[type="submit"]');
 await page.waitForURL('**/app', { timeout: 15000 });
 
-for (const [name, path] of [['app_shipments', '/app/shipments']]) {
+/**
+ * The console's own routes, in the order a merchant would meet them.
+ *
+ * This list was one entry long for the first two months of screenshots, so shots/ showed a
+ * shipments table and nothing else about a console with ten screens. A reviewer scrolling that
+ * directory would reasonably conclude the product was a list and a detail page.
+ *
+ * Order is the merchant's day: create, watch, collect, settle. Money before webhooks because COD
+ * and settlement are what this vertical is actually for — Bangladesh is cash-on-delivery, and a
+ * logistics OS that treats the cash as an afterthought is not the product being described.
+ */
+const ROUTES = [
+  ['app_shipments', '/app/shipments'],
+  ['app_shipment_new', '/app/shipments/new'],
+  ['app_bulk', '/app/shipments/bulk'],
+  ['app_cod', '/app/cod'],
+  ['app_settlements', '/app/settlements'],
+  ['app_money', '/app/money'],
+  ['app_analytics', '/app/analytics'],
+  ['app_pricing', '/app/pricing'],
+  ['app_webhooks', '/app/webhooks'],
+];
+
+for (const [name, path] of ROUTES) {
   await page.goto(`${CONSOLE}${path}`);
   await settle(page);
+  const body = await page.locator('body').innerText();
+  if (body.includes('Something went wrong')) {
+    throw new Error(`${path} rendered an error box — refusing to photograph it`);
+  }
   await shoot(page, name);
 }
 
@@ -174,6 +211,28 @@ async function waitForChecked(index, expected) {
   }
 }
 
+/**
+ * Put the three switches back to all-on before toggling.
+ *
+ * The script used to assume a fresh database and click the second switch expecting it to go off.
+ * The second run of the day then found it already off, clicked it back on, and failed its own
+ * assertion with `switch 1 never became false (still true)` — which reads like the optimistic
+ * update regressed, when in fact the script had simply been run twice against the same fixture.
+ *
+ * A screenshot script that only works once is a screenshot script you cannot use to check a change,
+ * which is the only reason to have one. So: restore the known state first, then assert.
+ */
+for (const [index, target] of [
+  [0, 'true'],
+  [1, 'true'],
+  [2, 'true'],
+]) {
+  if ((await switches.nth(index).getAttribute('aria-checked')) !== target) {
+    await switches.nth(index).click();
+    await waitForChecked(index, target);
+  }
+}
+
 await switches.nth(1).click();
 await waitForChecked(1, 'false');
 // The other two must be untouched. Before the optimistic update was scoped to the tapped row, one
@@ -182,9 +241,41 @@ await waitForChecked(0, 'true');
 await waitForChecked(2, 'true');
 await shoot(page, 'app_notifications_muted');
 
-// One row click proves the table navigates to the detail route.
+// The shipment list, then the detail routes.
+//
+// Both detail shots are taken from THIS page load, before navigating anywhere else. An earlier
+// version clicked the first row, shot it, and only afterwards went looking for a delivered parcel
+// — by which point it was no longer on the list, so the lookup silently matched nothing and the
+// delivered shot was skipped with a message that read like missing data rather than a script bug.
 await page.goto(`${CONSOLE}/app/shipments`);
 await settle(page);
+
+// A DELIVERED parcel specifically, which is the screen worth having in a portfolio.
+//
+// Clicking the first row photographs whatever the newest shipment happens to be, and after
+// `seed:shots` that is a LOST parcel — correct, and a poor advertisement. A delivered parcel's
+// timeline is the whole argument: pickup, two hubs, a dispatch, a proof of delivery and a COD
+// collection, in order, attributed to whoever did each thing.
+// `hasText` with an anchored regex fails here: the status cell is its own element, so the row's
+// text is "ZP-…DeliveredDhaka metro…" on one line and `^Delivered$` can never match it. A plain
+// substring is what actually identifies the row, and it is scoped to the tracking column so a
+// recipient address containing the word could never be mistaken for a status.
+const deliveredRow = page
+  .locator('tbody tr')
+  .filter({ has: page.getByText('Delivered', { exact: true }) })
+  .first();
+if ((await deliveredRow.count()) > 0) {
+  await deliveredRow.click();
+  await page.waitForURL('**/app/shipments/**', { timeout: 15000 });
+  await page.waitForTimeout(600);
+  await shoot(page, 'app_shipment_delivered');
+  await page.goBack();
+  await settle(page);
+} else {
+  console.log('skip  app_shipment_delivered (no delivered parcel in the fixture set)');
+}
+
+// One row click proves the table navigates to the detail route.
 await page.click('tbody tr');
 await page.waitForURL('**/app/shipments/**', { timeout: 15000 });
 await page.waitForTimeout(600);

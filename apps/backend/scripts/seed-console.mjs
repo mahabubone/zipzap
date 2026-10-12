@@ -94,8 +94,19 @@ if (!login.ok) {
   console.error(`login failed: ${login.status} ${await login.text()}`);
   process.exit(1);
 }
-const { token } = await login.json();
-const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+// Cookie session, not a bearer token — see ADR-0016 and the longer note in `seed-shots.mjs`.
+// Reading `token` off the body yields `undefined` here, and every create then fails 401 with the
+// unhelpfully vague message this script used to print for a dozen identical failures.
+const cookie = (login.headers.getSetCookie?.() ?? [login.headers.get('set-cookie')])
+  .filter(Boolean)
+  .map((c) => c.split(';')[0])
+  .join('; ');
+if (!cookie) {
+  console.error('login returned no session cookie — cannot seed.');
+  process.exit(1);
+}
+const auth = { Cookie: cookie, 'Content-Type': 'application/json' };
 
 const created = [];
 for (const [i, p] of PARCELS.entries()) {

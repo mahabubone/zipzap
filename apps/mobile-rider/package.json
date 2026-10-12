@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "expo start",
     "build": "expo export --platform web",
+    "export:web": "expo export --platform web --output-dir dist-web",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
     "verify:queue": "node scripts/verify-queue.mjs",
