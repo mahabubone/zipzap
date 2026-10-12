@@ -38,7 +38,9 @@ await db.connect();
 // A merchant that actually owns a parcel. Picking "the first merchant" instead picks one with no
 // shipments on a database that has been seeded repeatedly, and the proof then fails on a null
 // fixture rather than on the thing it is proving.
-const { rows: [parcel] } = await db.query(
+const {
+  rows: [parcel],
+} = await db.query(
   `UPDATE shipment.shipments s
       SET status = 'OUT_FOR_DELIVERY',
           recipient_phone = COALESCE(s.recipient_phone, '+8801710000000')
@@ -88,13 +90,17 @@ const countMessages = async (eventId) =>
 console.log('\nGET/PUT /v1/notification-preferences\n');
 
 const initial = await api('GET', '/v1/notification-preferences');
-check('the endpoint answers a merchant key with every notifiable event', () => {
-  assert.equal(initial.status, 200);
-  assert.deepEqual(
-    initial.body.map((r) => r.eventType),
-    ['ShipmentCreated', 'DeliveryOutForDelivery', 'DeliveryCompleted'],
-  );
-}, JSON.stringify(initial.body));
+check(
+  'the endpoint answers a merchant key with every notifiable event',
+  () => {
+    assert.equal(initial.status, 200);
+    assert.deepEqual(
+      initial.body.map((r) => r.eventType),
+      ['ShipmentCreated', 'DeliveryOutForDelivery', 'DeliveryCompleted'],
+    );
+  },
+  JSON.stringify(initial.body),
+);
 check('nothing is muted and everything is marked default on a fresh account', () => {
   assert.ok(initial.body.every((r) => r.enabled === true && r.isDefault === true));
 });
@@ -194,7 +200,10 @@ check('the same event now does produce a message, with the recipient on it', () 
 });
 
 // A second event type is unaffected by the first one's row.
-await api('PUT', '/v1/notification-preferences', { eventType: 'DeliveryCompleted', enabled: false });
+await api('PUT', '/v1/notification-preferences', {
+  eventType: 'DeliveryCompleted',
+  enabled: false,
+});
 const otherEvent = randomUUID();
 await js.publish(
   'zipzap.delivery.out_for_delivery',
@@ -216,7 +225,9 @@ check('muting one event leaves the others sending', () => {
 });
 
 // --- cleanup ---------------------------------------------------------------------
-await db.query('DELETE FROM notification.merchant_preferences WHERE merchant_id = $1', [merchant.id]);
+await db.query('DELETE FROM notification.merchant_preferences WHERE merchant_id = $1', [
+  merchant.id,
+]);
 await db.query('DELETE FROM notification.messages WHERE event_id LIKE $1', ['evt-pref-%']);
 await db.query('DELETE FROM notification.messages WHERE event_id = $1', [otherEvent]);
 await db.query('DELETE FROM merchant.api_credentials WHERE key_id = $1', [keyId]);

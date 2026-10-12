@@ -7,21 +7,28 @@ import {
   ApiPropertyOptional,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { AuthenticationRequiredError } from '../../common/domain-error.ts';
 import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { AuthSessionResponseDto, AuthTokenResponseDto } from './auth-response.dto.ts';
 import { MerchantAuthService } from '../merchant/sessions.service.ts';
 import { setSessionCookie, SESSION_IDLE_TTL_HOURS } from './session-cookie.ts';
+import { normalisePhone } from './rules/phone.ts';
 
 export class LoginDto {
   @ApiProperty({
     example: 'owner@example.com',
-    description: 'The address the account is registered under.',
+    description:
+      'The handle the account is registered under — an email address for a merchant, or a phone ' +
+      'number for a rider. A rider is issued a SIM card, not a mailbox, and does not know or ' +
+      'care which kind of identifier their depot gave them, so there is one field and the ' +
+      'server works out which it is. Phone numbers are accepted in any format a person writes ' +
+      'them: `01712345678`, `+8801712345678`, `+880 1712-345678` are one account, not three.',
   })
-  @IsEmail()
-  email!: string;
+  @IsString()
+  @MinLength(3)
+  identifier!: string;
 
   @ApiProperty({
     example: 'correct horse battery staple',
@@ -74,8 +81,8 @@ export class LoginController {
   @ApiBody({
     type: LoginDto,
     description:
-      'Email and password, and optionally which business to act inside. Omit `merchantId` and the ' +
-      'first membership is chosen deterministically.',
+      'A handle (email or phone), a password, and optionally which business to act inside. ' +
+      'Omit `merchantId` and the first membership is chosen deterministically.',
   })
   @ApiErrors()
   async login(
@@ -84,7 +91,7 @@ export class LoginController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthSessionResponseDto> {
     const session = await this.auth.loginWithPassword({
-      email: body.email,
+      ...resolveHandle(body.identifier),
       password: body.password,
       merchantId: body.merchantId ?? null,
       ip: req.ip ?? null,
@@ -126,8 +133,8 @@ export class LoginController {
   @ApiBody({
     type: LoginDto,
     description:
-      'Email and password, and optionally which business to act inside. Nothing is set as a cookie, ' +
-      'so this is the flow for a client with nowhere to keep one.',
+      'A handle (email or phone) and a password. Nothing is set as a cookie, so this is the ' +
+      'flow for a client with nowhere to keep one — which is exactly the rider app.',
   })
   @ApiErrors()
   async token(
@@ -135,7 +142,7 @@ export class LoginController {
     @Req() req: Request & { requestId?: string },
   ): Promise<AuthTokenResponseDto> {
     const session = await this.auth.loginWithPassword({
-      email: body.email,
+      ...resolveHandle(body.identifier),
       password: body.password,
       merchantId: body.merchantId ?? null,
       ip: req.ip ?? null,
@@ -152,4 +159,26 @@ export class LoginController {
       merchantIds: session.merchantIds,
     };
   }
+}
+
+/**
+ * Turn a typed handle into the (identifier, kind) pair the auth service wants.
+ *
+ * Split out of both endpoints so there is exactly one definition of "is this an email or a phone",
+ * and so it can be reasoned about without constructing a Nest request. The order is email first:
+ * an `@` is unambiguous, while a digit run could be several things and the phone normaliser is the
+ * one that can still say no.
+ *
+ * A phone that does not normalise falls through as an email, which finds nothing and answers the
+ * same 401 as a wrong password. That is deliberate — a specific "that is not a valid phone number"
+ * is a tell, and a login endpoint that tells you how to format a handle is a login endpoint that
+ * helps someone enumerate accounts.
+ */
+function resolveHandle(typed: string): { identifier: string; handleKind: 'email' | 'phone' } {
+  const trimmed = typed.trim();
+  if (!trimmed.includes('@')) {
+    const phone = normalisePhone(trimmed);
+    if (phone !== null) return { identifier: phone, handleKind: 'phone' };
+  }
+  return { identifier: trimmed, handleKind: 'email' };
 }

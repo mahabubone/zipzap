@@ -224,7 +224,7 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "Email and password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically.",
+          "description": "A handle (email or phone), a password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically.",
           "content": {
             "application/json": {
               "schema": {
@@ -328,7 +328,7 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "Email and password, and optionally which business to act inside. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one.",
+          "description": "A handle (email or phone) and a password. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one — which is exactly the rider app.",
           "content": {
             "application/json": {
               "schema": {
@@ -10434,6 +10434,12 @@
             "example": "Ayesha Begum",
             "description": "A human-readable name for a human principal, so a console can render who is signed in without showing a UUID. Falls back to the login email when no display name is set. Always null for a machine principal — an API key has no person to name."
           },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "example": "ayesha@ayesha.test",
+            "description": "The login email for a human principal. Present so a console can render an identity — a name, an email, and an avatar initial derived from them — without a second round-trip. Null for a machine principal."
+          },
           "merchantId": {
             "type": "string",
             "nullable": true,
@@ -10476,6 +10482,7 @@
           "kind",
           "subjectId",
           "displayName",
+          "email",
           "merchantId",
           "merchantIds",
           "scopes",
@@ -10486,11 +10493,11 @@
       "LoginDto": {
         "type": "object",
         "properties": {
-          "email": {
+          "identifier": {
             "type": "string",
-            "format": "email",
+            "minLength": 3,
             "example": "owner@example.com",
-            "description": "The address the account is registered under."
+            "description": "The handle the account is registered under — an email address for a merchant, or a phone number for a rider. A rider is issued a SIM card, not a mailbox, and does not know or care which kind of identifier their depot gave them, so there is one field and the server works out which it is. Phone numbers are accepted in any format a person writes them: `01712345678`, `+8801712345678`, `+880 1712-345678` are one account, not three."
           },
           "password": {
             "type": "string",
@@ -10505,7 +10512,7 @@
           }
         },
         "required": [
-          "email",
+          "identifier",
           "password"
         ]
       },

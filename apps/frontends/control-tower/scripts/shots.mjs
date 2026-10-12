@@ -39,10 +39,36 @@ const browser = await chromium.launch({
 
 async function settle(page) {
   await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(500);
+  // Leaflet draws its tile layer and then places markers, and neither is synchronous with
+  // `networkidle` — the tiles are `<img>` elements loaded after the container mounts, and the
+  // markers are React effects that run after the tile layer is in the DOM. A fixed 500ms caught
+  // this once and then failed on a cold cache, so the count is polled instead: the shot waits until
+  // the map has actually drawn something, or times out loudly.
+  await page.waitForFunction(
+    () => document.querySelectorAll('.leaflet-marker-icon').length > 0,
+    undefined,
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(600);
 }
 
-async function shoot(page, name, fullPage = true) {
+/**
+ * Capture the VIEWPORT, not the whole scrollable page.
+ *
+ * This defaulted to `fullPage: true` in every app, which produced a 6,145-pixel screenshot of the
+ * API reference and a 1,582-pixel one of the landing page — images four times taller than the
+ * screen they claim to depict. In a README they render as a sliver, and the argument they were
+ * meant to make (this is what the product looks like) is lost to a scrollbar.
+ *
+ * A screenshot is a photograph of a screen. If a screen needs 6,000 pixels to be understood, the
+ * problem is the screen, not the photograph — and the honest fix is to crop, not to ship the whole
+ * page as an unreadable strip.
+ *
+ * `FULL_PAGE=1` still captures the scroll, for the rare case where the whole document IS the
+ * point. Nothing in shots/ needs it.
+ */
+
+async function shoot(page, name, fullPage = process.env.FULL_PAGE === '1') {
   const file = `${OUT}${DATE}_ops_${name}.png`;
   await page.screenshot({ path: file, fullPage });
   console.log(`shot  ${file}`);
@@ -50,11 +76,15 @@ async function shoot(page, name, fullPage = true) {
 
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.goto(`${APP}/login`);
-await settle(page);
+// NOT `settle`. That waits for Leaflet markers, and the login page has none — the shot would time
+// out before the form was ever touched, which is exactly what it did the first time the map gained
+// a real tile layer.
+await page.waitForLoadState('networkidle');
 await page.fill('#email', EMAIL);
 await page.fill('#password', PASSWORD);
 await page.click('button[type="submit"]');
-await page.waitForURL('**/', { timeout: 15000 }).catch(() => {});
+await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 });
+// Now the map is up and `settle` means what it says.
 await settle(page);
 
 // Fail loudly rather than photograph the error box. A shot that says PERMISSION_DENIED is a false
@@ -69,8 +99,14 @@ await shoot(page, 'network_map');
 // The list the map falls back to. Worth its own shot: the fallback is a decision (see
 // docs/ADR/0011-postgis.md and the map's own header), and a decision nobody can see is a decision
 // nobody will believe was made.
-const markers = await page.locator('[data-marker="hub"]').count();
-console.log(`      ${markers} hubs drawn`);
+const markers = await page.locator('.leaflet-marker-icon').count();
+console.log(`      ${markers} markers on the basemap`);
+const hubs = await page.locator('text=/hubs/').count();
+if (hubs > 0) {
+  const footer = await page.locator('body').innerText();
+  const match = /(\d+) hubs/.exec(footer);
+  if (match) console.log(`      ${match[1]} hubs reported by the screen`);
+}
 const suppressed = await page.locator('text=/too close to label/').count();
 if (suppressed > 0) {
   // Not a failure — an honest report. The footer counts what it could not label rather than

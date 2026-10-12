@@ -36,9 +36,7 @@ const API_SECRET = process.env.API_SECRET;
 let failures = 0;
 function check(label, ok, detail = '') {
   if (!ok) failures++;
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`,
-  );
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`);
 }
 
 if (!KEY_ID || !API_SECRET) {
@@ -54,8 +52,14 @@ check('the spec declares paths', Object.keys(spec.paths ?? {}).length > 0);
 
 const createSchemaName = spec.paths?.['/v1/shipments']?.post?.requestBody?.content?.[
   'application/json'
-]?.schema?.$ref?.split('/').pop();
-check('POST /v1/shipments publishes a request schema', Boolean(createSchemaName), 'no $ref on the request body');
+]?.schema?.$ref
+  ?.split('/')
+  .pop();
+check(
+  'POST /v1/shipments publishes a request schema',
+  Boolean(createSchemaName),
+  'no $ref on the request body',
+);
 check(
   'the request schema is a real component, not an inline stub',
   Boolean(spec.components?.schemas?.[createSchemaName]),
@@ -70,9 +74,16 @@ check(
 );
 check(
   'the required set covers sender, recipient and parcel basics',
-  ['senderName', 'senderPhone', 'senderAddress', 'recipientName', 'recipientPhone', 'recipientAddress', 'parcelWeightGrams', 'zone'].every(
-    (f) => required.includes(f),
-  ),
+  [
+    'senderName',
+    'senderPhone',
+    'senderAddress',
+    'recipientName',
+    'recipientPhone',
+    'recipientAddress',
+    'parcelWeightGrams',
+    'zone',
+  ].every((f) => required.includes(f)),
   `required: ${required.join(', ')}`,
 );
 check(
@@ -94,8 +105,9 @@ try {
   // Resolved by hand, not through the exports map: openapi-typescript@7 declares `"./*.js": "./*.mjs"`,
   // which points at a file that does not exist on disk. Importing the package's declared bin
   // specifier fails with MODULE_NOT_FOUND; only the literal path in the package directory works.
-  const generatorCli = fileURLToPath(import.meta.resolve('openapi-typescript/package.json'))
-    .replace(/package\.json$/, 'bin/cli.js');
+  const generatorCli = fileURLToPath(
+    import.meta.resolve('openapi-typescript/package.json'),
+  ).replace(/package\.json$/, 'bin/cli.js');
   await run(process.execPath, [generatorCli, specPath, '--output', typesPath], { cwd: dir });
   const generated = await import('node:fs').then((fs) => fs.readFileSync(typesPath, 'utf8'));
   check(
@@ -150,9 +162,24 @@ export function buildBody(weightGrams: number) {
   const tscPath = fileURLToPath(import.meta.resolve('typescript/bin/tsc'));
   let typeErrors = '';
   try {
-    await run(process.execPath, [tscPath, '--noEmit', '--strict', '--target', 'ES2022', '--module', 'nodenext', '--moduleResolution', 'nodenext', clientPath], {
-      cwd: dir,
-    });
+    await run(
+      process.execPath,
+      [
+        tscPath,
+        '--noEmit',
+        '--strict',
+        '--target',
+        'ES2022',
+        '--module',
+        'nodenext',
+        '--moduleResolution',
+        'nodenext',
+        clientPath,
+      ],
+      {
+        cwd: dir,
+      },
+    );
   } catch (e) {
     typeErrors = `${e.stdout ?? ''}${e.stderr ?? ''}`;
   }
@@ -196,10 +223,18 @@ export function buildBody(weightGrams: number) {
     body: JSON.stringify(body),
   });
   const created = await createdRes.json();
-  check('a fresh client can create a shipment with the published contract', createdRes.status === 201, `HTTP ${createdRes.status} ${JSON.stringify(created).slice(0, 200)}`);
+  check(
+    'a fresh client can create a shipment with the published contract',
+    createdRes.status === 201,
+    `HTTP ${createdRes.status} ${JSON.stringify(created).slice(0, 200)}`,
+  );
 
   const id = created?.data?.id ?? created?.id;
-  check('the response carries an id', typeof id === 'string' && id.length > 0, JSON.stringify(created).slice(0, 200));
+  check(
+    'the response carries an id',
+    typeof id === 'string' && id.length > 0,
+    JSON.stringify(created).slice(0, 200),
+  );
 
   const readRes = await fetch(`${BASE}/v1/shipments/${id}`, { headers: { Authorization: auth } });
   const read = await readRes.json();

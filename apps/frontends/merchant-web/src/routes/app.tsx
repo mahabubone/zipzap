@@ -8,9 +8,10 @@ import {
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
-import { AppShell, Button, type NavGroup, type NavLinkRender } from '@zipzap/ui';
+import { AppShell, type NavGroup, type NavLinkRender } from '@zipzap/ui';
 import { apiClient } from '../lib/api.ts';
 import { Logo } from '../lib/brand.tsx';
+import { UserIdentity } from '../lib/user-identity.tsx';
 
 /**
  * Resolves the principal on the SERVER, from the request context the global middleware captured.
@@ -137,18 +138,12 @@ function ConsoleLayout() {
       nav={navFor(pathname)}
       renderLink={renderLink}
       sidebarFooter={
-        <div className="flex flex-col gap-2">
-          {/* The person's name, not `subjectId`. A UUID is correct and unreadable, and it was
-              rendered above a sign-out button in every authenticated screenshot — the one place
-              on the screen whose entire job is to answer "who am I, and am I about to lose my
-              session". Falls back to the kind badge so a machine key is still identifiable. */}
-          <p className="truncate text-xs font-medium text-slate-700">
-            {principal.displayName ?? (principal.kind === 'machine' ? 'API key' : 'Signed in')}
-          </p>
-          <Button variant="secondary" size="sm" onClick={logout}>
-            Sign out
-          </Button>
-        </div>
+        <UserIdentity
+          displayName={principal.displayName}
+          email={principal.email}
+          kind={principal.kind}
+          onSignOut={logout}
+        />
       }
     >
       <Outlet />

@@ -195,6 +195,61 @@ async function seed() {
   );
   await client.query('COMMIT');
 
+  // A rider who can actually sign in, with a phone number as the handle.
+  //
+  // Every fixture rider above is a row in `rider.riders` with no credential, which meant NONE of
+  // them could authenticate — the rider app's login screen works against the API, but there was
+  // no seeded account to exercise it with, and the phone-number flow it now asks for had no rider
+  // to log in. So the one screen the person on the bike uses daily was the one screen a reviewer
+  // could not get into.
+  //
+  // A rider therefore has two rows, which is the model the rest of the system already uses and
+  // which this does not invent: `rider.riders` holds the operational record (capacity, position,
+  // status) and `identity.users` holds the credential. See ADR-0002 and `rules/phone.ts`.
+  // The rider's number uses the same derivation `seedProfile` uses for the fixture riders, so a
+  // rider who can log in collides with no fixture. It is computed here rather than read from
+  // `seedProfile`, because that function owns its own number range and borrowing one of its values
+  // would couple a login to whether a profile ran at all.
+  const riderPhoneBase = 80_000_000 + (parseInt(runTag, 36) % 10_000_000);
+  const riderPhone = `+88017${String(riderPhoneBase)}`;
+  const riderUserId = randomUUID();
+  const riderPassword = `rd_${createHash('sha256')
+    .update(String(Date.now()) + 'riderpassword')
+    .digest('base64url')
+    .slice(0, 24)}`;
+  await client.query('BEGIN');
+  await client.query(
+    `INSERT INTO identity.users (id, email, phone, password_hash) VALUES ($1, $2, $3, $4)`,
+    [
+      riderUserId,
+      // An email is NOT NULL on identity.users, and it is not the handle — the phone is. This is a
+      // synthesised, non-routable address so the column stays honest about being a column nobody
+      // types. It is never used to sign in and never shown to the rider.
+      `rider+${runTag}@riders.zipzap.local`,
+      riderPhone,
+      hashSecret(riderPassword),
+    ],
+  );
+  // A membership, because a session is anchored to a business — `merchant.sessions.merchant_id`
+  // is NOT NULL and `authenticateToken` JOINs `merchant.merchants`. Without a row the rider
+  // passes the password and is then refused with `no_membership`, which is the correct failure
+  // name and the wrong failure for a rider: they are not supposed to be a *member* of anything,
+  // they are supposed to be dispatched to parcels.
+  //
+  // So the RIDER role attaches to the seeded merchant, and its scope bundle is exactly the five
+  // scopes the rider app needs (`rules/roles.ts`) — no shipments:write, no settlements:approve,
+  // nothing that gates another merchant's data. A rider's tenancy is then correct by
+  // construction: they can only act on riders, and the rider module scopes the rest.
+  await client.query(
+    `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
+     VALUES ($1, $2, 'RIDER')`,
+    [riderUserId, merchantId],
+  );
+  // No membership: a rider is not a member of a merchant's business, and a rider must not be
+  // scoped to one merchant's shipments. The rider's scope comes from the rider module's own
+  // records, exactly as it did before this column existed.
+  await client.query('COMMIT');
+
   console.log(`merchant_id : ${merchantId}`);
   console.log(`key_id      : ${keyId}`);
   console.log(`secret      : ${secret}`);
@@ -211,6 +266,12 @@ async function seed() {
   console.log();
   console.log('   (named network+ rather than ops+ because the merchant owner above is already');
   console.log('    ops+<tag> — they are different principals with deliberately different scopes)');
+  console.log();
+  console.log();
+  console.log('Rider app login — PHONE NUMBER, not an email:');
+  console.log(`rider_phone: ${riderPhone}`);
+  console.log(`rider_password: ${riderPassword}`);
+  console.log('   (the email above is a placeholder the column requires, never the handle)');
   console.log();
   console.log('Authorization: ApiKey <key_id>.<secret>');
   console.log('Login:       POST /v1/auth/login { email, password }');
@@ -237,6 +298,9 @@ async function seed() {
   console.log(`export SEED_OPS_PASSWORD=${opsPassword}`);
   console.log(`export SEED_API_KEY_ID=${keyId}`);
   console.log(`export SEED_API_SECRET=${secret}`);
+  console.log(`export SEED_RIDER_EMAIL=rider+${runTag}@riders.zipzap.local`);
+  console.log(`export SEED_RIDER_PASSWORD=${riderPassword}`);
+  console.log(`export SEED_RIDER_PHONE=${riderPhone}`);
 }
 
 async function seedProfile(counts, name, runTag, credentialMerchantId) {

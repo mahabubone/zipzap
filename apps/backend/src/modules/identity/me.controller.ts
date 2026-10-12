@@ -41,10 +41,10 @@ export class MeController {
   async me(@Req() request: AuthenticatedRequest): Promise<ApiPrincipalResponseDto> {
     const principal: ApiPrincipal = request.principal!;
 
-    // Only a person has a name to render. An API key is not a user, and looking one up in
+    // Only a person has an identity to render. An API key is not a user, and looking one up in
     // `identity.users` would return nothing at best and a stranger's row at worst.
-    const displayName =
-      principal.kind === 'human' ? await this.users.findDisplayName(principal.subjectId) : null;
+    const person =
+      principal.kind === 'human' ? await this.users.findPerson(principal.subjectId) : null;
 
     // Field-by-field rather than `{ ...principal, displayName }`: the spread would carry
     // `ApiPrincipal`'s optional `rateLimitPerMin` and its `readonly` arrays straight into a DTO
@@ -53,7 +53,8 @@ export class MeController {
     return {
       kind: principal.kind,
       subjectId: principal.subjectId,
-      displayName,
+      displayName: person?.displayName ?? null,
+      email: person?.email ?? null,
       merchantId: principal.merchantId,
       merchantIds: [...principal.merchantIds],
       scopes: [...principal.scopes],

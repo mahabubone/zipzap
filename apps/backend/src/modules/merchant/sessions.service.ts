@@ -54,7 +54,18 @@ export interface IssuedSession {
 
 /** Provenance for the audit row. Never carries the password — see audit.writer's denylist. */
 export interface LoginAttempt {
-  readonly email: string;
+  /**
+   * The handle typed — an email, or a phone number for a rider.
+   *
+   * One field, not two. A rider is issued a SIM card, not a mailbox, and does not know or care
+   * which kind of identifier their depot handed them; asking for a "login email or phone" and
+   * branching here is the alternative, and it pushes a UI decision into the auth service.
+   *
+   * `handleKind` is resolved by the caller from the shape of the value (see `rules/phone.ts`) so
+   * that this function never has to guess, and so the decision is testable without a database.
+   */
+  readonly identifier: string;
+  readonly handleKind: 'email' | 'phone';
   readonly password: string;
   /** The business to act inside. Must be one the user holds; refused otherwise, never ignored. */
   readonly merchantId?: string | null;
@@ -72,13 +83,14 @@ export class MerchantAuthService {
   ) {}
 
   async loginWithPassword(attempt: LoginAttempt): Promise<IssuedSession | null> {
-    const user = await this.users.findByEmail(attempt.email);
+    const user = await this.users.findByHandle(attempt.identifier, attempt.handleKind);
 
-    // Same failure for unknown email, disabled user and wrong password — never a signal about
-    // which part failed. The password is NOT optional on identity.users (NOT NULL), so there is no
-    // "no password set" case here any more; it lived on merchant.merchants and is gone.
+    // Same failure for an unknown handle, a disabled user and a wrong password — never a signal
+    // about which part failed. Answering differently per case turns login into an account
+    // enumeration oracle, and the rider flow makes that worse rather than better: a shared depot
+    // phone would be discoverable by anyone who guessed it.
     if (!user || user.disabledAt !== null) {
-      await this.audit.record(this.failedAttempt(attempt, !user ? 'unknown_email' : 'disabled'));
+      await this.audit.record(this.failedAttempt(attempt, !user ? 'unknown_handle' : 'disabled'));
       return null;
     }
     if (!(await verifySecret(attempt.password, user.passwordHash))) {

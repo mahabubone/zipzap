@@ -1498,6 +1498,11 @@ export interface components {
              */
             displayName: string | null;
             /**
+             * @description The login email for a human principal. Present so a console can render an identity — a name, an email, and an avatar initial derived from them — without a second round-trip. Null for a machine principal.
+             * @example ayesha@ayesha.test
+             */
+            email: string | null;
+            /**
              * @description The ACTIVE business — the one this request acts inside, always one of merchantIds. Null for a platform administrative key.
              * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
              */
@@ -1527,11 +1532,10 @@ export interface components {
         };
         LoginDto: {
             /**
-             * Format: email
-             * @description The address the account is registered under.
+             * @description The handle the account is registered under — an email address for a merchant, or a phone number for a rider. A rider is issued a SIM card, not a mailbox, and does not know or care which kind of identifier their depot gave them, so there is one field and the server works out which it is. Phone numbers are accepted in any format a person writes them: `01712345678`, `+8801712345678`, `+880 1712-345678` are one account, not three.
              * @example owner@example.com
              */
-            email: string;
+            identifier: string;
             /**
              * @description The account password, checked against a scrypt hash. An unknown address, a disabled user, a wrong password and an inactive business all answer the same 401.
              * @example correct horse battery staple
@@ -3836,7 +3840,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description Email and password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically. */
+        /** @description A handle (email or phone), a password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginDto"];
@@ -3924,7 +3928,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description Email and password, and optionally which business to act inside. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one. */
+        /** @description A handle (email or phone) and a password. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one — which is exactly the rider app. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginDto"];

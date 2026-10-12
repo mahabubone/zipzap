@@ -88,7 +88,7 @@ const PARCELS = [
 const login = await fetch(`${BASE}/v1/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password }),
+  body: JSON.stringify({ identifier: email, password }),
 });
 if (!login.ok) {
   console.error(`login failed: ${login.status} ${await login.text()}`);

@@ -41,7 +41,23 @@ async function settle(page) {
   await page.waitForTimeout(500);
 }
 
-async function shoot(page, name, fullPage = true) {
+/**
+ * Capture the VIEWPORT, not the whole scrollable page.
+ *
+ * This defaulted to `fullPage: true` in every app, which produced a 6,145-pixel screenshot of the
+ * API reference and a 1,582-pixel one of the landing page — images four times taller than the
+ * screen they claim to depict. In a README they render as a sliver, and the argument they were
+ * meant to make (this is what the product looks like) is lost to a scrollbar.
+ *
+ * A screenshot is a photograph of a screen. If a screen needs 6,000 pixels to be understood, the
+ * problem is the screen, not the photograph — and the honest fix is to crop, not to ship the whole
+ * page as an unreadable strip.
+ *
+ * `FULL_PAGE=1` still captures the scroll, for the rare case where the whole document IS the
+ * point. Nothing in shots/ needs it.
+ */
+
+async function shoot(page, name, fullPage = process.env.FULL_PAGE === '1') {
   const file = `${OUT}${DATE}_hub_${name}.png`;
   await page.screenshot({ path: file, fullPage });
   console.log(`shot  ${file}`);

@@ -99,7 +99,9 @@ const PARCELS = [
 const login = await fetch(`${BASE}/v1/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password }),
+  // `identifier`, not `email`: the login DTO takes a handle since phones became valid ones
+  // (rules/phone.ts). A console still sends an email; the field is the same either way.
+  body: JSON.stringify({ identifier: email, password }),
 });
 if (!login.ok) {
   console.error(`login failed: ${login.status} ${await login.text()}`);
@@ -193,6 +195,103 @@ for (const { code, scenario } of created) {
  * freeze money that has not landed, which is the rule doing its job. That is reported, not
  * swallowed, so a failure here is a real signal about the fixture set.
  */
+console.log('\n--- rider positions ---');
+
+/**
+ * Give the seeded riders a live position.
+ *
+ * The control tower's map showed 0 riders, and the honest reason was that the only riders in the
+ * database are the ones the simulations registered, and none of them had ever reported a location —
+ * `rider.riders` starts with `last_known_*` NULL. That is correct for real data and useless as a
+ * screenshot: a map of only hubs does not look like an operations tool, and the whole point of the
+ * screen is that the network is alive.
+ *
+ * So each rider reports through the same endpoint the app uses, spread across the divisions the
+ * network covers. The staleness colouring is NOT defeated — a rider who stops reporting goes grey on
+ * the next snapshot, which is the behaviour worth having.
+ *
+ * Rider ids are read from `rider.riders` because there is no `GET /v1/riders` in the public API and
+ * no rider id in `SimulationResult`. The endpoint that says who exists is the table, so the table is
+ * asked. It uses the rider module's own connection, not a global pool.
+ */
+async function positionRiders() {
+  const pgMod = await import('pg').catch(() => null);
+  if (!pgMod) {
+    console.log('      pg unavailable — skipping rider positions');
+    return;
+  }
+  {
+    const { Client } = pgMod.default ?? pgMod;
+    const riderDb = new Client({ connectionString: process.env.DATABASE_URL });
+    await riderDb.connect();
+    try {
+      const { rows } = await riderDb.query(
+        `SELECT id, display_name FROM rider.riders ORDER BY created_at DESC LIMIT 6`,
+      );
+
+      // Positions are reported AS A RIDER, not as the merchant. `POST /v1/riders/:id/position` is
+      // guarded by `rider:sync`, which is a RIDER-role scope and deliberately not held by any
+      // merchant role — a shop owner must not be able to move a rider on a map. Using the merchant
+      // here gets a 403, which is the system working.
+      if (!process.env.SEED_RIDER_PHONE) {
+        console.log(
+          "      no SEED_RIDER_PHONE — skipping (a position needs the rider's own session)",
+        );
+        return;
+      }
+      const riderLogin = await fetch(`${BASE}/v1/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: process.env.SEED_RIDER_PHONE,
+          password: process.env.SEED_RIDER_PASSWORD,
+        }),
+      });
+      if (!riderLogin.ok) {
+        console.log(`      rider login failed (${riderLogin.status}) — skipping positions`);
+        return;
+      }
+      const { token: riderToken } = await riderLogin.json();
+      const riderAuth = { Authorization: `Bearer ${riderToken}` };
+
+      // Dhaka, Chattogram, Sylhet, Khulna, Rajshahi — the hubs the network actually runs.
+      const hubCoords = [
+        { lat: 23.81, lng: 90.41 },
+        { lat: 22.36, lng: 91.83 },
+        { lat: 24.9, lng: 91.87 },
+        { lat: 22.84, lng: 89.56 },
+        { lat: 24.37, lng: 88.6 },
+      ];
+
+      for (const [i, rider] of rows.entries()) {
+        const hub = hubCoords[i % hubCoords.length];
+        const res = await fetch(`${BASE}/v1/riders/${rider.id}/position`, {
+          method: 'POST',
+          headers: { ...riderAuth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // Jittered by a few hundred metres so markers separate instead of stacking into one
+            // dot and reading as a single rider.
+            latitude: hub.lat + (Math.random() - 0.5) * 0.08,
+            longitude: hub.lng + (Math.random() - 0.5) * 0.08,
+            accuracyMeters: 12,
+            recordedAt: '2026-10-12T10:00:00.000Z',
+          }),
+        });
+        if (!res.ok) {
+          console.error(`      ${(await res.text()).slice(0, 300)}`);
+        }
+        console.log(
+          `${res.ok ? 'positioned' : 'position skipped'}  ${(rider.display_name ?? rider.id).padEnd(16)} → ${res.status}`,
+        );
+      }
+    } finally {
+      await riderDb.end();
+    }
+  }
+}
+
+await positionRiders();
+
 console.log('\n--- settlement ---');
 const post = async (path, body, key) => {
   const res = await fetch(`${BASE}${path}`, {

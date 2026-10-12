@@ -73,6 +73,16 @@ export class ApiPrincipalResponseDto {
   displayName!: string | null;
 
   @ApiProperty({
+    example: 'ayesha@ayesha.test',
+    nullable: true,
+    description:
+      'The login email for a human principal. Present so a console can render an identity — a ' +
+      'name, an email, and an avatar initial derived from them — without a second round-trip. ' +
+      'Null for a machine principal.',
+  })
+  email!: string | null;
+
+  @ApiProperty({
     example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     nullable: true,
     description:

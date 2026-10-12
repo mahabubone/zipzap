@@ -612,7 +612,7 @@ export class ZipZapClient {
    * business the user does not hold rather than falling back to a default.
    */
   async login(
-    email: string,
+    identifier: string,
     password: string,
     merchantId?: string,
   ): Promise<{
@@ -624,7 +624,7 @@ export class ZipZapClient {
   }> {
     const { data } = await this.request('/v1/auth/login', {
       method: 'POST',
-      body: { email, password, ...(merchantId ? { merchantId } : {}) },
+      body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
     return data as {
       token: string;
@@ -645,7 +645,7 @@ export class ZipZapClient {
    * body because a client with no browser has nowhere else to put it.
    */
   async loginToken(
-    email: string,
+    identifier: string,
     password: string,
     merchantId?: string,
   ): Promise<{
@@ -658,7 +658,7 @@ export class ZipZapClient {
   }> {
     const { data } = await this.request('/v1/auth/token', {
       method: 'POST',
-      body: { email, password, ...(merchantId ? { merchantId } : {}) },
+      body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
     return data as {
       token: string;
