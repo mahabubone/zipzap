@@ -31,7 +31,23 @@ const browser = await chromium.launch({
 
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
-async function shoot(path, name, fullPage = true) {
+/**
+ * Capture the VIEWPORT, not the whole scrollable page.
+ *
+ * This defaulted to `fullPage: true` in every app, which produced a 6,145-pixel screenshot of the
+ * API reference and a 1,582-pixel one of the landing page — images four times taller than the
+ * screen they claim to depict. In a README they render as a sliver, and the argument they were
+ * meant to make (this is what the product looks like) is lost to a scrollbar.
+ *
+ * A screenshot is a photograph of a screen. If a screen needs 6,000 pixels to be understood, the
+ * problem is the screen, not the photograph — and the honest fix is to crop, not to ship the whole
+ * page as an unreadable strip.
+ *
+ * `FULL_PAGE=1` still captures the scroll, for the rare case where the whole document IS the
+ * point. Nothing in shots/ needs it.
+ */
+
+async function shoot(path, name, fullPage = process.env.FULL_PAGE === '1') {
   await page.goto(`${SITE}${path}`);
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(600);
