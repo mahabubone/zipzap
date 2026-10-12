@@ -1,21 +1,42 @@
-MIT License
+Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
 
-Copyright (c) 2026 ZipZap
+Copyright (c) 2026 Mahabub — ZipZap
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This work is licensed under the Creative Commons
+Attribution-NonCommercial-NoDerivatives 4.0 International Licence.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+  — You may read it. Clone it, run it locally, look at how it is built.
+  — You may cite it, with attribution, and link to this repository.
+  — You may NOT use it commercially, in whole or in part, without written
+    permission. "Commercially" includes anything that earns money or
+    supports a business, including a product, a service, a hiring exercise
+    or a client deliverable.
+  — You may NOT distribute a modified version. NoDerivatives means the
+    work, as a whole, is what is shared, and changes are not redistributed.
+    See the note below about what this does and does not allow.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Full legal text: https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+────────────────────────────────────────────────────────────────────────
+
+A note on NoDerivatives, because it is a real consequence and not boilerplate
+
+ND blocks redistributing a modified version of the work. It does NOT stop
+you reading, running or learning from this code, and it does not stop you
+making a private fork to understand it.
+
+It does stop two things that a reader may reasonably want:
+
+  — You cannot open a pull request against this repository that changes
+    the code, because that is proposing a redistributable derivative. If
+    you find a bug, please open an issue describing it rather than a PR.
+  — You cannot publish your own copy with changes in it.
+
+That is deliberate. This repository exists to demonstrate how I build
+systems, and the demonstration is the authorship. If you want to build
+something from these ideas, the architecture is documented in docs/ with
+its reasoning and its alternatives — build your own, tell me about it, and
+I will be genuinely pleased.
+
+For a licence that permits modifications while still barring commercial
+use, CC BY-NC 4.0 is the one to ask for.
