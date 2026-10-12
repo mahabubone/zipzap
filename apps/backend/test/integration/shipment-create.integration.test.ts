@@ -32,6 +32,7 @@ import { connectModuleDataSource } from '../../dist/database/module-connection.j
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
 import { TrackingEventEntity } from '../../dist/modules/tracking/tracking-event.entity.js';
+import { buildPricingService } from './harness.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -39,7 +40,7 @@ const describeIfDb = databaseUrl ? describe : describe.skip;
 let shipmentDb: DataSource;
 let trackingDb: DataSource;
 let systemDb: DataSource;
-let pricingDb: DataSource;
+let pricing: Awaited<ReturnType<typeof buildPricingService>>;
 let codDb: DataSource;
 let networkDb: DataSource;
 let service: CreateShipmentService;
@@ -67,7 +68,7 @@ before(async () => {
     PublicTimelineEntity,
   ]);
   systemDb = await connectModuleDataSource('system', []);
-  pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
+  pricing = await buildPricingService();
   codDb = await connectModuleDataSource('cod', [CodRecordEntity]);
   networkDb = await connectModuleDataSource('network', [ServiceAreaEntity]);
 
@@ -75,7 +76,7 @@ before(async () => {
     shipmentDb,
     new ShipmentRepository(),
     new AppendTrackingEventService(),
-    new PricingService(pricingDb, new PricingRepository()),
+    pricing.service,
     new EnsureCodRecordService(codDb),
     new NetworkService(networkDb),
   );
@@ -85,7 +86,8 @@ after(async () => {
   await shipmentDb?.destroy();
   await trackingDb?.destroy();
   await systemDb?.destroy();
-  await pricingDb?.destroy();
+  await pricing?.db.destroy();
+  await pricing?.merchantDb.destroy();
   await codDb?.destroy();
   await networkDb?.destroy();
 });

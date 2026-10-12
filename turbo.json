@@ -32,6 +32,25 @@
       "dependsOn": ["^build", "@zipzap/backend#openapi:export"],
       "outputs": []
     },
+    /* Declared because CI runs `pnpm test:integration`, and turbo refuses to dispatch a task
+     * that no package defines — it errors with "Missing tasks in project" rather than skipping.
+     * So the workflow step existed and could never have gone green.
+     *
+     * `dependsOn: ["build"]` — its OWN build, not `^build` — is load-bearing and was the cause of
+     * a whole class of baffling failures. These suites import from `dist/`, because node:test
+     * cannot load decorators. Without this dependency turbo does not build, but it still restores
+     * `build`'s cached outputs over `dist/`, and a cache entry recorded when `dist/` was empty
+     * silently replaced a good build with nothing. Every suite then failed with
+     * `Cannot find module 'dist/database/module-connection.js'` — sixteen files reporting a
+     * missing build artifact while the build command itself reported success.
+     *
+     * `cache: false` is the point, not an oversight. These tests bind ports and talk to a live
+     * Postgres, Redis and NATS, so a cached "pass" is not evidence about the current tree. */
+    "test:integration": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": ["^build", "@zipzap/api-client#generate"],
       "outputs": []

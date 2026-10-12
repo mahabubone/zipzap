@@ -6,7 +6,7 @@
   "license": "MIT",
   "main": "dist/main.js",
   "scripts": {
-    "build": "nest build",
+    "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "start:api": "node --env-file-if-exists=../../.env dist/main.js",
     "start:worker": "node --env-file-if-exists=../../.env dist/worker.js",

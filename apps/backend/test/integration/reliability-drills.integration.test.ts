@@ -19,14 +19,12 @@ import { money } from '../../dist/common/money.js';
 import { CreateShipmentService } from '../../dist/modules/shipment/create-shipment.service.js';
 import { ShipmentRepository } from '../../dist/modules/shipment/shipment.repository.js';
 import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
-import { PricingService } from '../../dist/modules/pricing/pricing.service.js';
-import { PricingRepository } from '../../dist/modules/pricing/pricing.repository.js';
-import { PricingVersionEntity } from '../../dist/modules/pricing/pricing-version.entity.js';
 import { EnsureCodRecordService } from '../../dist/modules/cod/ensure-cod-record.service.js';
 import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
 import { NetworkService } from '../../dist/modules/network/network.service.js';
 import { ServiceAreaEntity } from '../../dist/modules/network/service-area.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
+import { buildPricingService } from './harness.ts';
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { TrackingEventEntity } from '../../dist/modules/tracking/tracking-event.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
@@ -40,7 +38,7 @@ const describeIfDb = databaseUrl ? describe : describe.skip;
 let shipmentDb: DataSource;
 let trackingDb: DataSource;
 let systemDb: DataSource;
-let pricingDb: DataSource;
+let pricing: Awaited<ReturnType<typeof buildPricingService>>;
 let codDb: DataSource;
 let networkDb: DataSource;
 let service: CreateShipmentService;
@@ -68,7 +66,7 @@ before(async () => {
     PublicTimelineEntity,
   ]);
   systemDb = await connectModuleDataSource('system', []);
-  pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
+  pricing = await buildPricingService();
   codDb = await connectModuleDataSource('cod', [CodRecordEntity]);
   networkDb = await connectModuleDataSource('network', [ServiceAreaEntity]);
 
@@ -76,7 +74,7 @@ before(async () => {
     shipmentDb,
     new ShipmentRepository(),
     new AppendTrackingEventService(),
-    new PricingService(pricingDb, new PricingRepository()),
+    pricing.service,
     new EnsureCodRecordService(codDb),
     new NetworkService(networkDb),
   );
@@ -86,7 +84,8 @@ after(async () => {
   await shipmentDb?.destroy();
   await trackingDb?.destroy();
   await systemDb?.destroy();
-  await pricingDb?.destroy();
+  await pricing?.db.destroy();
+  await pricing?.merchantDb.destroy();
   await codDb?.destroy();
   await networkDb?.destroy();
 });
