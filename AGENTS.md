@@ -3,7 +3,7 @@
 ## What this is
 
 ZipZap — a logistics operating system for e-commerce merchants, riders, hubs and delivery
-operations. Bangladesh first. It models a real courier business end to end: order → pickup →
+operations. It models a real courier business end to end: order → pickup →
 origin hub → line-haul → destination hub → last-mile → COD → settlement.
 
 **Modular monolith.** One deployable, many internal domains. Microservices are an extraction

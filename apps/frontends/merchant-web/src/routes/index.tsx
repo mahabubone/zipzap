@@ -17,8 +17,8 @@ const PILLARS = [
     body: 'Cash on delivery is most orders here. Collection, reconciliation and settlement are tracked, not spreadsheets.',
   },
   {
-    title: 'Built for Bangladesh',
-    body: 'Zones, riders and hubs modelled the way delivery actually works across eight divisions.',
+    title: 'Built for the network you run',
+    body: 'Zones, riders and hubs modelled the way delivery actually works across every division you serve.',
   },
 ];
 
@@ -46,7 +46,7 @@ function Home() {
       <main>
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-6 pt-20 pb-16 text-center">
-          <Badge tone="info">Bangladesh first</Badge>
+          <Badge tone="info">Logistics operating system</Badge>
           <h1 className="mx-auto mt-6 max-w-3xl text-5xl font-semibold tracking-tight text-slate-900">
             The logistics layer your <span className="text-brand-600">e-commerce</span> runs on
           </h1>
@@ -131,7 +131,7 @@ function Home() {
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-sm text-slate-500">
           <Logo />
-          <p>Logistics operating system for Bangladesh.</p>
+          <p>A logistics operating system for delivery teams.</p>
         </div>
       </footer>
     </div>

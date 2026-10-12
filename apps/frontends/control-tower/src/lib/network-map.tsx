@@ -204,7 +204,7 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
           </Badge>
         ) : null}
         <span className="text-xs text-slate-400">
-          Bangladesh · 8 divisions · PostGIS service areas
+          Network coverage · 8 divisions · PostGIS service areas
         </span>
       </div>
     </div>

@@ -96,6 +96,24 @@ if (body.includes('Something went wrong') || body.includes('PERMISSION_DENIED'))
 
 await shoot(page, 'network_map');
 
+// Zoomed to Dhaka at the scale an operator actually works at.
+//
+// The default fit-bounds view fits the whole network, which shows the reach and hides what the
+// screen is opened for: which riders are near which hub right now. Two clicks on the real zoom
+// control rather than reaching into Leaflet's internals — the container does not expose its map
+// instance, and a `flyTo` on `undefined` fails silently and leaves the identical view, which is how
+// the first version of this shot ended up being a second copy of the full-network one.
+const zoomIn = page.locator('.leaflet-control-zoom-in');
+for (let i = 0; i < 2; i++) {
+  await zoomIn.click();
+  await page.waitForTimeout(350);
+}
+// Pan so Dhaka — where the density is — sits centred rather than at the edge of a zoomed frame.
+await page.mouse.move(700, 450);
+await page.mouse.wheel(0, 120);
+await page.waitForTimeout(900);
+await shoot(page, 'network_map_dhaka');
+
 // The list the map falls back to. Worth its own shot: the fallback is a decision (see
 // docs/ADR/0011-postgis.md and the map's own header), and a decision nobody can see is a decision
 // nobody will believe was made.
@@ -112,6 +130,19 @@ if (suppressed > 0) {
   // Not a failure — an honest report. The footer counts what it could not label rather than
   // silently dropping them, and that behaviour is worth stating out loud in the run log.
   console.log('      note: some hub labels were suppressed for lack of room');
+}
+
+// The third ops shot: a marker's detail, open. A map of dots is a picture; the reason an operator
+// opens this screen is to read ONE dot — who it is, what they are doing, when they last checked
+// in — and none of that is visible until a marker is hovered. Capturing it closed would be
+// photographing the map without the part that does the work.
+const riderMarker = page.locator('.leaflet-marker-icon').first();
+if ((await riderMarker.count()) > 0) {
+  await riderMarker.hover();
+  await page.waitForTimeout(700);
+  await shoot(page, 'network_map_rider_detail');
+} else {
+  console.log('skip  network_map_rider_detail (no markers drawn)');
 }
 
 await browser.close();

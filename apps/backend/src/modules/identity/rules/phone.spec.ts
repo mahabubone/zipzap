@@ -65,7 +65,7 @@ describe('normalisePhone', () => {
   });
 
   it('leaves another country`s number exactly as written', () => {
-    // Not inferred, not mangled. This app is Bangladesh-first, but it does not get to break a
+    // Not inferred, not mangled. The country list is narrow on purpose, but it does not get
     // number that already works.
     expect(normalisePhone('+12125550123')).toBe('+12125550123');
   });

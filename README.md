@@ -9,13 +9,12 @@ in one deployable, with five surfaces reading one event stream.
 
 <br/>
 
-[![CI](https://github.com/mahabubone/zipzap/actions/workflows/ci.yml/badge.svg)](https://github.com/mahabubone/zipzap/actions/workflows/ci.yml)
 [![Licence](https://img.shields.io/badge/licence-CC%20BY--NC--ND%204.0-lightgrey.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6.svg)](https://www.typescriptlang.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-12-e0234e.svg)](https://nestjs.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18%20%2B%20PostGIS-336791.svg)](https://www.postgresql.org/)
 
-_Bangladesh first, where cash-on-delivery is the norm and the courier is the whole business._
+_Cash-on-delivery, where the courier holds the customer's money in trust and the money is the risk._
 
 </div>
 
@@ -29,11 +28,11 @@ of, every day, to move a box from a shop door to a customer's hand and get the m
 
 It exists for two reasons.
 
-**The product reason.** Bangladesh is a cash-on-delivery market. The courier holds the customer's
-money in trust from the moment a parcel is handed over, reconciles it against what was quoted, and
-pays it out once the merchant has settled. That is the whole business, and it is where the risk
-lives: a system that treats cash as an afterthought is one lost parcel away from an unrecoverable
-one. ZipZap models the money as carefully as it models the transport.
+**The product reason.** Cash-on-delivery is most orders in this market. The courier holds the
+customer's money in trust from the moment a parcel is handed over, reconciles it against what was
+quoted, and pays it out once the merchant has settled. That is the whole business, and it is where
+the risk lives: a system that treats cash as an afterthought is one lost parcel away from an
+unrecoverable one. ZipZap models the money as carefully as it models the transport.
 
 **The engineering reason.** The interesting problem is simultaneity. One parcel scan has to appear at
 that instant in five places — the merchant's detail view, the operations control tower, the rider's
@@ -65,6 +64,37 @@ flowchart LR
 
 Five surfaces. One stream. No cross-schema JOIN anywhere — which is the only reason the diagram
 above is true and not aspirational.
+
+---
+
+## :construction: Our Technology Stack
+
+**Architecture**: Event-Driven Architecture (EDA) with CQRS logically separated, Transactional outbox pattern & premature microservices ready to extract when needed. Also, this codebase is monorepo with tools like pnpm & turbo.
+
+**Authentication**: JWT based
+
+**Authorization**: Role-based access control (RBAC) with scoped permissions
+
+**Frontend**: React, TanStack Start, Expo (React Native), and Astro.js (for content site only), TailwindCSS.
+
+**Backend**: NestJS, TypeORM, OpenAPI & RESTful APIs
+
+**Database**: PostgreSQL x PostGIS, Redis, NATS JetStream
+
+**Event Bus**: NATS JetStream
+
+**Message Queue**: BullMQ
+
+**Cache**: Redis
+
+**Monitoring**: OpenTelemetry compatible
+
+**Logging**: OpenTelemetry compatible
+
+**Version Control**: Git
+
+> [!NOTE]
+> This repository is a demonstration of the architecture. It is not a production-ready system. Also, I did care about backend much more than our frontends and mobile etc. applications in terms of UI-design to UX enriching. Focusing on them cloud take a lot of time I don't have right now.
 
 ---
 
@@ -163,7 +193,7 @@ flowchart TB
 ```
 
 Seventeen modules, each owning its own Postgres schema, each unreachable from any other by SQL. The
-rule is enforced in CI, not promised in a README.
+rule is enforced by a checker that runs before every commit, not promised in a README.
 
 ---
 
@@ -254,7 +284,7 @@ flowchart LR
 | ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Runtime**       | Node 24 · pnpm 11 · Turbo 2.11              | Strict ESM and a workspace graph, so a package cannot import another's internals by accident                                                                                                      |
 | **Backend**       | NestJS 12                                   | Dependency injection with real module boundaries — `forModule('identity', [...])` scopes a connection per module, which makes a cross-schema query _fail at runtime_ rather than degrade silently |
-| **ORM**           | TypeORM 1.1                                 | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration — CI runs `db:migrate`, `db:revert`, `db:migrate` on every push                                         |
+| **ORM**           | TypeORM 1.1                                 | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration — the gate runs `db:migrate`, `db:revert`, `db:migrate` on every push                                   |
 | **Database**      | PostgreSQL 18 + PostGIS                     | Coverage, service areas and routing are spatial. A healthcheck runs `SELECT postgis_version()`, because "accepts connections" is not "works"                                                      |
 | **Async**         | NATS JetStream · BullMQ · Redis             | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                         |
 | **Language**      | TypeScript 6.0                              | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                    |
@@ -293,7 +323,7 @@ pnpm boundaries:check     # the architecture gate
 
 ```mermaid
 flowchart LR
-    C["📝 Commit"] --> P{"pnpm verify"}
+    C["📝 Every commit"] --> P{"pnpm verify"}
     P --> B["🧱 boundaries:check<br/><i>cross-schema query,<br/>framework import in rules/,<br/>provider wire format escaping,<br/>float in a money field</i>"]
     P --> T["🔍 typecheck"]
     P --> U["🧪 2,411 unit tests"]
@@ -305,13 +335,13 @@ flowchart LR
     T --> V; U --> V; I --> V; K --> V; D --> V
 
     style B fill:#fef2f2,stroke:#dc2626,stroke-width:2px
-    style K fill:#f0fdf4,stroke#22c55e,stroke-width:2px
-    style D fill:#eff6ff,stroke#3b82f6,stroke-width:2px
+    style K fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    style D fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
 ```
 
 `boundaries:check` is 194 lines of zero-dependency JavaScript and the highest-leverage file in the
-repository: it fails CI on the failure modes this architecture is most at risk of, which are
-invisible to a human reading a small diff.
+repository: it fails the gate on the failure modes this architecture is most at risk of, all of which
+are invisible to a human reading a small diff.
 
 ---
 
@@ -351,7 +381,7 @@ invisible to a human reading a small diff.
 ### Operations
 
 <p align="center">
-  <img src="shots/2026-10-12_ops_network_map.png" alt="Control tower on a real Bangladesh basemap" width="900">
+  <img src="shots/2026-10-12_ops_network_map.png" alt="Control tower on a real basemap" width="900">
 </p>
 
 <p align="center">
@@ -443,29 +473,245 @@ Stated plainly, because a portfolio that only lists its strengths is telling you
 
 **Built and designed by [Mahabub](https://github.com/mahabubone).**
 
-<!--
-  ────────────────────────────────────────────────────────────────────────────
-  CONTACT — replace the three lines below with your own. They are deliberately
-  placeholders: I should not write an email address that might be stale, and a
-  wrong contact in a portfolio is worse than none.
-  ────────────────────────────────────────────────────────────────────────────
--->
-
-📧 **Email** · `your.email@example.com`
-💼 **LinkedIn** · `linkedin.com/in/your-handle`
-🐦 **X / Twitter** · `@your-handle`
-
-_Found a bug, or want to talk about the architecture? Open an issue — the
-[`AGENTS.md`](AGENTS.md) conventions are what keep this repo navigable, and an issue gives more
-context than a DM._
+📧 **Email** · `iam.mahabub@proton.me`
+💼 **LinkedIn** · `linkedin.com/in/mahabubone`
 
 ### Libraries this is built on
 
 [NestJS](https://nestjs.com) · [TypeORM](https://typeorm.io) · [PostgreSQL](https://www.postgresql.org) ·
-[PostGIS](https://postgis.net) · [NATS JetStream](https://nats.io) · [BullMQ](https://docs.bullmq.io) ·
+[PostGIS](https://postgis.net) · [NATS JetStream](https://nats.io) · [BullMQ](https://docs.bullmq.io) · [Redis](https://redis.io) ·
 [React](https://react.dev) · [TanStack](https://tanstack.com) · [Expo](https://expo.dev) ·
 [Astro](https://astro.build) · [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org) ·
 [Vitest](https://vitest.dev) · [OpenTelemetry](https://opentelemetry.io)
+
+---
+
+## 📸 Every surface, shot by shot
+
+Forty-two screenshots across five applications. **Every one is regenerable** — this is not a curated
+gallery: `pnpm shots` rebuilds the whole directory against a running stack, so the images cannot
+drift from what the code renders.
+
+```bash
+pnpm seed:shots && pnpm shots     # web · hub · ops · site · mobile
+```
+
+A few also appear above, next to the commentary they belong to. Where they repeat it is on purpose:
+the section above argues, this one indexes.
+
+### 🏪 Merchant console — 21 shots
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_home.png" alt="Landing — the pitch, before any session"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_login.png" alt="Sign in — cookie session, no token in storage"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Landing — the pitch, before any session</sub></td>
+<td align="center"><sub>Sign in — cookie session, no token in storage</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_login_brand_hidden.png" alt="The login split at 900px, where the panel hides"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_mobile_drawer.png" alt="The console at 390px, drawer open"/></td>
+</tr>
+<tr>
+<td align="center"><sub>The login split at 900px, where the panel hides</sub></td>
+<td align="center"><sub>The console at 390px, drawer open</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_shipments.png" alt="Six parcels, six lifecycle states"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_shipment_delivered.png" alt="Twelve-step history, every actor attributed"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Six parcels, six lifecycle states</sub></td>
+<td align="center"><sub>Twelve-step history, every actor attributed</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_shipment_detail.png" alt="A lost parcel — actions off, history intact"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_shipment_new.png" alt="Live server pricing and a coverage check"/></td>
+</tr>
+<tr>
+<td align="center"><sub>A lost parcel — actions off, history intact</sub></td>
+<td align="center"><sub>Live server pricing and a coverage check</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_bulk.png" alt="Bulk import, previewed before it commits"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_money.png" alt="A balance derived from the ledger, not stored"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Bulk import, previewed before it commits</sub></td>
+<td align="center"><sub>A balance derived from the ledger, not stored</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_cod.png" alt="The reconciliation queue — the empty state is honest"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_settlements.png" alt="Settlements, with a downloadable statement"/></td>
+</tr>
+<tr>
+<td align="center"><sub>The reconciliation queue — the empty state is honest</sub></td>
+<td align="center"><sub>Settlements, with a downloadable statement</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_pricing.png" alt="Rate card, with worked examples"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_analytics.png" alt="Analytics over the same event stream"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Rate card, with worked examples</sub></td>
+<td align="center"><sub>Analytics over the same event stream</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_webhooks.png" alt="Webhooks with a per-attempt delivery log"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_notifications.png" alt="Notification preferences, as shipped"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Webhooks with a per-attempt delivery log</sub></td>
+<td align="center"><sub>Notification preferences, as shipped</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_app_notifications_muted.png" alt="The same, toggled to a real merchant state"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_app_control_tower.png" alt="Control tower, as an operations manager"/></td>
+</tr>
+<tr>
+<td align="center"><sub>The same, toggled to a real merchant state</sub></td>
+<td align="center"><sub>Control tower, as an operations manager</sub></td>
+</tr>
+
+### 👤 Customer tracking — 4 shots
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_track_lookup.png" alt="Enter a code — no account, no session"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_track_parcel.png" alt="The journey, without the operational detail"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Enter a code — no account, no session</sub></td>
+<td align="center"><sub>The journey, without the operational detail</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_web_track_not_found.png" alt="An unknown code, answered plainly"/></td>
+<td width="50%"><img src="shots/2026-10-12_web_home.png" alt="The public landing page this ships beside"/></td>
+</tr>
+<tr>
+<td align="center"><sub>An unknown code, answered plainly</sub></td>
+<td align="center"><sub>The public landing page this ships beside</sub></td>
+</tr>
+
+### 📡 Operations — 3 shots
+
+<table>
+<tr>
+<td width="33%"><img src="shots/2026-10-12_ops_network_map.png" alt="Network map"/></td>
+<td width="33%"><img src="shots/2026-10-12_ops_network_map_dhaka.png" alt="Zoomed"/></td>
+<td width="33%"><img src="shots/2026-10-12_ops_network_map_rider_detail.png" alt="Rider detail"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Whole network, fitted</sub></td>
+<td align="center"><sub>Zoomed to where the density is</sub></td>
+<td align="center"><sub>One marker hovered — the reason the screen exists</sub></td>
+</tr>
+</table>
+
+### 🏢 Hub console — 3 shots
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_hub_worklist.png" alt="Hub picker with a live parcels-waiting count"/></td>
+<td width="50%"><img src="shots/2026-10-12_hub_hub_detail.png" alt="Scan-first dock operations for one site"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Hub picker with a live parcels-waiting count</sub></td>
+<td align="center"><sub>Scan-first dock operations for one site</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_hub_manifests.png" alt="Route manifests and reconciliation"/></td>
+<td width="50%"></td>
+</tr>
+<tr>
+<td align="center"><sub>Route manifests and reconciliation</sub></td>
+<td align="center"></td>
+</tr>
+
+### 🚴 Rider — 12 shots
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_auth.png" alt="Mobile number, numeric keypad"/></td>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_jobs.png" alt="Shift feed with cash in hand"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Mobile number, numeric keypad</sub></td>
+<td align="center"><sub>Shift feed with cash in hand</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_job-pickup.png" alt="A pickup batch"/></td>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_job-pickup-queued.png" alt="Queued offline, confirmed with a sequence"/></td>
+</tr>
+<tr>
+<td align="center"><sub>A pickup batch</sub></td>
+<td align="center"><sub>Queued offline, confirmed with a sequence</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_job-delivery.png" alt="A delivery, with what to collect"/></td>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_job-attempt-queued.png" alt="A failed attempt, queued"/></td>
+</tr>
+<tr>
+<td align="center"><sub>A delivery, with what to collect</sub></td>
+<td align="center"><sub>A failed attempt, queued</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_proof-empty.png" alt="Proof capture, empty"/></td>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_proof-code.png" alt="Proof captured — the OTP, the photo, the location"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Proof capture, empty</sub></td>
+<td align="center"><sub>Proof captured — the OTP, the photo, the location</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_sync-pending.png" alt="The queue, believed-state visible"/></td>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_sync-settled.png" alt="Settled rulings, including ones that disagreed"/></td>
+</tr>
+<tr>
+<td align="center"><sub>The queue, believed-state visible</sub></td>
+<td align="center"><sub>Settled rulings, including ones that disagreed</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/mobile/2026-10-12_rider_profile.png" alt="Session and queue summary"/></td>
+<td width="50%"></td>
+</tr>
+<tr>
+<td align="center"><sub>Session and queue summary</sub></td>
+<td align="center"></td>
+</tr>
+
+### 📚 Documentation site — 4 shots
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_site_docs_index.png" alt="Catalog index across six guides"/></td>
+<td width="50%"><img src="shots/2026-10-12_site_api_reference.png" alt="The API reference, generated from the same spec as the client"/></td>
+</tr>
+<tr>
+<td align="center"><sub>Catalog index across six guides</sub></td>
+<td align="center"><sub>The API reference, generated from the same spec as the client</sub></td>
+</tr>
+
+<tr>
+<td width="50%"><img src="shots/2026-10-12_site_docs_rider.png" alt="The rider guide"/></td>
+<td width="50%"><img src="shots/2026-10-12_site_docs_getting_started.png" alt="Getting started, with idempotency explained"/></td>
+</tr>
+<tr>
+<td align="center"><sub>The rider guide</sub></td>
+<td align="center"><sub>Getting started, with idempotency explained</sub></td>
+</tr>
 
 ---
 
@@ -488,6 +734,6 @@ Looking for a licence that allows modifications while still barring commercial u
 
 **⚡ ZipZap** · _The logistics layer your e-commerce runs on._
 
-<sub>Bangladesh first · cash-on-delivery first · integer minor units, always</sub>
+<sub>Cash-on-delivery first · integer minor units, always</sub>
 
 </div>

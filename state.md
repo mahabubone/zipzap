@@ -14,7 +14,7 @@ this file is the bug. Sourced from [`ROADMAP.md`](ROADMAP.md), [`docs/product/vi
 ## 1. Full picture — the thing being built
 
 **ZipZap** is a logistics operating system for e-commerce merchants, riders, hubs and delivery
-operations. Bangladesh first. It models a real courier business end to end.
+operations. It models a real courier business end to end.
 
 ```
 merchant creates order → pricing → pickup requested → rider assigned → rider picks up

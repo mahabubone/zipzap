@@ -23,7 +23,7 @@
  * to delete. `normalisePhone` collapses all of them to one string, so the unique index does the
  * work it is there to do.
  *
- * ## Bangladesh-first, deliberately narrow
+ * ## Deliberately narrow
  *
  * The country is inferred from the national prefix when one is present, which is the only inference
  * made here. `+8801712345678` and `01712345678` are the same number; `+12125550123` is left exactly
@@ -36,8 +36,14 @@
  * and is fixable, the other signs you in as somebody else.
  */
 
-/** Bangladesh's country calling code, and the national trunk prefix it drops. */
-const BD_CC = '880';
+/**
+ * Country calling codes this app will infer for a national number.
+ *
+ * A key on this map, not a bare constant, because the day a second market is added the fix is one
+ * entry and not a rewrite of the inference below — and because a list makes the limitation visible
+ * at the top of the file rather than buried in a branch.
+ */
+const INFERABLE_COUNTRY_CODES = ['880'] as const;
 const BD_TRUNK = '0';
 
 /**
@@ -67,16 +73,17 @@ export function normalisePhone(input: string): string | null {
 
   if (explicitPlus) return `+${digits}`;
 
-  // No `+`: this is a national number, so the country has to be inferred. Only Bangladesh is
-  // inferred, because only Bangladesh is what this app is for.
-  if (digits.startsWith(BD_CC)) return `+${digits}`;
+  // No `+`: this is a national number, so the country has to be inferred. Only the codes on
+  // INFERABLE_COUNTRY_CODES are, because a number that already carries its country code is
+  // unambiguous and needs no inference at all.
+  if (INFERABLE_COUNTRY_CODES.some((cc) => digits.startsWith(cc))) return `+${digits}`;
 
-  // A national BD number: a leading trunk zero is dropped before the country code is added.
+  // A national number: a leading trunk zero is dropped before the country code is added.
   if (digits.startsWith(BD_TRUNK)) {
     const national = digits.slice(BD_TRUNK.length);
     // `0` alone, or `00…`, is not a number anyone can be reached on.
     if (national.length === 0 || national.startsWith(BD_TRUNK)) return null;
-    return `+${BD_CC}${national}`;
+    return `+${INFERABLE_COUNTRY_CODES[0]}${national}`;
   }
 
   // No trunk zero and no country code: a bare subscriber number is ambiguous, and guessing a

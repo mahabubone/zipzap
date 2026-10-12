@@ -45,10 +45,9 @@ function Login() {
           </p>
           <p className="mt-4 leading-relaxed text-slate-400">
             One console for live network counts, your shipments and cash-on-delivery — modelled the
-            way delivery actually works across Bangladesh.
+            way delivery actually works.
           </p>
         </div>
-        <p className="text-sm text-slate-500">Bangladesh first.</p>
       </aside>
 
       <main className="flex flex-col justify-center px-6 py-12">
