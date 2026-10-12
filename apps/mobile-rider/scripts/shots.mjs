@@ -225,7 +225,10 @@ async function settle() {
   await page.waitForTimeout(600);
 }
 
-const email = page.getByPlaceholder('rider@example.com');
+// The rider's handle is a phone number, not an email. The placeholder changed with it, and a shots
+// script that still fills `rider@example.com` fails on the first field with a 30-second timeout
+// rather than anything that looks like a login problem.
+const phone = page.getByPlaceholder('01712345678');
 const password = page.getByPlaceholder('••••••••');
 const riderId = page.getByPlaceholder('The rider you are working as');
 
@@ -233,7 +236,7 @@ await page.goto(BASE);
 await settle();
 await shoot('auth');
 
-await email.fill('rider@example.com');
+await phone.fill('01712345678');
 await password.fill('shot-password');
 await riderId.fill('rider-7');
 await page.getByRole('button', { name: 'Sign in' }).click();
