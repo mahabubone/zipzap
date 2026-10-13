@@ -395,7 +395,7 @@ pnpm prove:browser        # three browser proofs against a running stack: map, l
 | Workspaces in the graph                       | **12**                                      |
 | Documentation files                           | **77** markdown                             |
 | Screenshots, all regenerable by `pnpm shots`  | **42** across 6 apps                        |
-| Code                                          | ~85k lines of TypeScript, TSX and Astro     |
+| Code                                          | ~84k lines of TypeScript, TSX and Astro     |
 
 ### The gates, and what they actually prevent
 
