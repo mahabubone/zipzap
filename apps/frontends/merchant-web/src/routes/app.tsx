@@ -10,6 +10,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { AppShell, BrandMark, type NavGroup, type NavLinkRender } from '@zipzap/ui';
 import { apiClient } from '../lib/api.ts';
+import { activeLink } from '../lib/console-nav.ts';
 import { UserIdentity } from '../lib/user-identity.tsx';
 
 /**
@@ -90,19 +91,13 @@ const LINKS = [
 ] as const;
 
 function navFor(pathname: string): NavGroup[] {
+  // In `src/lib/console-nav.ts`, with its own suite: this rule's failure mode is two rows of the
+  // sidebar lit at once, which is visible in a screenshot and invisible in a diff.
+  const lit = activeLink(pathname, LINKS);
   return [
     {
       label: 'Operate',
-      items: LINKS.map((l) => ({
-        ...l,
-        // `/app` must not light up for `/app/shipments`, and `/app/shipments/new`
-        // would light BOTH — so the longer path is matched exactly and only the
-        // list uses a prefix test.
-        active:
-          l.href === '/app'
-            ? pathname === '/app'
-            : pathname === l.href || pathname.startsWith(`${l.href}/`),
-      })),
+      items: LINKS.map((l) => ({ ...l, active: l.href === lit })),
     },
   ];
 }
@@ -127,6 +122,13 @@ function ConsoleLayout() {
 
   // The shell renders plain anchors; without this every nav click is a full
   // document reload and the console loses its session-scoped state.
+  //
+  // `activeOptions={{ exact: true }}` is load-bearing, not a default worth spelling out. TanStack's
+  // `Link` decides activeness itself and writes `aria-current="page"` from that decision — by prefix,
+  // so on `/app/shipments/new` it lit the overview, the list *and* the create form. The shell already
+  // decides which row is lit (`activeLink` in `src/lib/console-nav.ts`); the router's opinion is a
+  // second, looser opinion that overwrites it. `exact` makes the router's answer agree with ours on
+  // every row it has an opinion about, and stay silent on the rest.
   const renderLink: NavLinkRender = ({
     href,
     className,
@@ -134,7 +136,13 @@ function ConsoleLayout() {
     'aria-current': ariaCurrent,
     onNavigate,
   }) => (
-    <Link to={href} className={className} aria-current={ariaCurrent} onClick={onNavigate}>
+    <Link
+      to={href}
+      className={className}
+      activeOptions={{ exact: true }}
+      aria-current={ariaCurrent}
+      onClick={onNavigate}
+    >
       {children}
     </Link>
   );

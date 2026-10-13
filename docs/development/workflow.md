@@ -76,18 +76,36 @@ stated rather than implied.
 boundaries → format → proofs → typecheck → unit
 ```
 
-| Command                 | What it proves                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm boundaries:check` | No cross-schema SQL, no framework in `rules/`, no provider wire format outside its adapter, no float on a money-shaped name    |
-| `pnpm format:check`     | One formatter, so a diff is about the change and not about the author's editor                                                 |
-| `pnpm prove`            | Eleven zero-dependency proofs, including one that reads the backend's scan kinds and asserts the dock's vocabulary covers each |
-| `pnpm typecheck`        | Every workspace, and the generated client against the spec                                                                     |
-| `pnpm test`             | Unit tests. Vitest, colocated `*.spec.ts`, no mocks of the code under test                                                     |
-| `pnpm test:integration` | The behaviour of the above against real Postgres, Redis and NATS — Testcontainers, not mocks, for the things being tested      |
+| Command                 | What it proves                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm boundaries:check` | No cross-schema SQL, no framework in `rules/`, no provider wire format outside its adapter, no float on a money-shaped name                                  |
+| `pnpm format:check`     | One formatter, so a diff is about the change and not about the author's editor                                                                               |
+| `pnpm prove`            | Eleven zero-dependency proofs, including one that reads the backend's scan kinds and asserts the dock's vocabulary covers each                               |
+| `pnpm typecheck`        | Every workspace, and the generated client against the spec                                                                                                   |
+| `pnpm test`             | Unit tests. Vitest, colocated `*.spec.ts`, no mocks of the code under test                                                                                   |
+| `pnpm test:integration` | The behaviour of the above against real Postgres, Redis and NATS — Testcontainers, not mocks, for the things being tested                                    |
+| `pnpm prove:stack`      | Six proofs against a running API: the typed client's decoding, tokens, the webhook portal, the OpenAPI round trip, notification preferences, delivery proofs |
+| `pnpm prove:browser`    | Three proofs in a real browser against the running stack: the map's projection and tile policy, the login split, the public tracking page                    |
 
 `pnpm verify` runs the first five. `.githooks/pre-commit` (installed with `pnpm hooks:install`)
 runs the boundary checker in full and Prettier on the staged files only, because a hook that takes
 a minute is a hook that gets `--no-verify`'d. Integration tests are deliberately not in the hook.
+
+### Two proofs that are not wired, and why
+
+Sixteen `verify-*.mjs` scripts existed with no command reaching any of them. Fourteen now do. The two
+that do not are left in the tree with the reason written at the top of each, because a script that
+silently does not run is worse than one that is known to be stale:
+
+- **`apps/frontends/hub-console/scripts/verify-console.mjs`** — written against bearer tokens, before
+  the HttpOnly session cookie (ADR-0016), and against a hub console that took a hub code in the URL
+  rather than resolving one from `GET /v1/hubs/my-hub`. It needs a cookie jar and a `hub.staff` fixture
+  row; that is a rewrite of its auth half, not a field rename.
+- **`apps/frontends/control-tower/scripts/verify-map-fallback.mjs`** — needs two dev servers of its
+  own, because the tile URL is baked in at build time and the whole point is for it to be wrong. It
+  cannot run against the stack that is already up.
+
+Both are run by hand, deliberately, and both are documented where they live.
 
 **Order matters if you are also photographing the app**: `dashboard.integration.test.ts` empties the
 shipment, rider, COD and delivery tables, so run it _before_ `pnpm seed:shots`, never after.

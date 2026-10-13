@@ -14,25 +14,11 @@ import type { Coverage, Quote } from '@zipzap/api-client';
 import { apiClient } from '../../lib/api.ts';
 import { toE164 } from '../../lib/phone.ts';
 import { parseAmount } from '../../lib/money.ts';
+import { zoneLabel, useAsync } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/app/shipments/new')({
   component: NewShipment,
 });
-
-/** Zones the seed covers. `GET /v1/coverage?zone=` is the authority, not this list. */
-const ZONES = [
-  'dhaka-metro',
-  'dhaka-outside',
-  'chattogram',
-  'sylhet',
-  'khulna',
-  'rajshahi',
-  'cumilla',
-  'bogura',
-  'barishal',
-  'rangpur',
-  'mymensingh',
-] as const;
 
 interface Form {
   senderName: string;
@@ -59,7 +45,9 @@ const EMPTY: Form = {
   parcelWeightGrams: '',
   parcelDescription: '',
   codAmount: '',
-  zone: 'dhaka-metro',
+  // Empty, not a default. The zone list comes from the server, and a hard-coded default here is a
+  // guess that would quietly override the server's first zone — or name one it does not serve.
+  zone: '',
   remoteArea: false,
   fragile: false,
 };
@@ -73,6 +61,27 @@ function newIdempotencyKey(): string {
 function NewShipment() {
   const navigate = useNavigate();
   const [form, setForm] = useState<Form>(EMPTY);
+
+  /**
+   * Zones, from the server.
+   *
+   * This list was hard-coded, with a comment saying the server was the authority — and then the list
+   * screen beside it read the same thing from `GET /v1/zones` for exactly the reason that comment
+   * gave. Two screens, two sources, one of them a snapshot of a day when somebody counted: a retired
+   * zone offered on a create form, a new one missing from it, and a form that submits a destination
+   * the pricing engine has never heard of.
+   *
+   * The chosen zone is preserved across a re-fetch, so a merchant who has already typed a weight and
+   * filled a recipient does not lose the form because the zone list arrived a second later.
+   */
+  const zones = useAsync(() => apiClient().zones(), 'zones');
+  useEffect(() => {
+    const first = zones.data?.[0];
+    if (first === undefined) return;
+    setForm((current) => (current.zone === '' ? { ...current, zone: first } : current));
+  }, [zones.data]);
+
+  const zoneOptions = (zones.data ?? []).map((zone) => ({ value: zone, label: zoneLabel(zone) }));
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -372,7 +381,7 @@ function NewShipment() {
                   id="zone"
                   value={form.zone}
                   onChange={(e) => set('zone', e.target.value)}
-                  options={ZONES.map((z) => ({ value: z, label: z }))}
+                  options={zoneOptions}
                 />
               </FormField>
             </div>

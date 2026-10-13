@@ -339,7 +339,7 @@ function LegendItem({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <svg width="24" height="8" style={{ opacity }}>
+      <svg width="24" height="8" style={{ opacity }} aria-hidden="true">
         <line x1="0" y1="4" x2="24" y2="4" stroke={color} strokeWidth="2" strokeDasharray={dash} />
       </svg>
       <span className="text-slate-700">{label}</span>

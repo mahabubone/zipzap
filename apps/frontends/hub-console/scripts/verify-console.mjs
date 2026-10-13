@@ -27,9 +27,29 @@
  * `pg` resolves from the backend workspace via PG (below), so this works without anything installed
  * here. Same convention as merchant-web/scripts/shots.mjs.
  *
- * Run: API_URL=http://localhost:3005 WEB_URL=http://127.0.0.1:5177 \
- *      PG=../../backend/node_modules/pg/esm/index.mjs \
- *      node apps/frontends/hub-console/scripts/verify-console.mjs
+ * ## Not wired into `pnpm prove:browser`, and why
+ *
+ * This one has drifted, and the drift is worth writing down rather than discovering at 2am.
+ *
+ * 1. **It authenticates with a bearer token.** `POST /v1/auth/login` is sent `{ email, password }` and
+ *    reads `session.token`. The endpoint takes `identifier`, and browsers get an HttpOnly session
+ *    cookie instead of a token (ADR-0016) — so `session.token` is `undefined`, every `Authorization:
+ *    Bearer …` header is `Bearer undefined`, and the proof fails at its own first check. The fix is a
+ *    cookie jar for the API calls and `context.addCookies` for the browser half, not a one-line
+ *    change to the field name.
+ * 2. **Its fixture user has no hub.** The console now resolves the hub from `GET /v1/hubs/my-hub` and
+ *    a person is *assigned* to one; an `identity.user_merchants` row with `HUB_OPERATOR` is no longer
+ *    enough. The fixture needs a `hub.staff` row, and the browser assertions start at `/my-hub` rather
+ *    than at a hub code.
+ *
+ * Both are real work rather than a two-minute patch, so it is left visible and unwired. The subject it
+ * covers — a hub operator's work list at phone width, and a refusal rendered in full — is also covered
+ * by `scripts/shots.mjs` and by the hub console's own route, and neither of those depends on a token
+ * that no longer exists.
+ *
+ * Run, once the two changes above are made:
+ *   API_URL=http://localhost:3000 WEB_URL=http://localhost:5176 DATABASE_URL=… \
+ *   node apps/frontends/hub-console/scripts/verify-console.mjs
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core').then(
   (m) => m.default ?? m,

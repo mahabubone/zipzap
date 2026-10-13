@@ -2,16 +2,28 @@
  * Stage 5 exit check four, in a real browser: the map degrades to a list when the tile server is
  * unreachable.
  *
- * The backend half is proven over HTTP in apps/backend/scripts/tmp-s5-map.mjs. This covers the part
- * an API cannot: that a *rendered* console notices dead tiles and swaps itself, without an operator
- * clicking anything, and that the markers — which this app draws itself — survive the swap as data.
+ * This covers the part an API cannot: that a *rendered* console notices dead tiles and swaps itself,
+ * without an operator clicking anything, and that the markers — which this app draws itself — survive
+ * the swap as data.
  *
  * Both tile states are driven by pointing VITE_TILE_URL at a host that does not answer and at one
  * that does, so neither is asserted by mocking the image loader. A mocked `onError` proves the
  * handler runs; it does not prove a browser fires it.
  *
- * Run: API_URL=... WEB_URL=http://127.0.0.1:5178 DEAD_TILE_WEB=http://127.0.0.1:5199 \
- *      OPS_EMAIL=... OPS_PASSWORD=... node apps/frontends/control-tower/scripts/verify-map-fallback.mjs
+ * ## Not wired into `pnpm prove:browser`, and why
+ *
+ * It needs two servers of its own — the console on 5178 and a dead-tile host on 5199 — started with
+ * `VITE_TILE_URL` pointing at each in turn. The other browser proofs run against the stack that is
+ * already up; this one cannot, because the tile URL is baked in at build time and the point is to have
+ * it be wrong.
+ *
+ * So it is run by hand, deliberately, and its absence from the wired command is a stated gap rather
+ * than a missing entry in an array. The header used to point at `apps/backend/scripts/tmp-s5-map.mjs`
+ * for the backend half, which no longer exists.
+ *
+ * Run, with both servers already started:
+ *   API_URL=... WEB_URL=http://127.0.0.1:5178 DEAD_TILE_WEB=http://127.0.0.1:5199 \
+ *   OPS_EMAIL=... OPS_PASSWORD=... node apps/frontends/control-tower/scripts/verify-map-fallback.mjs
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core').then(
   (m) => m.default ?? m,

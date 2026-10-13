@@ -377,18 +377,19 @@ Full reasoning, with the alternatives that were rejected, lives in
 ## 🧪 What proves it works
 
 ```bash
-pnpm verify               # boundaries → format → proofs → typecheck → 2,494 unit tests
+pnpm verify               # boundaries → format → proofs → typecheck → 2,502 unit tests
 pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
-pnpm prove:stack          # the browser and live-stack proofs: client, tokens, webhooks, proofs
+pnpm prove:stack          # six proofs against a running API: client, tokens, webhooks, proofs
+pnpm prove:browser        # three browser proofs against a running stack: map, login split, tracking
 ```
 
 |                                               |                                             |
 | --------------------------------------------- | ------------------------------------------- |
 | Domain modules, each owning a Postgres schema | **17**                                      |
 | HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
-| Unit tests                                    | **2,494**                                   |
+| Unit tests                                    | **2,502**                                   |
 | Integration tests on live infrastructure      | **86** across 17 files                      |
-| Standalone proofs, reachable from one command | **11**                                      |
+| Standalone proofs, reachable from a command   | **20** across four commands                 |
 | Reviewed, reversible migrations               | **51**                                      |
 | Architecture decision records                 | **17**, each with the alternatives rejected |
 | Workspaces in the graph                       | **12**                                      |
@@ -405,7 +406,7 @@ flowchart LR
     P --> F["💅 format:check"]
     P --> V["🧷 pnpm prove<br/><i>11 zero-dependency proofs</i>"]
     P --> T["🔍 typecheck"]
-    P --> U["🧪 2,494 unit tests"]
+    P --> U["🧪 2,502 unit tests"]
     P --> I["🔗 test:integration<br/><i>real PG / NATS / Redis</i>"]
 
     B --> G([✅ green])
@@ -421,10 +422,13 @@ repository: it fails on the failure modes this architecture is most at risk of, 
 invisible to a human reading a small diff. With no CI, `.githooks/pre-commit` runs it and prettier on
 every commit, so the gate is where the work happens rather than somewhere nobody looks.
 
-`pnpm prove` exists because eleven `verify-*.mjs` proofs were reachable from no command at all —
-not from `package.json`, not from anything. One of them now checks the dock's vocabulary against the
+`pnpm prove` exists because eleven `verify-*.mjs` proofs were reachable from no command at all — not
+from `package.json`, not from anything. Twenty are now reachable across four commands
+(`prove`, `prove:stack`, `prove:browser`), one of them checking the dock's vocabulary against the
 server's scan kinds across the module boundary, so a sixth gesture cannot reach a loading dock as a
-button labelled `Scan`.
+button labelled `Scan`. The two that are still unwired — and what has drifted in each — are named in
+[`docs/development/workflow.md`](docs/development/workflow.md), because a script that silently does not
+run is worse than one that is known to be stale.
 
 ---
 
