@@ -1,0 +1,64 @@
+---
+/**
+ * The shell every prose doc page renders inside.
+ *
+ * Two jobs: a sidebar of siblings (so a catalog is navigable from any of its pages) and the prose
+ * styles. The sidebar is generated from the collection rather than a hand-maintained list, because
+ * a sidebar that has to be edited alongside every page is a sidebar that ends up wrong.
+ */
+import Base from '../layouts/Base.astro';
+import { getCollection, type CollectionEntry } from 'astro:content';
+
+interface Props {
+  /** Which collection this page belongs to. */
+  collection: string;
+  /** The current page's entry, so the sidebar can light up the right row. */
+  entry: CollectionEntry<'onboarding' | 'rider' | 'hub' | 'operations' | 'faq'>;
+  /** Human label for the catalog, shown in the sidebar heading. */
+  label: string;
+  /** Where the catalog lives in the URL. */
+  basePath: string;
+}
+
+const { collection, entry, label, basePath } = Astro.props;
+
+const siblings = (await getCollection(collection as 'onboarding')).sort((left, right) => {
+  const leftOrder = left.data.order ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = right.data.order ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return left.data.title.localeCompare(right.data.title);
+});
+---
+
+<Base title={entry.data.title} description={entry.data.description} current={basePath}>
+  <div class="mx-auto flex max-w-6xl gap-10 px-5 py-10">
+    <aside class="hidden w-56 shrink-0 lg:block">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-pale">
+        {label}
+      </p>
+      <nav aria-label={label} class="flex flex-col gap-0.5 text-sm">
+        {
+          siblings.map((sibling) => (
+            <a
+              href={`${basePath}/${sibling.id}`}
+              aria-current={sibling.id === entry.id ? 'page' : undefined}
+              class:list={[
+                'rounded-md px-2.5 py-1.5 transition-colors',
+                sibling.id === entry.id
+                  ? 'bg-canvas font-medium text-ink'
+                  : 'text-slate hover:bg-canvas hover:text-ink',
+              ]}
+            >
+              {sibling.data.title}
+            </a>
+          ))
+        }
+      </nav>
+    </aside>
+
+    <article class="prose min-w-0 max-w-3xl flex-1">
+      <p class="text-xs font-medium uppercase tracking-wide text-slate-pale">{label}</p>
+      <slot />
+    </article>
+  </div>
+</Base>

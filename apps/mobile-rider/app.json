@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "ZipZap Rider",
+    "slug": "zipzap-rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "scheme": "zipzap-rider",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zipzap.rider",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ZipZap Rider uses the camera to capture a photo as proof of delivery. The photo is attached to the delivery it proves and nothing else."
+      }
+    },
+    "android": {
+      "package": "com.zipzap.rider",
+      "usesCleartextTraffic": false,
+      "permissions": ["android.permission.CAMERA"],
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow ZipZap Rider to keep your signed-in session in the device keychain."
+        }
+      ]
+    ]
+  }
+}

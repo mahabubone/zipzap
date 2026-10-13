@@ -18,3 +18,14 @@ allowBuilds:
   # report usage to a third party.
   '@scarf/scarf': false
   msgpackr-extract: true
+
+# React's types, pinned across every workspace package.
+#
+# `@stoplight/elements` pulls `@stoplight/mosaic`, which declares `@types/react@17`. Without this
+# override, both 17 and 19 land in the pnpm store, and TypeScript — resolving through `typeRoots`
+# and therefore able to see either — reports `Outlet`/`Link` as invalid JSX components with an error
+# about `children` missing from `ReactPortal`. Every consumer breaks, in packages that did not
+# change, with an error that names nothing about docs or Stoplight.
+overrides:
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0

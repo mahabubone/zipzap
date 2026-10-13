@@ -22,6 +22,8 @@ import { DashboardService } from './dashboard.service.ts';
 import { DashboardController } from './dashboard.controller.ts';
 import { ReportService } from './report.service.ts';
 import { ReportController } from './report.controller.ts';
+import { MapService } from './map.service.ts';
+import { MapController } from './map.controller.ts';
 
 @Module({
   imports: [
@@ -34,8 +36,8 @@ import { ReportController } from './report.controller.ts';
     HubModule,
     IdentityModule,
   ],
-  providers: [DashboardService, ReportService],
-  controllers: [DashboardController, ReportController],
+  providers: [DashboardService, ReportService, MapService],
+  controllers: [DashboardController, ReportController, MapController],
   exports: [DashboardService],
 })
 export class DashboardModule {}

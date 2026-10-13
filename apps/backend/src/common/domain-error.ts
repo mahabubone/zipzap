@@ -63,6 +63,49 @@ export class ResourceNotFoundError extends DomainError {
   } satisfies DomainErrorSpec;
 }
 
+/**
+ * No such member of this business.
+ *
+ * A 404 rather than a 403, and for the same reason `assertTenant` hides a merchant id: a 403
+ * confirms the person is a member of the business, which is an oracle for who works there. Callers
+ * reaching this with a merchant id they do not belong to get the same answer as callers reaching it
+ * with one they do.
+ */
+export class MembershipNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'MEMBERSHIP_NOT_FOUND',
+    status: 404,
+    title: 'Not a member',
+  } satisfies DomainErrorSpec;
+}
+
+/** This person is already a member of this business. */
+export class MembershipExistsError extends DomainError {
+  readonly spec = {
+    code: 'MEMBERSHIP_EXISTS',
+    status: 409,
+    title: 'Already a member',
+  } satisfies DomainErrorSpec;
+}
+
+/** The account being invited is disabled, so inviting it would silently reactivate it. */
+export class MemberDisabledError extends DomainError {
+  readonly spec = {
+    code: 'MEMBER_DISABLED',
+    status: 409,
+    title: 'Account disabled',
+  } satisfies DomainErrorSpec;
+}
+
+/** The business named by the path does not exist (or does not belong to this principal). */
+export class MerchantNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'MERCHANT_NOT_FOUND',
+    status: 404,
+    title: 'Business not found',
+  } satisfies DomainErrorSpec;
+}
+
 export class CommandQueueFullError extends DomainError {
   readonly spec = {
     code: 'COMMAND_QUEUE_FULL',
@@ -99,6 +142,21 @@ export class CodRecordNotFoundError extends DomainError {
     code: 'COD_RECORD_NOT_FOUND',
     status: 404,
     title: 'COD record not found',
+  } satisfies DomainErrorSpec;
+}
+
+/**
+ * A settlement that does not exist, or belongs to another merchant.
+ *
+ * One error for both, on purpose: `assertTenant` runs after the lookup and throws this rather than
+ * `PermissionDeniedError`, because a 403 confirms the row exists and a settlement id is sequential
+ * enough to be enumerated. Same reasoning as `assertTenant` itself.
+ */
+export class SettlementNotFoundError extends DomainError {
+  readonly spec = {
+    code: 'SETTLEMENT_NOT_FOUND',
+    status: 404,
+    title: 'Settlement not found',
   } satisfies DomainErrorSpec;
 }
 
@@ -236,6 +294,110 @@ export class DependencyUnavailableError extends DomainError {
  */
 export type DomainErrorClass = new (...args: any[]) => DomainError;
 
+/**
+ * Proof of delivery. Five failure modes because the rider needs five different instructions —
+ * "wait for a new code" and "stop guessing" are not the same message, and a single boolean would
+ * collapse them into a shrug.
+ *
+ * These live here rather than in `delivery/rules/proof.ts` because `DOMAIN_ERROR_SPECS` is what turns
+ * a domain error into a §87 envelope, and a class missing from that map answers 500 — an
+ * infrastructure fault for what is a rider being told the truth about a doorstep.
+ */
+export class ProofCodeExpiredError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_EXPIRED',
+    status: 410,
+    title: 'Delivery code expired',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofCodeAttemptsExhaustedError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_ATTEMPTS_EXHAUSTED',
+    status: 429,
+    title: 'Too many wrong codes',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofCodeInvalidError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_INVALID',
+    status: 422,
+    title: 'Wrong delivery code',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofPhotoMissingError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_PHOTO_REQUIRED',
+    status: 422,
+    title: 'Photo required',
+  } satisfies DomainErrorSpec;
+}
+
+export class ProofPhotoTooLargeError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_PHOTO_TOO_LARGE',
+    status: 413,
+    title: 'Photo too large',
+  } satisfies DomainErrorSpec;
+  constructor(
+    readonly bytes: number,
+    readonly max: number,
+  ) {
+    super(`Delivery photo is ${bytes} bytes; the limit is ${max}.`);
+  }
+}
+
+export class ProofLocationImplausibleError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_LOCATION_IMPLAUSIBLE',
+    status: 422,
+    title: 'Implausible location',
+  } satisfies DomainErrorSpec;
+}
+
+/** Raised by `complete` when a rider tries to mark a parcel delivered with no evidence behind it. */
+export class ProofRequiredError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_REQUIRED',
+    status: 409,
+    title: 'Proof of delivery required',
+  } satisfies DomainErrorSpec;
+}
+
+/**
+ * A redemption arrived for a job that was never sent a code.
+ *
+ * Distinct from `ProofCodeExpiredError` on purpose: "expired" tells the rider to ask for a new code,
+ * this tells them to ask for one *at all* — and it is the answer to a bug in the caller, not a
+ * customer-facing dead end.
+ */
+export class ProofCodeNotIssuedError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_CODE_NOT_ISSUED',
+    status: 409,
+    title: 'No delivery code issued',
+  } satisfies DomainErrorSpec;
+}
+
+/**
+ * There is no proof to capture here: the job is not at a door, or it was already proved.
+ *
+ * One error for both because the rider's next move is the same in each case — nothing. Splitting
+ * them would only tell a caller which of two non-actions it was about to take.
+ */
+export class ProofNotAvailableError extends DomainError {
+  readonly spec = {
+    code: 'PROOF_NOT_AVAILABLE',
+    status: 409,
+    title: 'Proof not available',
+  } satisfies DomainErrorSpec;
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> = new Map<
   DomainErrorClass,
   DomainErrorSpec
@@ -255,8 +417,22 @@ export const DOMAIN_ERROR_SPECS: ReadonlyMap<DomainErrorClass, DomainErrorSpec> 
   [ServiceabilityFailedError, new ServiceabilityFailedError('reason').spec],
   [ReconciliationExceptionError, new ReconciliationExceptionError().spec],
   [ManifestIncompleteError, new ManifestIncompleteError([]).spec],
+  // Was missing, so a full offline queue surfaced as a 500 — an infrastructure fault for what is
+  // ordinary backpressure. Unreachable only because no HTTP route could fill the queue; the moment
+  // the device replay route landed it would have shipped. Caught by reading the spec against the
+  // classes, which is what this map exists for.
+  [CommandQueueFullError, new CommandQueueFullError(0, 0).spec],
   [RateLimitedError, new RateLimitedError(60).spec],
   [DependencyUnavailableError, new DependencyUnavailableError().spec],
+  [ProofCodeExpiredError, new ProofCodeExpiredError().spec],
+  [ProofCodeAttemptsExhaustedError, new ProofCodeAttemptsExhaustedError().spec],
+  [ProofCodeInvalidError, new ProofCodeInvalidError().spec],
+  [ProofPhotoMissingError, new ProofPhotoMissingError().spec],
+  [ProofPhotoTooLargeError, new ProofPhotoTooLargeError(1, 2).spec],
+  [ProofLocationImplausibleError, new ProofLocationImplausibleError().spec],
+  [ProofRequiredError, new ProofRequiredError().spec],
+  [ProofCodeNotIssuedError, new ProofCodeNotIssuedError().spec],
+  [ProofNotAvailableError, new ProofNotAvailableError('x').spec],
 ]);
 
 export function isDomainError(value: unknown): value is DomainError {

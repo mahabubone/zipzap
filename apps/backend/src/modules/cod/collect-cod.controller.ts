@@ -7,10 +7,19 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsInt, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { CollectCodService, type CollectedCod } from './collect-cod.service.ts';
+import { CollectCodService } from './collect-cod.service.ts';
+import { CollectedCodDto } from './cod-response.dto.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 
 export class CollectCodDto {
@@ -20,6 +29,10 @@ export class CollectCodDto {
   /** Integer minor units. A decimal here is a bug, not a convenience. */
   @IsInt()
   @Min(0)
+  @ApiProperty({
+    type: 'integer',
+    description: 'Integer minor units (poisha). A decimal here is a bug, not a convenience.',
+  })
   collectedMinor!: number;
 }
 
@@ -29,14 +42,37 @@ export class CollectCodDto {
 export class CollectCodController {
   constructor(@Inject(CollectCodService) private readonly collectCod: CollectCodService) {}
 
+  @ApiErrors()
   @Post('collect')
   @ApiOperation({ summary: 'Record a COD collection' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    type: CollectCodDto,
+    description:
+      'The shipment being collected against and the cash actually taken, in integer poisha — ' +
+      'a decimal amount is rejected here, never rounded. The `Idempotency-Key` header is what ' +
+      'makes a retried collection safe.',
+  })
+  @ApiOkResponse({
+    type: CollectedCodDto,
+    description:
+      'What was actually taken beside the frozen quote that promised it: `expectedMinor` is ' +
+      'never rewritten by a collection, so `shortfallMinor` is the gap between promise and ' +
+      'reality, recorded rather than smoothed over. Partial collection is a recorded outcome, ' +
+      'not an error, and a replay of the same `Idempotency-Key` returns this same body with ' +
+      '`replayed: true`.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Retry guard for a money-moving call: a replay with the same key returns the original ' +
+      'response instead of collecting twice.',
+  })
   async collect(
     @Body() body: CollectCodDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CollectedCod & { replayed: boolean }> {
+  ): Promise<CollectedCodDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }

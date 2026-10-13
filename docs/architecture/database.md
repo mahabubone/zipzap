@@ -8,28 +8,28 @@ PostgreSQL 16+ with PostGIS. The only source of truth in the system.
 
 One schema per module. The schema _is_ the boundary.
 
-| Schema         | Module       | Owns                                                                               |
-| -------------- | ------------ | ---------------------------------------------------------------------------------- |
-| `identity`     | identity     | users, sessions, credentials, roles, permissions                                   |
-| `merchant`     | merchant     | merchants, branches, addresses, contracts, credentials, webhooks                   |
-| `customer`     | customer     | customers, phones, addresses                                                       |
-| `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                                    |
-| `pickup`       | pickup       | pickup requests, batches, assignments, attempts                                    |
-| `hub`          | hub          | hubs, staff, capacity, schedules                                                   |
-| `network`      | network      | geo hierarchy (division→…→delivery point), service areas, routes, manifests, trips |
-| `rider`        | rider        | riders, devices, availability, performance, command_queue (offline sync)           |
-| `delivery`     | delivery     | delivery jobs, attempts, proof                                                     |
-| `tracking`     | tracking     | tracking events (append-only)                                                      |
-| `pricing`      | pricing      | pricing rules, quotes, contracts                                                   |
-| `cod`          | cod          | COD records, collection attempts                                                   |
-| `finance`      | finance      | ledger accounts, entries, settlements                                              |
-| `returns`      | returns      | return requests, approvals                                                         |
-| `notification` | notification | templates, messages, deliveries                                                    |
-| `support`      | support      | tickets, messages, status history                                                  |
-| `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                             |
-| `analytics`    | analytics    | projections only                                                                   |
-| `dashboard`    | dashboard    | none — read-only control-tower surface, no tables                                  |
-| `system`       | system       | outbox, idempotency keys                                                           |
+| Schema         | Module       | Owns                                                                                |
+| -------------- | ------------ | ----------------------------------------------------------------------------------- |
+| `identity`     | identity     | users, user_merchants (roles are code; sessions and API credentials are merchant's) |
+| `merchant`     | merchant     | merchants, branches, addresses, contracts, api_credentials, sessions, webhooks      |
+| `customer`     | customer     | customers, phones, addresses                                                        |
+| `shipment`     | shipment     | shipments, parcels, scans, bulk_jobs, bulk_rows                                     |
+| `pickup`       | pickup       | pickup requests, batches, assignments, attempts                                     |
+| `hub`          | hub          | hubs, staff, capacity, schedules                                                    |
+| `network`      | network      | geo hierarchy (division→…→delivery point), service areas, routes, manifests, trips  |
+| `rider`        | rider        | riders, devices, availability, performance, command_queue (offline sync)            |
+| `delivery`     | delivery     | delivery jobs, attempts, proof                                                      |
+| `tracking`     | tracking     | tracking events (append-only)                                                       |
+| `pricing`      | pricing      | pricing rules, quotes, contracts                                                    |
+| `cod`          | cod          | COD records, collection attempts                                                    |
+| `finance`      | finance      | ledger accounts, entries, settlements                                               |
+| `returns`      | returns      | return requests, approvals                                                          |
+| `notification` | notification | templates, messages, deliveries, merchant_preferences                               |
+| `support`      | support      | tickets, messages, status history                                                   |
+| `warehouse`    | warehouse    | warehouses, bins, inventory, movements                                              |
+| `analytics`    | analytics    | projections only                                                                    |
+| `dashboard`    | dashboard    | none — read-only control-tower surface, no tables                                   |
+| `system`       | system       | outbox, idempotency keys, consumed events, audit events (append-only)               |
 
 No foreign keys across schemas. A `rider_id` in `delivery` is a bare identifier — an
 application-level reference, not a constraint. See
@@ -56,6 +56,35 @@ Rules:
 pnpm --filter @zipzap/backend db:migrate   # apply
 pnpm --filter @zipzap/backend db:revert    # roll back the last one
 ```
+
+## Identity and multi-business
+
+A login is a **person** (`identity.users`); a **membership** (`identity.user_merchants`) is that
+person's role inside one merchant. One person may hold several, which is why tenancy is a set rather
+than a single id: `ApiPrincipal.merchantId` is the active business, `merchantIds` is every business
+the principal may act inside, and `assertTenant` checks membership. A business outside the set gets
+the same 404 as one that does not exist.
+
+`role` sits on the **membership**, not on the user and not on the session, so one person can be an
+operator in one store and an owner in another. It is a `text` column with a CHECK rather than a
+Postgres enum, for the same reason the session role was: the vocabulary is code
+(`identity/rules/roles.ts`) and an enum needs a migration every time a role is added.
+
+`user_merchants.merchant_id` and `sessions.user_id` are **bare uuids, never foreign keys** — the
+counterpart table belongs to another module, and a cross-schema FK is the coupling
+[ADR-0002](../ADR/0002-postgresql-schema-boundaries.md) exists to prevent.
+
+Migration 0036 moved the password hash off `merchant.merchants` onto `identity.users` and dropped
+`sessions.role`, backfilling one user and one `MERCHANT_OWNER` membership per merchant that had a
+password. Both columns were **dropped, not nulled**: each now has one source of truth, and leaving a
+second copy of a credential in the database is one more thing to rotate and one more place to leak
+from.
+
+The membership table has been **writable since 2026-10-11** (migration 0048 added the `members:manage`
+scope). `user_merchants.merchant_id` still has no foreign key, so a membership can name a business
+that does not exist — the write path checks through `MERCHANT_LOOKUP` rather than by querying across
+the boundary, and a membership for a business that has since been deleted is left alone rather than
+cascaded, because `merchant` owns that decision.
 
 ## Naming
 
@@ -95,10 +124,74 @@ queries in the system.
 application. Tracking codes are a separate, human-facing, collision-checked value — never the
 primary key.
 
+## The reviewer's decision is its own columns
+
+`cod.records` carries `review_note text`, `reviewed_by uuid` and `reviewed_at timestamptz`, added by
+`1759000000038-CodExceptionReview`.
+
+It also still carries `failure_note`, which is never written. **That is deliberate, and the reason
+is the difference in shape.** A failure note describes a problem; a reviewer note records a
+decision. One nullable text column cannot honestly hold both, and the second is the one the
+reconciliation queue is built around — it is what tells the next person that somebody already looked
+at this parcel and concluded the rider was right.
+
+The partial index below is what makes the queue cheap, and it is written to be usable:
+
+```sql
+CREATE INDEX records_open_exceptions_idx
+  ON cod.records (merchant_id, created_at DESC)
+  WHERE status = 'RECONCILIATION_EXCEPTION';
+```
+
+`exceptionsFor` therefore pins `status = 'RECONCILIATION_EXCEPTION'` in its `WHERE` rather than
+filtering in application code — filtering afterwards would not use the index, and the queue is the
+one COD query an operator waits on.
+
+`merchant.merchants.plan text NOT NULL DEFAULT 'standard'` came from `1759000000039-MerchantPlan`.
+The plan used to be a **request body field** on both `POST /v1/pricing/quote` and
+`POST /v1/shipments`, which meant any caller could name `"growth"` and be quoted the 1000bps
+discount. It is a column now, read through `MERCHANT_PLAN_LOOKUP` (rule 2: pricing may not open
+`merchant`). The backfill is `standard` — 0bps — so no existing merchant's price changed.
+
+## Projections are re-grained, never duplicated
+
+`analytics.cod_summary` is keyed `(merchant_id, day, currency)` since migration `0047`. It used
+to be `(day, currency)` — network-wide, so a merchant had nowhere to read their own money from.
+Re-grained rather than copied beside a network table: two tables holding the same collections
+must agree, and the sum silently stopping equaling the whole is a bug you find by accident.
+Summing the merchant rows reproduces the network figure exactly.
+
+`analytics.merchant_daily_shipments` is keyed `(merchant_id, day)`. Both are projections —
+rebuildable from the outbox, never authoritative ([../domains/analytics.md](../domains/analytics.md)).
+
+## A preference is a row, and its absence is the answer
+
+`notification.merchant_preferences` (migration `1759000000045`) is `(merchant_id, event_type,
+enabled, updated_at)` keyed on `(merchant_id, event_type)`. Two decisions in it are not the
+obvious ones:
+
+**Absent means send.** A merchant is opted out by _writing_ a row. There is no `is_default`
+column and no row for a merchant who has never touched the screen. Defaulting off would silently
+stop every merchant being told where their parcels are, and nothing anywhere would report it —
+a failure with no symptom. Re-enabling **deletes** the row rather than storing `enabled = true`,
+so absence stays the single way to say "default" and the table never accumulates rows that say
+nothing.
+
+**The event vocabulary is imported, not retyped.** The `CHECK (event_type IN (...))` list is
+built from `NOTIFIABLE_EVENTS` in `modules/notification/rules/preferences.ts` — the same array the
+consumer reads and the DTO validates against. Hand-maintaining a second copy in SQL is how a
+fourth event ends up configurable in the UI and rejected by the database, or sent for everyone
+with no way to opt out.
+
 ## Append-only tables
 
-`tracking.events`, `finance.ledger_entries`, `audit.events`, and webhook delivery logs are never
-updated or deleted. Not by application code, not by a backfill, not by hand.
+`tracking.events`, `finance.ledger_entries`, `audit.events`, webhook delivery logs, and a
+`VERIFIED` row in `delivery.delivery_proofs` are never updated or deleted. Not by application
+code, not by a backfill, not by hand.
+
+`delivery.delivery_proofs` is the one table that is append-only _from a point_: a `PENDING` row is
+live challenge state and takes counter writes, and the trigger freezes it the moment it becomes
+`VERIFIED`. See [../domains/delivery.md](../domains/delivery.md#proof-of-delivery).
 
 Correct a mistake by writing a new row that references the original. That is what makes the
 history defensible in a dispute over a COD collection six weeks ago.
@@ -161,6 +254,20 @@ backs a list endpoint, every geometry column (`GIST`), every partial index marki
 Never: index a low-cardinality boolean, or add an index to avoid writing a better query.
 
 Every index has a write cost. An unused index is a permanent tax on every insert.
+
+### GIN needs its operator classes, and `btree_gin` is not optional
+
+`ILIKE '%term%'` has a leading wildcard, so no btree can serve it. `pg_trgm` supplies
+`gin_trgm_ops`. But a composite GIN over `(merchant_id, tracking_code, …)` also needs an operator
+class for `merchant_id`, and **a plain GIN index has no default operator class for `uuid`** — the
+migration fails with `data type uuid has no default operator class for access method "gin"`.
+`btree_gin` supplies `gin_uuid_ops`.
+
+Both extensions must be created **inside the migration, before the index**. Installing them by hand
+to get past the error locally is how this hides until CI: an already-migrated database has the
+extension, so the statement passes there, and only a database that has never been migrated reproduces
+the failure. `1759000000037-ShipmentZone` was verified by creating a scratch database and running
+every migration from scratch.
 
 ## Retention
 

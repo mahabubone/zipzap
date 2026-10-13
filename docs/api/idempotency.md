@@ -111,6 +111,35 @@ interface OfflineCommand {
 Replay is ordered by `createdAt`. A command that is no longer valid — the shipment was cancelled
 while the device was offline — is **rejected explicitly** and reported back to the device.
 
+**What actually ships (`POST /v1/riders/:riderId/sync/replay`).** The `OfflineCommand` interface above
+is the _decision_; the wire is:
+
+```jsonc
+{
+  "commands": [
+    {
+      "deviceSequence": 41, // device-minted, monotonic, half the dedupe key
+      "createdAt": "2026-10-09T11:04:00Z", // the DEVICE's clock — the server orders on this
+      "commandType": "zipzap.rider.delivery",
+      "payload": { "shipmentId": "…" },
+      "expectedState": { "shipmentId": "…", "shipmentStatus": "OUT_FOR_DELIVERY" },
+    },
+  ],
+}
+```
+
+The response rules each command by `kind`:
+
+| `kind`      | Meaning                                                                        | Device action                                        |
+| ----------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `applied`   | First time, valid.                                                             | Drop from pending.                                   |
+| `rejected`  | First time, invalid. `reason` is human-readable.                               | Drop from pending, **show the reason**. Not retried. |
+| `duplicate` | This `deviceSequence` was already submitted. `reason` says what happened then. | Drop from pending, reconcile.                        |
+
+There is **no `deviceId` and no `commandId`**. `deviceSequence` is the key and it is minted on the
+device — which is why a phone that loses its keys still cannot apply a scan twice, and why a
+`rider.devices` revocation table is still owed before a lost phone can be cut off.
+
 Silently dropping it leaves the rider believing a scan succeeded that did not. They will tell the
 merchant, and the merchant will tell support, and the parcel will be unaccounted for.
 

@@ -173,7 +173,7 @@ describeIfDb('the flagship story — merchant order to DELIVERED', () => {
     // 1. Merchant creates a COD order. Serviceability gates it (coverage rows).
     const created = await createShipment.execute({
       merchantId: MERCHANT,
-      merchantPlan: 'standard',
+
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,
@@ -330,7 +330,7 @@ describeIfDb('the flagship story — merchant order to DELIVERED', () => {
   test('an out-of-order scan is rejected by the machine, not silently absorbed', async () => {
     const created = await createShipment.execute({
       merchantId: MERCHANT,
-      merchantPlan: 'standard',
+
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,
@@ -366,7 +366,7 @@ describeIfDb('the flagship story — merchant order to DELIVERED', () => {
     // Get a parcel to the gate: create → request → assign → scanned (PICKED_UP).
     const created = await createShipment.execute({
       merchantId: MERCHANT,
-      merchantPlan: 'standard',
+
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,

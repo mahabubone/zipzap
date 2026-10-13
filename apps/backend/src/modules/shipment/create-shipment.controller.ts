@@ -7,7 +7,15 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -20,7 +28,8 @@ import {
 } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { CreateShipmentService, type CreatedShipment } from './create-shipment.service.ts';
+import { CreateShipmentService } from './create-shipment.service.ts';
+import { CreatedShipmentDto } from './shipment-response.dto.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
 import { money } from '../../common/money.ts';
 
@@ -46,14 +55,23 @@ export class CreateShipmentDto {
   @IsString() @IsNotEmpty() @MaxLength(200) parcelDescription!: string;
 
   /** Money as integer minor units. A decimal here is a bug, not a convenience. */
-  @IsOptional() @IsInt() @IsPositive() codAmountMinor?: number;
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  @ApiProperty({
+    type: 'integer',
+    required: false,
+    description:
+      'Cash on delivery, in integer minor units (poisha). Omit for a non-COD shipment; zero is not ' +
+      'the same as omitted.',
+  })
+  codAmountMinor?: number;
   @IsOptional() @Matches(/^[A-Z]{3}$/) codCurrency?: string;
 
   @IsString() @MaxLength(80) zone!: string;
   @IsBoolean() remoteArea!: boolean;
   @IsBoolean() fragile!: boolean;
   @IsOptional() @IsString() @MaxLength(40) packagingKind?: string;
-  @IsString() @MaxLength(40) merchantPlan!: string;
 }
 
 @ApiTags('shipments')
@@ -64,15 +82,35 @@ export class CreateShipmentController {
     @Inject(CreateShipmentService) private readonly createShipment: CreateShipmentService,
   ) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Create a shipment' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    type: CreateShipmentDto,
+    description:
+      'Both contacts, the parcel, and the three surcharge flags — everything the price and the ' +
+      'serviceability check depend on. The merchant comes from the credential, never from here.',
+  })
+  @ApiCreatedResponse({
+    type: CreatedShipmentDto,
+    description:
+      'The shipment as stored: its tracking code, its status, and the cash the rider will be asked ' +
+      'to collect (integer minor units). A retried Idempotency-Key returns this same body with ' +
+      '`replayed: true` instead of a second parcel.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required here (ADR-0010): the same key replayed returns the original response rather than ' +
+      'creating a duplicate parcel. The same key with a different body is rejected as key reuse.',
+  })
   async create(
     @Body() body: CreateShipmentDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CreatedShipment & { replayed: boolean }> {
+  ): Promise<CreatedShipmentDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       // Mandatory on this operation (ADR-0010): a retried create would duplicate the parcel.
       throw new DuplicateRequestError('Idempotency-Key header is required.');
@@ -82,7 +120,6 @@ export class CreateShipmentController {
     const { result, replayed } = await this.createShipment.execute({
       // merchantId comes from the credential, never from the body.
       merchantId: principal.merchantId!,
-      merchantPlan: body.merchantPlan,
       zone: body.zone,
       remoteArea: body.remoteArea,
       fragile: body.fragile,

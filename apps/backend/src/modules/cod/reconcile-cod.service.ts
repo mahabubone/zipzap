@@ -11,7 +11,14 @@
  * amount. The reviewer's identity is recorded with the decision, because a mismatch resolution
  * without an owner is indistinguishable from a cover-up.
  *
- * A mismatch that is never reviewed blocks settlement. That is the product working.
+ * A mismatch that is never reviewed blocks settlement. That is the product working — and as of
+ * this writing it is finally true rather than merely asserted: `blocksSettlement` in rules/cod.ts
+ * is enforced by `CreateSettlementService`, so an unreviewed exception refuses the freeze instead of
+ * silently shrinking it.
+ *
+ * The reviewer's note is written to `cod.records.review_note`, not only to the tracking event. The
+ * tracking event was always written, but nothing read it: the exception queue is a work queue, and a
+ * reviewer note you cannot see while reviewing the item is not an audit trail.
  */
 
 import { Inject, Injectable } from '@nestjs/common';
@@ -52,10 +59,15 @@ export class ReconcileCodService {
       // reconciled or not yet collected, and resolving those would be meaningless.
       assertTransition(record.status as CodStatus, 'COD_RECONCILED');
 
+      // One instant for the row and the event: a review recorded a second before the correction it
+      // explains reads as two facts, and only one of them is true.
+      const now = new Date();
       record.status = 'COD_RECONCILED';
+      record.reviewNote = command.note;
+      record.reviewedBy = command.actorId;
+      record.reviewedAt = now;
       await this.records.save(manager, record);
 
-      const now = new Date();
       await this.tracking.append(manager, {
         id: randomUUID(),
         shipmentId: command.shipmentId,
@@ -72,8 +84,14 @@ export class ReconcileCodService {
         aggregateId: record.id,
         payload: {
           shipmentId: command.shipmentId,
+          merchantId: record.merchantId,
+          currency: record.currency,
           reviewerId: command.actorId,
           note: command.note,
+          // The three figures a reviewer decided between. Carried on the event so a downstream
+          // consumer never has to read `cod` to learn what was resolved.
+          expectedMinor: Number(record.expectedMinor),
+          collectedMinor: record.collectedMinor === null ? null : Number(record.collectedMinor),
         },
       });
 

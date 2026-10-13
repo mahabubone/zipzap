@@ -5,6 +5,7 @@ import { ShipmentEntity } from './shipment.entity.ts';
 import { ShipmentRepository } from './shipment.repository.ts';
 import { CreateShipmentService } from './create-shipment.service.ts';
 import { ShipmentLookup, SHIPMENT_LOOKUP } from './shipment.lookup.ts';
+import { ShipmentHandoffLookup, SHIPMENT_HANDOFF_LOOKUP } from './shipment-handoff.lookup.ts';
 import { BulkJobEntity, BulkRowEntity } from './bulk.entity.ts';
 import { BulkRepository } from './bulk.repository.ts';
 import { BulkImportService, BULK_QUEUE } from './bulk-import.service.ts';
@@ -20,6 +21,7 @@ import { CreateShipmentController } from './create-shipment.controller.ts';
 import { ListShipmentsController } from './list-shipments.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentDetailController } from './shipment-detail.controller.ts';
+import { GetShipmentService } from './get-shipment.service.ts';
 import { CancelShipmentService } from './cancel-shipment.service.ts';
 import { ReportExceptionService } from './report-exception.service.ts';
 import { ReportExceptionController } from './report-exception.controller.ts';
@@ -55,13 +57,16 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
     ReportExceptionService,
     HoldReleaseService,
     ListShipmentsService,
+    GetShipmentService,
     AppendTrackingEventService,
     ShipmentAdvanceService,
     { provide: SHIPMENT_LOOKUP, useClass: ShipmentLookup },
+    ShipmentHandoffLookup,
+    { provide: SHIPMENT_HANDOFF_LOOKUP, useExisting: ShipmentHandoffLookup },
     BulkRepository,
     BulkImportService,
     BulkProcessor,
   ],
-  exports: [SHIPMENT_LOOKUP, ShipmentAdvanceService, ShipmentRepository],
+  exports: [SHIPMENT_LOOKUP, SHIPMENT_HANDOFF_LOOKUP, ShipmentAdvanceService, ShipmentRepository],
 })
 export class ShipmentModule {}

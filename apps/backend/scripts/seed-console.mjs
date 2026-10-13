@@ -114,7 +114,6 @@ for (const [i, p] of PARCELS.entries()) {
       zone: p.zone,
       remoteArea: false,
       fragile: false,
-      merchantPlan: 'standard',
     }),
   });
   const body = await res.json();

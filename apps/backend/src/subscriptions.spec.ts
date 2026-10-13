@@ -28,6 +28,8 @@ const AGGREGATE_OF: Record<string, string> = {
   DeliveryCompleted: 'delivery',
   CODCollected: 'cod',
   CODPartialCollection: 'cod',
+  CODCollectionFailed: 'cod',
+  CODReconciled: 'cod',
   SettlementApproved: 'settlement',
   SettlementCompleted: 'settlement',
   ReturnRequested: 'return',

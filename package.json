@@ -6,6 +6,10 @@
     "node": ">=22"
   },
   "scripts": {
+    "api:sync": "turbo run openapi:export generate",
+    "api:check": "pnpm api:sync && git diff --exit-code -- apps/backend/openapi.json apps/backend/openapi.yaml packages/api-client/src/generated.d.ts",
+    "docs:dev": "pnpm --filter @zipzap/site dev",
+    "docs:build": "turbo run build --filter=@zipzap/site",
     "boundaries:check": "node scripts/check-boundaries.mjs",
     "build": "turbo run build",
     "db:migrate": "pnpm --filter @zipzap/backend db:migrate",

@@ -15,7 +15,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
-import { ResourceNotFoundError } from '../../common/domain-error.ts';
+import { ResourceNotFoundError, ProofRequiredError } from '../../common/domain-error.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { DeliveryRepository } from './delivery.repository.ts';
@@ -23,6 +23,7 @@ import { ShipmentLookup, SHIPMENT_LOOKUP } from '../shipment/shipment.lookup.ts'
 import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { CollectCodService } from '../cod/collect-cod.service.ts';
 import { assertTransition, type DeliveryStatus } from './rules/delivery.ts';
+import { assertProofIsComplete } from './rules/proof.ts';
 import { shipmentsDeliveredTotal } from '../../common/metrics';
 
 @Injectable()
@@ -101,6 +102,18 @@ export class AdvanceDeliveryService {
     return this.deliveryDataSource.transaction(async (manager) => {
       const job = await this.jobs.findByIdForUpdate(manager, jobId);
       if (!job) throw new ResourceNotFoundError('Delivery job not found.');
+
+      // No evidence, no delivery. This is the one line that makes proof-of-delivery a feature
+      // rather than a screen: every other way of reaching DELIVERED in this service goes through
+      // here, so a rider tapping "delivered" on a bare status change stops working and the
+      // customer gets an answer with a name and a photo behind it.
+      const proof = await this.jobs.findVerifiedProof(manager, job.id);
+      if (!proof) {
+        throw new ProofRequiredError(
+          'Marking a parcel delivered requires a proof: a code the recipient read out, a photo, and a location.',
+        );
+      }
+      assertProofIsComplete(proof);
 
       // ATTEMPTED -> DELIVERED via the machine: OUT_FOR_DELIVERY must pass through ATTEMPTED
       // first (see record-attempt), so a job that was never attempted 409s here instead of

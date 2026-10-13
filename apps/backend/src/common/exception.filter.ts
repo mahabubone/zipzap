@@ -15,6 +15,7 @@ import {
   type DomainErrorClass,
 } from './domain-error';
 import { INTERNAL_ERROR_SPEC, toEnvelope } from './error-envelope';
+import { resolveRequestId } from './request-id.ts';
 
 /**
  * A dependency failure is a 503, not a 500: the request did not fail, the
@@ -55,8 +56,10 @@ export class DomainExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const response = http.getResponse<Response>();
-    const request = http.getRequest<Request>();
-    const requestId = String(request.headers['x-request-id'] ?? 'unknown');
+    const request = http.getRequest<Request & { requestId?: string }>();
+    // The middleware already resolved and validated this. Reading the raw header here would
+    // resurrect the `'unknown'` fallback and trust a client-supplied value unvalidated.
+    const requestId = request.requestId ?? resolveRequestId(request.headers['x-request-id']);
 
     if (isDomainError(exception)) {
       const spec =

@@ -4,6 +4,7 @@ import { ServiceAreaEntity } from './service-area.entity.ts';
 import { NetworkService } from './network.service.ts';
 import { ManifestService } from './manifest.service.ts';
 import { CoverageController } from './coverage.controller.ts';
+import { ManifestController } from './manifest.controller.ts';
 import { ShipmentModule } from '../shipment/shipment.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
@@ -23,7 +24,7 @@ import { IdentityModule } from '../identity/identity.module.ts';
     IdentityModule,
   ],
   providers: [NetworkService, ManifestService],
-  controllers: [CoverageController],
+  controllers: [CoverageController, ManifestController],
   exports: [NetworkService, ManifestService],
 })
 export class NetworkModule {}

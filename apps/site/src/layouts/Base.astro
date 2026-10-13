@@ -1,0 +1,111 @@
+---
+/**
+ * The page shell: brand, nav, and the outlet.
+ *
+ * `slot` is used rather than a `children` prop because this is a layout, and Astro's slot is the
+ * idiomatic way to pass a rendered subtree into one.
+ *
+ * The header is deliberately plain — a docs site's chrome should never compete with its content.
+ * The nav items are the catalog slugs, so adding a catalog page is the only way to change the nav.
+ */
+
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Catalog slug for the current page, so the matching nav link lights up. */
+  current?: string;
+}
+
+const NAV = [
+  { href: '/', label: 'Docs' },
+  { href: '/api-reference', label: 'API Reference' },
+  { href: '/merchant-onboarding', label: 'Merchant Onboarding' },
+  { href: '/rider', label: 'Rider' },
+  { href: '/hub', label: 'Hub' },
+  { href: '/operations', label: 'Operations' },
+  { href: '/faq', label: 'FAQ' },
+];
+
+const { title, description, current } = Astro.props;
+const fullTitle = title === 'Docs' ? 'ZipZap Documentation' : `${title} · ZipZap Documentation`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    {/*
+      Registers Stoplight's custom elements on the client.
+      A frontmatter `import '@stoplight/elements'` runs on the SERVER and is thrown away — the page
+      ships with no JS, and `<elements-api>` is an unknown tag, which looks exactly like a failed
+      spec fetch. This `<script>` is bundled and sent to the browser.
+
+      The subpath is the whole point. `@stoplight/elements` declares `sideEffects` only for
+      `web-components.min.js`, so the bare `'.'` import is a side-effect-free module as far as the
+      bundler is concerned and gets tree-shaken out entirely — the script ships, the registration
+      does not, and nothing renders. Importing the declared path is the fix.
+    */}
+    <script>
+      import '@stoplight/elements/web-components.min.js';
+
+      if (typeof window !== 'undefined') {
+        (window as unknown as { __zipzapElements?: boolean }).__zipzapElements = true;
+      }
+    </script>
+
+    <header class="sticky top-0 z-10 border-b border-line bg-paper/85 backdrop-blur">
+      <div class="mx-auto flex h-14 max-w-6xl items-center gap-6 px-5">
+        <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+            <rect width="20" height="20" rx="5" class="fill-accent" />
+            <path d="M6 10.5l2.5 2.5L14 7.5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>ZipZap Docs</span>
+        </a>
+        <nav class="flex flex-1 items-center gap-1 text-sm" aria-label="Site">
+          {
+            NAV.map((item) => (
+              <a
+                href={item.href}
+                aria-current={current === item.href ? 'page' : undefined}
+                class:list={[
+                  'rounded-md px-2.5 py-1.5 transition-colors',
+                  current === item.href
+                    ? 'bg-canvas font-medium text-ink'
+                    : 'text-slate hover:bg-canvas hover:text-ink',
+                ]}
+              >
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+        <a
+          href="https://app.zipzap.com"
+          class="hidden rounded-md border border-line px-3 py-1.5 text-sm text-slate transition-colors hover:bg-canvas hover:text-ink sm:block"
+          >Console</a
+        >
+      </div>
+    </header>
+
+    <slot />
+
+    <footer class="mt-20 border-t border-line py-8">
+      <div class="mx-auto max-w-6xl px-5 text-sm text-slate">
+        <p>
+          ZipZap — logistics operating system for e-commerce merchants, riders, hubs and delivery
+          operations. Bangladesh first.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

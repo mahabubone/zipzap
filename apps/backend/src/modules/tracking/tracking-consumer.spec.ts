@@ -32,9 +32,11 @@ function message(type: string, data: Record<string, unknown>, aggregateType = 'x
 describe('TrackingConsumer dispatch', () => {
   let consumer: TrackingConsumer;
   let projected: { trackingCode: string; shipmentId: string; eventType: string }[];
+  let minted: { shipmentId: string; token: string }[];
 
   beforeEach(async () => {
     projected = [];
+    minted = [];
     const lookup: ShipmentLookup = {
       findTrackingCode: vi.fn(async (shipmentId: string) =>
         shipmentId === 'missing' ? null : `ZP-${shipmentId.slice(0, 8).toUpperCase()}`,
@@ -48,6 +50,11 @@ describe('TrackingConsumer dispatch', () => {
             const paramsArray = params as unknown[];
             if (sql.includes('MAX(sequence)')) return [{ next: projected.length + 1 }];
             if (sql.includes('consumed_events')) return [{ event_id: 'evt-1' }];
+            if (sql.includes('public_tokens')) {
+              // INSERT binds (shipment_id, token).
+              minted.push({ shipmentId: String(paramsArray[0]), token: String(paramsArray[1]) });
+              return [];
+            }
             if (!sql.includes('public_timeline')) return [];
             // INSERT binds (id, tracking_code, shipment_id, sequence, event_type, occurred_at).
             projected.push({
@@ -122,6 +129,30 @@ describe('TrackingConsumer dispatch', () => {
       await consumer.handle({ subject: 'x', payload: new TextEncoder().encode('{nope') }),
     ).toBe('malformed');
     expect(projected).toHaveLength(0);
+  });
+
+  it('mints one 26-char public token per parcel, never the same token twice', async () => {
+    await consumer.handle(message('PickupAssigned', { shipmentIds: ['s-1', 's-2'] }));
+    expect(minted.map((m) => m.shipmentId)).toEqual(['s-1', 's-2']);
+    for (const { token } of minted) {
+      expect(token).toHaveLength(26);
+      // The alphabet drops I, L, O and U: an operator reading a token down the phone must not have to
+      // spell "one" as "eye" and "five" as "fife".
+      expect(token).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    }
+    expect(new Set(minted.map((m) => m.token)).size).toBe(2);
+  });
+
+  it('offers a token again on a later event — the row PK settles it, so the link cannot rotate', async () => {
+    await consumer.handle(message('ShipmentCreated', { shipmentId: 's-1' }));
+    await consumer.handle(message('DeliveryOutForDelivery', { shipmentId: 's-1' }));
+    // Two events, two attempts, same parcel — and the insert is keyed by shipment_id with
+    // ON CONFLICT DO NOTHING, so the second is discarded rather than replacing a token a customer has
+    // already bookmarked. Asserting the two candidate tokens differ is what makes that real: if they
+    // matched, this test would pass without the DO NOTHING clause doing anything.
+    const inserts = minted.filter((m) => m.shipmentId === 's-1');
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0]!.token).not.toBe(inserts[1]!.token);
   });
 
   it('skips unresolvable shipment ids without failing the batch', async () => {

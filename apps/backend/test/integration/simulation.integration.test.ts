@@ -46,7 +46,7 @@ const codes = new Map<Scenario, string>();
 async function newShipment(scenario: Scenario): Promise<string> {
   const created = await app.get(CreateShipmentService).execute({
     merchantId: MERCHANT,
-    merchantPlan: 'standard',
+
     zone: 'dhaka-metro',
     remoteArea: false,
     fragile: false,

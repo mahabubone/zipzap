@@ -20,9 +20,9 @@ SMS · email · push · WhatsApp-compatible integration · in-app · webhook
    SMS twice is a real, visible failure — worse than a late one.
 3. **Templates are versioned.** A message sent last month must be reproducible for a dispute.
    Store the template version on the delivery row, not just the text.
-4. **Preferences are respected where they exist, and consent is recorded.** Transactional
+4. **The merchant may silence any parcel event, and absence means send.** Transactional
    messages about a parcel in motion are not marketing; the distinction is real and must be
-   explicit in the template type.
+   explicit in the template type. See [Merchant opt-out](#merchant-opt-out).
 5. **Delivery status is recorded per channel attempt**, success and failure alike.
 
 ## Pipeline
@@ -83,6 +83,40 @@ Every parcel notification is sent as MiMSMS `transactionType: "T"`:
 Never batch parcel notifications into one promotional call. Per-recipient personalisation goes
 through the provider's dynamic-SMS endpoint, which is a different path with different semantics.
 See [../architecture/provider-adapters.md](../architecture/provider-adapters.md).
+
+## Merchant opt-out
+
+`GET`/`PUT /v1/notification-preferences`, scope `notifications:manage`. The merchant comes from
+the principal, never from the body.
+
+Three events can notify a customer today: `ShipmentCreated`, `DeliveryOutForDelivery`,
+`DeliveryCompleted`. The list is `Object.keys(TEMPLATE_OF)` in
+[`rules/preferences.ts`](../../apps/backend/src/modules/notification/rules/preferences.ts) — one
+map from event to template, read by the consumer, the DTO and the migration's `CHECK`.
+
+Two rules that are easy to get backwards:
+
+**A merchant is opted out by writing a row.** No row means send. The alternative — a row per
+merchant per event, defaulted off — is the more "complete" design and it fails silently and
+completely: every merchant stops being told where their parcels are, and no counter moves,
+because counters measure sends and there are simply none. `PUT enabled=true` therefore deletes
+the row rather than storing "on".
+
+**An unknown event type is sent, not refused.** `isEnabled` returns `true` for anything outside
+the vocabulary. Reaching that branch means the consumer learned about an event this file did
+not, and the two honest answers are "send" or "silently drop real notifications". Sending is
+recoverable; dropping is invisible.
+
+The gate runs in the consumer, **after** the dedupe check and **before** any write, so an opted-out
+event leaves no message row and costs nothing to send.
+
+`notifications:manage` is deliberately _not_ `shipments:write`. An operator who can create
+shipments should not be able to silence every delivery notification for the merchant they work
+for — see [identity.md](identity.md).
+
+`scripts/verify-notification-preferences.mjs` asserts the whole path against a running stack,
+including the assertion that matters: a muted event produces **no** message row, and unmuting it
+produces one addressed to the customer.
 
 ## Must not touch
 

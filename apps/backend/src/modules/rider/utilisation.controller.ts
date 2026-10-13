@@ -7,10 +7,11 @@
  */
 
 import { Controller, Get, Inject, Param, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { ApiKeyGuard } from '../identity/api-key.guard.ts';
 import { UtilisationService } from './utilisation.service.ts';
-import type { PoolUtilisation } from './utilisation.service.ts';
+import { PoolUtilisationDto, RiderLoadDto } from './rider-response.dto.ts';
 
 @ApiTags('riders')
 @Controller('v1/riders')
@@ -20,14 +21,31 @@ export class UtilisationController {
 
   @Get(':riderId/utilisation')
   @ApiOperation({ summary: "Rider's current load factor" })
-  async riderUtilisation(@Param('riderId') riderId: string) {
+  @ApiParam({ name: 'riderId', description: 'The rider whose current load factor is read.' })
+  @ApiOkResponse({
+    type: RiderLoadDto,
+    nullable: true,
+    description:
+      "The rider's current load — capacity, the job in hand, and the 0..1 load factor they " +
+      'represent. Null when the rider is unknown. A projection: reading it never mutates state ' +
+      'or makes a dispatch decision.',
+  })
+  @ApiErrors()
+  async riderUtilisation(@Param('riderId') riderId: string): Promise<RiderLoadDto | null> {
     const load = await this.util.getRiderLoad(riderId);
     return load ?? null;
   }
 
   @Get('pool-utilisation')
   @ApiOperation({ summary: 'Pool-wide rider utilisation KPI' })
-  async poolUtilisation(): Promise<PoolUtilisation> {
+  @ApiOkResponse({
+    type: PoolUtilisationDto,
+    description:
+      'Pool-wide utilisation: capacity in use against total capacity, plus the mean, max and ' +
+      'min per-rider load factor. Read-only — the KPI is a projection, never a decision.',
+  })
+  @ApiErrors()
+  async poolUtilisation(): Promise<PoolUtilisationDto> {
     return this.util.getPoolLoad();
   }
 }

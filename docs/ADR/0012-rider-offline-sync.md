@@ -32,6 +32,18 @@ interface OfflineCommand {
 The server dedupes on `commandId`, per
 [ADR-0010](0010-idempotency.md). Replay is ordered by `createdAt`.
 
+**As built (2026-10-09), three parts of this shape changed and the reasoning survived:**
+
+| Decided                               | Built                                                | Why                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deviceId` on every command           | `(rider_id, device_sequence)`                        | The rider in the path already names the device's owner, so a separate id was redundant for dedupe. A `rider.devices` table is still owed — "revoking it cuts off sync from a lost phone" is **not implemented**, and a lost phone can still sync.                     |
+| `commandId` as the idempotency key    | `device_sequence`, a device-minted monotonic integer | Strictly stronger: it survives the device losing a key, so a factory-reset phone still cannot apply a scan twice.                                                                                                                                                     |
+| `operation: 'SCAN' \| 'DELIVER' \| …` | `commandType` + a per-type validator registry        | The queue does not need to know what a delivery means. `zipzap.rider.delivery` is validated against the **shipment's** status, which is what makes the "cancelled while offline" rejection below actually possible — a rider-status check alone would have passed it. |
+
+The decision's substance is intact and proven: replay is ordered by the device's `createdAt`, an
+invalid command is rejected explicitly with a reason, and server-side state still validates. Only the
+wire's spelling moved. See [../domains/rider.md](../domains/rider.md).
+
 Supporting decisions:
 
 - **An invalid command is rejected explicitly** and reported back to the device. A shipment

@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { HealthController } from './health/health.controller.ts';
+import { CsrfMiddleware } from './common/csrf.middleware.ts';
 import { SystemModule } from './modules/system/outbox.module.ts';
 import { IdentityModule } from './modules/identity/identity.module.ts';
 import { MerchantModule } from './modules/merchant/merchant.module.ts';
@@ -53,4 +54,16 @@ import { RiderJobsModule } from './modules/rider/rider-jobs.module.ts';
   ],
   controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * CSRF runs before every route, including the health probes: the probes are `GET`s and so never
+   * trip it, and a middleware that skips paths is a middleware that will be wrong the day someone
+   * adds an unauthenticated `POST /public/something`.
+   *
+   * `forRoutes('*')` rather than a controller list for the same reason — the alternative is a list
+   * that has to be maintained in lockstep with every future controller.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}

@@ -92,3 +92,109 @@ export function netPayable(
     money(0),
   );
 }
+
+/** One line of the itemised breakdown behind the headline number. */
+export interface BalanceLine {
+  readonly type: LedgerEntryType;
+  readonly direction: LedgerDirection;
+  readonly amountMinor: number;
+  /** How many ledger rows made up this line. A count, so a ৳1 difference is traceable to one row. */
+  readonly entries: number;
+}
+
+/**
+ * The itemised breakdown, in the order RedX's invoice model uses and the order a merchant reads
+ * them in: what we collected, what we charge, what we adjust, what we already paid.
+ *
+ * The order is not cosmetic. "Collected" first and "paid out" last means the reader's eye lands on
+ * what is still coming rather than on what has already gone, which is the figure people open a
+ * settlement screen to find.
+ *
+ * Lines with no rows are omitted rather than zero-filled: an empty "COD fee ৳0.00" teaches a
+ * merchant that we charge a fee, and then they look for it on the next statement where it is absent.
+ */
+export const BALANCE_LINE_ORDER: readonly LedgerEntryType[] = [
+  'COD_COLLECTED',
+  'DELIVERY_FEE',
+  'COD_FEE',
+  'RETURN_FEE',
+  'ADJUSTMENT',
+  'SETTLEMENT_PAYOUT',
+];
+
+/**
+ * Groups ledger rows into the itemised breakdown.
+ *
+ * This is what makes the headline checkable. `balanceMinor` is a bare sum, and a bare sum is a
+ * number a merchant cannot argue with — the only response available to "that is wrong" is "no".
+ * The breakdown is the same sum, itemised, so a disagreement becomes "your delivery fees say ৳240
+ * and mine say ৳180", which is a question with an answer.
+ *
+ * The headline is `netPayable` over EVERY row, not over the grouped lines. Grouping happens first
+ * and the total is derived from the groups, so a type missing from `BALANCE_LINE_ORDER` would
+ * silently vanish from the statement while still being in the balance — two numbers that disagree,
+ * which is the exact failure this is meant to prevent. `assertLinesReconcile` closes that hole.
+ */
+export function balanceLines(
+  rows: ReadonlyArray<{
+    type: LedgerEntryType;
+    direction: LedgerDirection;
+    amountMinor: number;
+  }>,
+): ReadonlyArray<BalanceLine> {
+  const totals = new Map<string, { amountMinor: number; entries: number }>();
+  for (const row of rows) {
+    const key = `${row.type}:${row.direction}`;
+    const seen = totals.get(key) ?? { amountMinor: 0, entries: 0 };
+    totals.set(key, { amountMinor: seen.amountMinor + row.amountMinor, entries: seen.entries + 1 });
+  }
+
+  return BALANCE_LINE_ORDER.flatMap((type) =>
+    ([1, -1] as const)
+      .map((direction) => {
+        const seen = totals.get(`${type}:${direction}`);
+        return seen === undefined
+          ? null
+          : { type, direction, amountMinor: seen.amountMinor, entries: seen.entries };
+      })
+      .filter((line): line is BalanceLine => line !== null),
+  );
+}
+
+/**
+ * The headline, derived from the same grouped rows the breakdown shows.
+ *
+ * Taken over the raw rows rather than the lines, so the two can never drift: a type the breakdown
+ * forgot still counts here, and `assertLinesReconcile` then fails loudly instead of the merchant
+ * quietly being underpaid.
+ */
+export function headlineBalance(
+  rows: ReadonlyArray<{
+    direction: LedgerDirection;
+    amountMinor: number;
+  }>,
+): Money {
+  return netPayable(rows);
+}
+
+/**
+ * The invariant that makes the statement trustworthy: the itemised lines sum to exactly the
+ * headline. Not approximately — exactly, in integer minor units, with no tolerance band.
+ *
+ * A poisha is the smallest unit and it is worth nothing on its own, but a system that loses one
+ * loses the same one every time and nobody notices for a month. The check is cheap and it is the
+ * difference between a statement and an assertion.
+ */
+export function assertLinesReconcile(
+  lines: ReadonlyArray<{ direction: LedgerDirection; amountMinor: number }>,
+  headlineMinor: number,
+): void {
+  const sum = netPayable(lines).amountMinor;
+  if (sum !== headlineMinor) {
+    throw new Error(
+      `The itemised statement sums to ${sum} but the headline balance is ${headlineMinor}. ` +
+        'A ledger row is missing from the breakdown — every entry type must appear in ' +
+        'BALANCE_LINE_ORDER.',
+    );
+  }
+}

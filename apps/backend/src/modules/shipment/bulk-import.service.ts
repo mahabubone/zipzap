@@ -19,7 +19,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import type { Queue } from 'bullmq';
-import { ResourceNotFoundError } from '../../common/domain-error.ts';
+import { ResourceNotFoundError, ValidationFailedError } from '../../common/domain-error.ts';
 import { BulkRepository } from './bulk.repository.ts';
 import {
   BULK_COLUMNS,
@@ -78,7 +78,23 @@ export class BulkImportService {
 
   /** Upload: parse, validate, store preview rows, return the checkpoint. */
   async upload(merchantId: string, filename: string, text: string): Promise<BulkPreview> {
-    const parsed = parseCsv(text);
+    let parsed: string[][];
+    try {
+      parsed = parseCsv(text);
+    } catch (error) {
+      // A merchant's 10,000-row file will eventually contain one stray quote.
+      // Letting `parseCsv` throw bare turned that into a 500 with a generic
+      // detail, which is the least useful thing we could tell the person whose
+      // upload just failed. The preview exists precisely to catch file mistakes
+      // before they become parcels, so a file we cannot read is a 400 naming the
+      // problem, not a crash.
+      throw new ValidationFailedError([
+        {
+          path: 'csv',
+          message: error instanceof Error ? error.message : 'The CSV could not be read.',
+        },
+      ]);
+    }
     if (parsed.length === 0) {
       throw new ResourceNotFoundError('Empty file.');
     }

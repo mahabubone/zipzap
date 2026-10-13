@@ -13,8 +13,20 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppAnalyticsRouteImport } from './routes/app/analytics'
+import { Route as AppCodRouteImport } from './routes/app/cod'
+import { Route as AppMoneyRouteImport } from './routes/app/money'
+import { Route as AppNotificationsRouteImport } from './routes/app/notifications'
+import { Route as AppPricingRouteImport } from './routes/app/pricing'
+import { Route as AppSettlementsRouteImport } from './routes/app/settlements'
 import { Route as AppShipmentsRouteImport } from './routes/app/shipments'
+import { Route as AppWebhooksRouteImport } from './routes/app/webhooks'
+import { Route as AppSettlementsIndexRouteImport } from './routes/app/settlements.index'
+import { Route as AppSettlementsIdRouteImport } from './routes/app/settlements.$id'
+import { Route as AppShipmentsIndexRouteImport } from './routes/app/shipments.index'
 import { Route as AppShipmentsIdRouteImport } from './routes/app/shipments.$id'
+import { Route as AppShipmentsBulkRouteImport } from './routes/app/shipments.bulk'
+import { Route as AppShipmentsNewRouteImport } from './routes/app/shipments.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -36,14 +48,74 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCodRoute = AppCodRouteImport.update({
+  id: '/cod',
+  path: '/cod',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMoneyRoute = AppMoneyRouteImport.update({
+  id: '/money',
+  path: '/money',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPricingRoute = AppPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettlementsRoute = AppSettlementsRouteImport.update({
+  id: '/settlements',
+  path: '/settlements',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppShipmentsRoute = AppShipmentsRouteImport.update({
   id: '/shipments',
   path: '/shipments',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWebhooksRoute = AppWebhooksRouteImport.update({
+  id: '/webhooks',
+  path: '/webhooks',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettlementsIndexRoute = AppSettlementsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettlementsRoute,
+} as any)
+const AppSettlementsIdRoute = AppSettlementsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppSettlementsRoute,
+} as any)
+const AppShipmentsIndexRoute = AppShipmentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppShipmentsRoute,
+} as any)
 const AppShipmentsIdRoute = AppShipmentsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
+  getParentRoute: () => AppShipmentsRoute,
+} as any)
+const AppShipmentsBulkRoute = AppShipmentsBulkRouteImport.update({
+  id: '/bulk',
+  path: '/bulk',
+  getParentRoute: () => AppShipmentsRoute,
+} as any)
+const AppShipmentsNewRoute = AppShipmentsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
   getParentRoute: () => AppShipmentsRoute,
 } as any)
 
@@ -51,40 +123,118 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/cod': typeof AppCodRoute
+  '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/pricing': typeof AppPricingRoute
+  '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app/': typeof AppIndexRoute
+  '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
+  '/app/shipments/bulk': typeof AppShipmentsBulkRoute
+  '/app/shipments/new': typeof AppShipmentsNewRoute
+  '/app/settlements/': typeof AppSettlementsIndexRoute
+  '/app/shipments/': typeof AppShipmentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/cod': typeof AppCodRoute
+  '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/pricing': typeof AppPricingRoute
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app': typeof AppIndexRoute
+  '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
+  '/app/shipments/bulk': typeof AppShipmentsBulkRoute
+  '/app/shipments/new': typeof AppShipmentsNewRoute
+  '/app/settlements': typeof AppSettlementsIndexRoute
+  '/app/shipments': typeof AppShipmentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/cod': typeof AppCodRoute
+  '/app/money': typeof AppMoneyRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/pricing': typeof AppPricingRoute
+  '/app/settlements': typeof AppSettlementsRouteWithChildren
   '/app/shipments': typeof AppShipmentsRouteWithChildren
+  '/app/webhooks': typeof AppWebhooksRoute
   '/app/': typeof AppIndexRoute
+  '/app/settlements/$id': typeof AppSettlementsIdRoute
   '/app/shipments/$id': typeof AppShipmentsIdRoute
+  '/app/shipments/bulk': typeof AppShipmentsBulkRoute
+  '/app/shipments/new': typeof AppShipmentsNewRoute
+  '/app/settlements/': typeof AppSettlementsIndexRoute
+  '/app/shipments/': typeof AppShipmentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/app' | '/login' | '/app/shipments' | '/app/' | '/app/shipments/$id'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/analytics'
+    | '/app/cod'
+    | '/app/money'
+    | '/app/notifications'
+    | '/app/pricing'
+    | '/app/settlements'
+    | '/app/shipments'
+    | '/app/webhooks'
+    | '/app/'
+    | '/app/settlements/$id'
+    | '/app/shipments/$id'
+    | '/app/shipments/bulk'
+    | '/app/shipments/new'
+    | '/app/settlements/'
+    | '/app/shipments/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/app/shipments' | '/app' | '/app/shipments/$id'
+  to:
+    | '/'
+    | '/login'
+    | '/app/analytics'
+    | '/app/cod'
+    | '/app/money'
+    | '/app/notifications'
+    | '/app/pricing'
+    | '/app/webhooks'
+    | '/app'
+    | '/app/settlements/$id'
+    | '/app/shipments/$id'
+    | '/app/shipments/bulk'
+    | '/app/shipments/new'
+    | '/app/settlements'
+    | '/app/shipments'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/login'
+    | '/app/analytics'
+    | '/app/cod'
+    | '/app/money'
+    | '/app/notifications'
+    | '/app/pricing'
+    | '/app/settlements'
     | '/app/shipments'
+    | '/app/webhooks'
     | '/app/'
+    | '/app/settlements/$id'
     | '/app/shipments/$id'
+    | '/app/shipments/bulk'
+    | '/app/shipments/new'
+    | '/app/settlements/'
+    | '/app/shipments/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -123,12 +273,82 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/cod': {
+      id: '/app/cod'
+      path: '/cod'
+      fullPath: '/app/cod'
+      preLoaderRoute: typeof AppCodRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/money': {
+      id: '/app/money'
+      path: '/money'
+      fullPath: '/app/money'
+      preLoaderRoute: typeof AppMoneyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/notifications': {
+      id: '/app/notifications'
+      path: '/notifications'
+      fullPath: '/app/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/pricing': {
+      id: '/app/pricing'
+      path: '/pricing'
+      fullPath: '/app/pricing'
+      preLoaderRoute: typeof AppPricingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settlements': {
+      id: '/app/settlements'
+      path: '/settlements'
+      fullPath: '/app/settlements'
+      preLoaderRoute: typeof AppSettlementsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/shipments': {
       id: '/app/shipments'
       path: '/shipments'
       fullPath: '/app/shipments'
       preLoaderRoute: typeof AppShipmentsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/app/webhooks': {
+      id: '/app/webhooks'
+      path: '/webhooks'
+      fullPath: '/app/webhooks'
+      preLoaderRoute: typeof AppWebhooksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settlements/': {
+      id: '/app/settlements/'
+      path: '/'
+      fullPath: '/app/settlements/'
+      preLoaderRoute: typeof AppSettlementsIndexRouteImport
+      parentRoute: typeof AppSettlementsRoute
+    }
+    '/app/settlements/$id': {
+      id: '/app/settlements/$id'
+      path: '/$id'
+      fullPath: '/app/settlements/$id'
+      preLoaderRoute: typeof AppSettlementsIdRouteImport
+      parentRoute: typeof AppSettlementsRoute
+    }
+    '/app/shipments/': {
+      id: '/app/shipments/'
+      path: '/'
+      fullPath: '/app/shipments/'
+      preLoaderRoute: typeof AppShipmentsIndexRouteImport
+      parentRoute: typeof AppShipmentsRoute
     }
     '/app/shipments/$id': {
       id: '/app/shipments/$id'
@@ -137,15 +357,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppShipmentsIdRouteImport
       parentRoute: typeof AppShipmentsRoute
     }
+    '/app/shipments/bulk': {
+      id: '/app/shipments/bulk'
+      path: '/bulk'
+      fullPath: '/app/shipments/bulk'
+      preLoaderRoute: typeof AppShipmentsBulkRouteImport
+      parentRoute: typeof AppShipmentsRoute
+    }
+    '/app/shipments/new': {
+      id: '/app/shipments/new'
+      path: '/new'
+      fullPath: '/app/shipments/new'
+      preLoaderRoute: typeof AppShipmentsNewRouteImport
+      parentRoute: typeof AppShipmentsRoute
+    }
   }
 }
 
+interface AppSettlementsRouteChildren {
+  AppSettlementsIdRoute: typeof AppSettlementsIdRoute
+  AppSettlementsIndexRoute: typeof AppSettlementsIndexRoute
+}
+
+const AppSettlementsRouteChildren: AppSettlementsRouteChildren = {
+  AppSettlementsIdRoute: AppSettlementsIdRoute,
+  AppSettlementsIndexRoute: AppSettlementsIndexRoute,
+}
+
+const AppSettlementsRouteWithChildren = AppSettlementsRoute._addFileChildren(
+  AppSettlementsRouteChildren,
+)
+
 interface AppShipmentsRouteChildren {
   AppShipmentsIdRoute: typeof AppShipmentsIdRoute
+  AppShipmentsBulkRoute: typeof AppShipmentsBulkRoute
+  AppShipmentsNewRoute: typeof AppShipmentsNewRoute
+  AppShipmentsIndexRoute: typeof AppShipmentsIndexRoute
 }
 
 const AppShipmentsRouteChildren: AppShipmentsRouteChildren = {
   AppShipmentsIdRoute: AppShipmentsIdRoute,
+  AppShipmentsBulkRoute: AppShipmentsBulkRoute,
+  AppShipmentsNewRoute: AppShipmentsNewRoute,
+  AppShipmentsIndexRoute: AppShipmentsIndexRoute,
 }
 
 const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
@@ -153,12 +407,26 @@ const AppShipmentsRouteWithChildren = AppShipmentsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppCodRoute: typeof AppCodRoute
+  AppMoneyRoute: typeof AppMoneyRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
+  AppPricingRoute: typeof AppPricingRoute
+  AppSettlementsRoute: typeof AppSettlementsRouteWithChildren
   AppShipmentsRoute: typeof AppShipmentsRouteWithChildren
+  AppWebhooksRoute: typeof AppWebhooksRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
+  AppCodRoute: AppCodRoute,
+  AppMoneyRoute: AppMoneyRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
+  AppPricingRoute: AppPricingRoute,
+  AppSettlementsRoute: AppSettlementsRouteWithChildren,
   AppShipmentsRoute: AppShipmentsRouteWithChildren,
+  AppWebhooksRoute: AppWebhooksRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -174,10 +442,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

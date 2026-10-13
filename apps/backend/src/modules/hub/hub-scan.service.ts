@@ -16,12 +16,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import type { DataSource } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { ResourceNotFoundError, ValidationFailedError } from '../../common/domain-error.ts';
 import { append as appendOutbox } from '../system/outbox.writer.ts';
 import { AppendTrackingEventService } from '../tracking/append-tracking-event.service.ts';
 import { ShipmentAdvanceService } from '../shipment/advance-shipment.service.ts';
 import { HUB_SCAN_KINDS, isHubScanKind, type HubScanKind } from './rules/scan.ts';
+import { HubRepository } from './hub.repository.ts';
+import { SHIPMENT_LOOKUP, type ShipmentLookup } from '../shipment/shipment.lookup.ts';
 
 export interface HubScanResult {
   readonly shipmentId: string;
@@ -36,6 +38,8 @@ export class HubScanService {
     @InjectDataSource('hub') private readonly hubDataSource: DataSource,
     @Inject(ShipmentAdvanceService) private readonly advance: ShipmentAdvanceService,
     @Inject(AppendTrackingEventService) private readonly tracking: AppendTrackingEventService,
+    @Inject(HubRepository) private readonly hubs: HubRepository,
+    @Inject(SHIPMENT_LOOKUP) private readonly shipments: ShipmentLookup,
   ) {}
 
   async execute(command: {
@@ -56,16 +60,17 @@ export class HubScanService {
     const mapping = HUB_SCAN_KINDS[kind];
 
     return this.hubDataSource.transaction(async (manager) => {
-      if (command.hubCode) {
-        const hubs = (await manager.query(`SELECT code FROM hub.hubs WHERE code = $1`, [
-          command.hubCode,
-        ])) as { code: string }[];
-        if (!hubs[0]) {
-          throw new ResourceNotFoundError(`Hub "${command.hubCode}" not found.`);
-        }
+      const hub = command.hubCode ? await this.hubs.findByCode(manager, command.hubCode) : null;
+      if (command.hubCode && !hub) {
+        throw new ResourceNotFoundError(`Hub "${command.hubCode}" not found.`);
       }
 
+      // Read through SHIPMENT_LOOKUP, not a qualified SELECT: hub does not own `shipment`, and the
+      // boundary checker rejects the read even qualified. Taken before the advance so it is one
+      // lookup per scan rather than one per scan plus one per row it rewrites.
+      const trackingCode = hub ? await this.shipments.findTrackingCode(command.shipmentId) : null;
       const status = await this.advance.advance(manager, command.shipmentId, mapping.to);
+      await this.recordPresence(manager, command, kind, hub, trackingCode);
 
       if (mapping.eventType) {
         await this.tracking.append(manager, {
@@ -92,6 +97,40 @@ export class HubScanService {
         status,
         hubCode: command.hubCode ?? null,
       };
+    });
+  }
+
+  /**
+   * Keep `hub.parcel_presence` in step with the scan, in the same transaction.
+   *
+   * DEPARTED removes the row: the parcel is on a van, and "at a hub" should then be false rather
+   * than true-until-somebody-remembers. ARRIVED puts it back, at whichever hub is scanning it in.
+   *
+   * Skipped entirely when the scan named no hub. A scan without a `hubCode` is legal — it is how
+   * the integration tests and the flagship story drive the machine — and inventing a hub for it
+   * would put parcels at a location nobody chose. The console reads presence, so a hubCode-less
+   * scan shows up as a parcel nobody has, which is the honest rendering of "we were not told".
+   */
+  private async recordPresence(
+    manager: EntityManager,
+    command: { readonly shipmentId: string; readonly hubCode?: string | null },
+    kind: HubScanKind,
+    hub: { readonly id: string; readonly code: string } | null,
+    trackingCode: string | null,
+  ): Promise<void> {
+    if (!hub || !trackingCode) return;
+
+    if (kind === 'DEPARTED') {
+      await this.hubs.clearPresence(manager, command.shipmentId);
+      return;
+    }
+
+    await this.hubs.upsertPresence(manager, {
+      shipmentId: command.shipmentId,
+      hubId: hub.id,
+      hubCode: hub.code,
+      trackingCode,
+      lastScan: kind,
     });
   }
 }

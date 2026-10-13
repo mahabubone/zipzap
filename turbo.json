@@ -16,16 +16,46 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"]
     },
-    "typecheck": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
     "lint": {
       "outputs": []
     },
+    "openapi:export": {
+      "dependsOn": ["@zipzap/backend#build"],
+      "outputs": ["openapi.json", "openapi.yaml"]
+    },
+    "generate": {
+      "dependsOn": ["@zipzap/backend#openapi:export"],
+      "outputs": ["src/generated.d.ts"],
+      "inputs": ["$TURBO_ROOT$/apps/backend/openapi.json", "src/index.ts"]
+    },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@zipzap/backend#openapi:export"],
       "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "@zipzap/api-client#generate"],
+      "outputs": []
+    },
+    /* The one package whose build must never be stale: `dist/` is what every app
+     * typechecks against, and `src/generated.d.ts` is rewritten by `generate`. Running the
+     * two in the wrong order gives consumers the previous spec's types while the artefact
+     * on disk says otherwise, which broke the hub console after the response DTOs landed —
+     * `ParcelPresenceDto` existed in `src/` but not yet in `dist/`, so `.map((parcel) => …)`
+     * inferred `any`. Self-contained on purpose: no task ordering in turbo can express it. */
+    "@zipzap/api-client#build": {
+      "dependsOn": ["^build", "@zipzap/backend#openapi:export"]
+    },
+    /* The docs site needs the contract in `public/` BEFORE Astro runs. Reverse the order and
+     * the build succeeds while serving a 404 for `/openapi.json`, which renders a blank API
+     * reference with no error — the failure mode a docs site must not have. */
+    "sync:spec": {
+      "dependsOn": ["@zipzap/backend#openapi:export"],
+      "inputs": ["scripts/**"],
+      "outputs": ["public/openapi.json"]
+    },
+    "@zipzap/site#build": {
+      "dependsOn": ["^build", "sync:spec"],
+      "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,

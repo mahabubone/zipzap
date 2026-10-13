@@ -172,7 +172,6 @@ describeIfDb('the failure story — refused, retried, refused, returned', () => 
     // 1. Order + pickup + hub corridor, exactly as the flagship runs it.
     const created = await createShipment.execute({
       merchantId: MERCHANT,
-      merchantPlan: 'standard',
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,
@@ -322,7 +321,6 @@ describeIfDb('the failure story — refused, retried, refused, returned', () => 
     // One return per parcel, ever — the unique index and the service agree.
     const created = await createShipment.execute({
       merchantId: MERCHANT,
-      merchantPlan: 'standard',
       zone: 'dhaka-metro',
       remoteArea: false,
       fragile: false,

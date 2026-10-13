@@ -43,6 +43,21 @@ export interface SLAEstimate {
 export class NetworkService {
   constructor(@InjectDataSource('network') private readonly network: DataSource) {}
 
+  /**
+   * Every serviceable zone, for a picker.
+   *
+   * A console must not hardcode this list: zones are network configuration, they
+   * change, and a stale hardcoded list offers a merchant a zone that was
+   * retired and hides one that was added. This reads `network`'s own table, so
+   * it is a plain read and not a cross-schema join (rule 2).
+   */
+  async listServiceableZones(): Promise<string[]> {
+    const rows = await this.network.query(
+      `SELECT zone FROM network.service_areas WHERE serviceable ORDER BY zone`,
+    );
+    return rows.map((r: { zone: string }) => r.zone);
+  }
+
   async checkZone(zone: string): Promise<CoverageCheck> {
     const rows = await this.network.query(
       `SELECT zone, serviceable, estimated_days, pickup_available, delivery_available, cod_available

@@ -11,11 +11,14 @@ import { WebhookDeliveryEntity } from './webhook-delivery.entity.ts';
 import { WebhookRepository } from './webhook.repository.ts';
 import { WebhookEndpointService } from './webhook-endpoint.service.ts';
 import { WebhookReplayService } from './webhook-replay.service.ts';
+import { ListWebhookDeliveriesService } from './list-webhook-deliveries.service.ts';
 import { WebhookController } from './webhook.controller.ts';
 import { WebhookConsumer, WEBHOOK_QUEUE } from './webhook.consumer.ts';
 import { WebhookProcessor } from './webhook.processor.ts';
 import { MerchantAuthService } from './sessions.service.ts';
 import { CreateApiKeyService } from './create-api-key.service.ts';
+import { MerchantPlanLookup, MERCHANT_PLAN_LOOKUP } from './merchant-plan.lookup.ts';
+import { MerchantLookup, MERCHANT_LOOKUP } from './merchant-lookup.ts';
 import { CreateApiKeyController } from './create-api-key.controller.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
@@ -60,6 +63,7 @@ export class BullConnectionCloser implements OnModuleDestroy {
   ],
   controllers: [WebhookController, CreateApiKeyController],
   providers: [
+    ListWebhookDeliveriesService,
     FindCredentialService,
     WebhookRepository,
     WebhookEndpointService,
@@ -69,7 +73,16 @@ export class BullConnectionCloser implements OnModuleDestroy {
     BullConnectionCloser,
     MerchantAuthService,
     CreateApiKeyService,
+    // Pricing resolves a merchant's plan through this rather than reading `merchant.merchants`.
+    MerchantPlanLookup,
+    MerchantLookup,
+    { provide: MERCHANT_PLAN_LOOKUP, useExisting: MerchantPlanLookup },
+    // Same shape as MERCHANT_PLAN_LOOKUP: a symbol token aliased onto a class, so a consumer asks
+    // for the question ("does this merchant exist") rather than for the class that answers it.
+    // Registering the symbol in `exports` alone is what makes Nest fail to resolve it — it must be
+    // in `providers` too, pointed at an existing one.
+    { provide: MERCHANT_LOOKUP, useExisting: MerchantLookup },
   ],
-  exports: [FindCredentialService, MerchantAuthService],
+  exports: [FindCredentialService, MerchantAuthService, MERCHANT_PLAN_LOOKUP, MERCHANT_LOOKUP],
 })
 export class MerchantModule {}

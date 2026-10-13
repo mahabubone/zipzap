@@ -2,20 +2,18 @@
  * GET /v1/control-tower/live-counts — the control tower's live snapshot: every number is a
  * single-schema read from one domain module, aggregated inside a transaction so the snapshot
  * describes one instant. Read-only, API-key guarded.
+ *
+ * These numbers are the whole network's, so the endpoint also names a scope. `ApiKeyGuard`
+ * authenticates and nothing more; without `network:read` a merchant key read every merchant's
+ * counts and outstanding COD. A merchant reads their own from `/v1/analytics/merchant`.
  */
 
 import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiKeyGuard } from '../identity/api-key.guard.ts';
-import { DashboardService, type LiveCounts } from './dashboard.service.ts';
-
-/** Money crosses the wire as a decimal string, never a JSON number — a bigint
- *  poisha amount above 2^53 would silently lose precision as a float. */
-type LiveCountsJson = Omit<LiveCounts, 'cod'> & {
-  readonly cod: Omit<LiveCounts['cod'], 'outstandingAmountMinor'> & {
-    readonly outstandingAmountMinor: string;
-  };
-};
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiKeyGuard, ScopeGuard } from '../identity/api-key.guard.ts';
+import { DashboardService } from './dashboard.service.ts';
+import { LiveCountsDto } from './dashboard-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('control-tower')
 @Controller('v1/control-tower')
@@ -24,8 +22,18 @@ export class DashboardController {
   constructor(@Inject(DashboardService) private readonly dashboard: DashboardService) {}
 
   @Get('live-counts')
+  @UseGuards(new ScopeGuard('network:read'))
   @ApiOperation({ summary: 'Live network counts, one snapshot in time' })
-  async getLiveCounts(): Promise<LiveCountsJson> {
+  @ApiOkResponse({
+    type: LiveCountsDto,
+    description:
+      'One snapshot of the whole network — shipments, pickups, deliveries, COD, riders and hubs ' +
+      '— every count read in the same micro-batch, so the numbers describe one instant. ' +
+      '`outstandingAmountMinor` is poisha as a decimal string, because the network-wide sum can ' +
+      'outgrow what a JSON number holds exactly.',
+  })
+  @ApiErrors()
+  async getLiveCounts(): Promise<LiveCountsDto> {
     const counts = await this.dashboard.getLiveCounts();
     return {
       ...counts,

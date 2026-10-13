@@ -27,20 +27,20 @@ Legend: ●●● strong ●●○ present ●○○ thin ○○○ absent · **
 
 | Capability                        |     CarryBee     |           RedX            |     Steadfast     |                  ZipZap                  |
 | --------------------------------- | :--------------: | :-----------------------: | :---------------: | :--------------------------------------: |
-| Merchant web panel                |       ●●●        |            ●●●            |        ●●○        |                   ●○○                    |
+| Merchant web panel                |       ●●●        |            ●●●            |        ●●○        |              ●●○ 12 routes               |
 | Public tracking (no login)        |       ●●●        |            ●●○            |        ●●●        |                   ●●○                    |
 | Map / ETA on public tracking      |       ○○○        |            ○○○            |        ○○○        |                   ○○○                    |
-| Proof of delivery to end customer |       ○○○        |            ○○○            |        ○○○        |                   ○○○                    |
+| Proof of delivery to end customer |       ○○○        |            ○○○            |        ○○○        |       ●●○ OTP+photo+GPS, required        |
 | Bulk import                       |     ●●○ CSV      |         ●●○ XLSX          |   ●●○ 500/file    | ●●● CSV, preview checkpoint, 10k in ~96s |
-| Create-shipment in the UI         |       ●●●        |            ●●●            |        ●●○        |                   ○○○                    |
-| Exception work queues             |       ●●●        |            ●●○            |        ●●○        |                   ○○○                    |
+| Create-shipment in the UI         |       ●●●        |            ●●●            |        ●●○        |              ●●○ form ships              |
+| Exception work queues             |       ●●●        |            ●●○            |        ●●○        |         ●○○ COD queue, read-only         |
 | Fraud / risk scoring              |       ●●○        |            ●○○            |        ●●●        |                   ○○○                    |
 | Return reattempt tooling          |       ●●●        |            ●●●            |        ●●○        |             ●○○ backend only             |
 | COD reconciliation                |       ●○○        |            ●●○            |        ●○○        |       ●●● records + reviewer note        |
 | Settlement ledger                 |       ●●○        |            ●●●            |        ●●●        |             ●●● append-only              |
 | Self-serve payout request         |       ●●○        |            ●○○            |        ●●●        |             ●●● backend only             |
 | Staff roles & permissions         |  ○○○ unverified  |            ●●●            | ●○○ account-level |                   ○○○                    |
-| Notification preferences          |       ●●○        |       ●●○ SMS+email       |        ○○○        |                   ○○○                    |
+| Notification preferences          |       ●●○        |       ●●○ SMS+email       |        ○○○        |          ●●○ 3 events, enforced          |
 | Push notifications                |       ●●●        | ○○○ capability, unexposed |        ○○○        |                   ○○○                    |
 | OpenAPI spec                      |       ○○○        |  ○○○ docs exist, no spec  |     ○○○ none      |              ●●● generated               |
 | Sandbox                           |       ○○○        |         ●●● live          |        ○○○        |              ●○○ fakes only              |
@@ -50,11 +50,20 @@ Legend: ●●● strong ●●○ present ●○○ thin ○○○ absent · **
 | Merchant-configurable pricing     |       ○○○        |     ●●○ per shop/area     |  ○○○ negotiated   |           ●●● pricing versions           |
 | Public live rate calculator       |       ●●○        |            ●●●            |        ●●●        |                   ○○○                    |
 | Mobile apps quality               | ●●○ Cordova, new |      ●●○ 3.6★ / 500K      |   ●●● 4.2★ / 1M   |                 ○○○ none                 |
-| Rider app                         |       ●●○        |      ○○○ none found       |   ○○○ internal    |             ○○○ server only              |
+| Rider app                         |       ●●○        |      ○○○ none found       |   ○○○ internal    |         ●●○ Expo, offline-first          |
 | Multi-business / multi-shop       |       ●●●        |            ●●●            |        ●○○        |                   ○○○                    |
 
 **Read the ZipZap column honestly.** The right half of that table is a specification, not a product.
 Everything ●●● under "backend only" is code with no screen attached.
+
+**The Stage 7 sweep moved five rows, and not all of them up.** Three were _understated_ — a
+scorecard that flatters us is bad, but one that undersells us is simply wrong, and an operator
+reading this file to decide what to build next would have built the wrong things. Create-shipment,
+the exception queue and the merchant panel all had screens the table said did not exist. Two moved
+up because Stage 4 finished the rider app and Stage 6 finished proof of delivery. One claim in the
+plan was flatly false: analytics was described as counters only, and `analytics.cod_summary` has
+carried `expected_minor` since migration 0029. Per-row evidence:
+[plan.md](plan.md#stage-7--parity-sweep).
 
 ---
 
@@ -130,6 +139,7 @@ Sequenced by value-per-unit-of-work. Nothing here requires an architectural chan
 - **A map.** Nobody in this market has one on a customer-facing surface; it is a feature-shaped
   distraction for a system that does not own vehicles.
 - **A rider app yet.** Two of three competitors appear to have none, and the third's is Cordova. Our
+  position there is detailed in [rider-app-revmap.md](rider-app-revmap.md)
   sync contract is done and that is the correct order — the device half is a separate bet.
 - **Anything to match their scale claims.** 300,000 registered merchants against ~5.7M cumulative
   parcels is a long tail with a 1.6★ Shopify app. We want the underserved mid-market, not the head.

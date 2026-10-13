@@ -51,10 +51,22 @@ export interface DataTableProps<Row> {
   readonly onSelectionChange?: (ids: ReadonlyArray<string>) => void;
   readonly onRowClick?: (row: Row) => void;
   readonly pageSizes?: ReadonlyArray<number>;
+  /** Server-side (cursor) paging, for lists that fetch one page at a time.
+   *  The rows are then exactly the page the server returned, so the built-in
+   *  pager, the search box and client sorting are all suppressed — each would
+   *  silently apply to one page and read as if it covered the whole list. */
+  readonly serverPage?: {
+    readonly hasMore: boolean;
+    readonly canGoBack: boolean;
+    readonly onNext: () => void;
+    readonly onBack: () => void;
+  };
   readonly density?: 'compact' | 'comfortable';
   readonly toolbarExtra?: ReactNode;
   readonly loading?: boolean;
   readonly error?: string;
+  /** Shown as a Retry button in the error state. Without it a failed load is a dead end. */
+  readonly onRetry?: () => void;
   readonly empty?: ReactNode;
   readonly className?: string;
 }
@@ -83,9 +95,10 @@ function SortIcon({ dir }: { readonly dir: false | 'asc' | 'desc' }) {
 /** Client-side data grid: sort, global filter, paginate, row-select, hide columns.
  *  Every list screen should use this instead of re-wiring `Table` by hand.
  *
- *  ponytail: client-side only. When a list outgrows a few thousand rows, add
- *  `manualSorting`/`manualPagination` plus an `on*Change` fetch callback here —
- *  one place, not a fork per screen. */
+ *  ponytail: paging and filtering are client-side unless `serverPage` is passed.
+ *  Server-side SORT is not modelled — a list that needs it wants
+ *  `manualSorting` plus an on*Change fetch callback, added here rather than
+ *  forked per screen. */
 export function DataTable<Row>({
   columns,
   rows,
@@ -97,10 +110,12 @@ export function DataTable<Row>({
   onSelectionChange,
   onRowClick,
   pageSizes = [10, 25, 50, 100],
+  serverPage,
   density = 'comfortable',
   toolbarExtra,
   loading = false,
   error,
+  onRetry,
   empty,
   className,
 }: DataTableProps<Row>) {
@@ -114,6 +129,7 @@ export function DataTable<Row>({
     pageIndex: 0,
     pageSize: pageSizes[0] ?? 10,
   });
+  const server = serverPage !== undefined;
 
   const visibleColumns = useMemo(() => columns.filter((c) => c.id !== SELECT), [columns]);
 
@@ -125,8 +141,8 @@ export function DataTable<Row>({
         header: c.header,
         cell: (info: { row: { original: Row } }) =>
           c.cell?.(info.row.original) ?? c.accessor?.(info.row.original),
-        enableSorting: c.sortable ?? c.accessor !== undefined,
-        enableGlobalFilter: c.searchable ?? c.accessor !== undefined,
+        enableSorting: !server && (c.sortable ?? c.accessor !== undefined),
+        enableGlobalFilter: !server && (c.searchable ?? c.accessor !== undefined),
       };
       return def as ColumnDef<Row, unknown>;
     });
@@ -142,11 +158,12 @@ export function DataTable<Row>({
       } as ColumnDef<Row, unknown>);
     }
     return defs;
-  }, [visibleColumns, selectable]);
+  }, [visibleColumns, selectable, server]);
 
   const table = useReactTable({
     data: rows as Row[],
     columns: columnDefs,
+    manualPagination: server,
     state: { sorting, globalFilter, rowSelection, columnVisibility, pagination },
     getRowId: (row) => rowKey(row),
     enableRowSelection: selectable,
@@ -191,14 +208,14 @@ export function DataTable<Row>({
   const cellPad = density === 'compact' ? 'px-4 py-2' : 'px-4 py-3';
   const hideable = visibleColumns.some((c) => !c.defaultHidden) && visibleColumns.length > 2;
 
-  const toolbar = searchable || toolbarExtra || hideable;
+  const toolbar = (searchable && !server) || toolbarExtra || hideable;
 
   return (
     <div className={cx('flex flex-col gap-3', className)}>
       {toolbar ? (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            {searchable ? (
+            {searchable && !server ? (
               <SearchInput
                 value={globalFilter}
                 onChange={setGlobalFilter}
@@ -231,7 +248,7 @@ export function DataTable<Row>({
       ) : null}
 
       {error ? (
-        <ErrorState message={error} />
+        <ErrorState message={error} retry={onRetry} />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
@@ -361,15 +378,41 @@ export function DataTable<Row>({
         </div>
       )}
 
-      <Pagination
-        pageIndex={pagination.pageIndex}
-        pageCount={table.getPageCount()}
-        pageSize={pagination.pageSize}
-        pageSizes={pageSizes}
-        totalRows={totalFiltered}
-        onPageIndexChange={(i) => setPagination((p) => ({ ...p, pageIndex: i }))}
-        onPageSizeChange={(size) => setPagination({ pageIndex: 0, pageSize: size })}
-      />
+      {serverPage ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-slate-500">
+            {totalFiltered === 0 ? 'No results' : `${totalFiltered} on this page`}
+          </p>
+          <nav aria-label="Pagination" className="flex items-center gap-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!serverPage.canGoBack || loading}
+              onClick={serverPage.onBack}
+            >
+              Newer
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!serverPage.hasMore || loading}
+              onClick={serverPage.onNext}
+            >
+              Older
+            </Button>
+          </nav>
+        </div>
+      ) : (
+        <Pagination
+          pageIndex={pagination.pageIndex}
+          pageCount={table.getPageCount()}
+          pageSize={pagination.pageSize}
+          pageSizes={pageSizes}
+          totalRows={totalFiltered}
+          onPageIndexChange={(i) => setPagination((p) => ({ ...p, pageIndex: i }))}
+          onPageSizeChange={(size) => setPagination({ pageIndex: 0, pageSize: size })}
+        />
+      )}
     </div>
   );
 }

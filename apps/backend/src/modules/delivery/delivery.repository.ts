@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
 import { DeliveryJobEntity } from './delivery.entity.ts';
 import { DeliveryAttemptEntity } from './delivery-attempt.entity.ts';
+import { DeliveryProofEntity } from './delivery-proof.entity.ts';
 import { type DeliveryStatus } from './rules/delivery.ts';
 import { MAX_ATTEMPTS } from './rules/delivery.ts';
 
@@ -21,6 +22,37 @@ export class DeliveryRepository {
     entity: DeliveryAttemptEntity,
   ): Promise<DeliveryAttemptEntity> {
     return manager.getRepository(DeliveryAttemptEntity).save(entity);
+  }
+
+  insertProof(manager: EntityManager, entity: DeliveryProofEntity): Promise<DeliveryProofEntity> {
+    return manager.getRepository(DeliveryProofEntity).save(entity);
+  }
+
+  /**
+   * The live challenge for a job, locked.
+   *
+   * `pessimistic_write` because two riders on one job must not both mint a code, and a redemption
+   * must not read a code a concurrent reissue has already replaced. `photo_data` stays unselected
+   * (`select: false`): both callers want hashes and coordinates, never the megabyte beside them.
+   */
+  async findProofForUpdate(
+    manager: EntityManager,
+    jobId: string,
+  ): Promise<DeliveryProofEntity | null> {
+    return manager
+      .createQueryBuilder(DeliveryProofEntity, 'p')
+      .setLock('pessimistic_write')
+      .where('p.job_id = :jobId', { jobId })
+      .getOne();
+  }
+
+  /** A VERIFIED proof, or null. The one read `DELIVERED` needs before it will accept a delivery. */
+  findVerifiedProof(manager: EntityManager, jobId: string): Promise<DeliveryProofEntity | null> {
+    return manager
+      .createQueryBuilder(DeliveryProofEntity, 'p')
+      .where('p.job_id = :jobId', { jobId })
+      .andWhere('p.status = :status', { status: 'VERIFIED' })
+      .getOne();
   }
 
   findById(manager: EntityManager, id: string): Promise<DeliveryJobEntity | null> {

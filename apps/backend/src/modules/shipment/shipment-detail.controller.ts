@@ -5,89 +5,81 @@
  * the shipment exists — an enumeration oracle). Cancel follows the
  * AdvanceDeliveryService shape: lock, assert, save, emit — and the machine rejects
  * cancelling a DELIVERED parcel, because that is a return, not a cancel.
+ *
+ * The GET response carries four contact fields, so the read is audited. The audit happens inside
+ * GetShipmentService rather than here: a controller that logs what it read is a controller that
+ * can forget to.
  */
 
 import { Controller, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { InjectDataSource } from '@nestjs/typeorm';
-import type { DataSource } from 'typeorm';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
 import { RateLimitGuard } from '../identity/rate-limit.guard.ts';
-import { ResourceNotFoundError } from '../../common/domain-error.ts';
-import { CancelShipmentService, type CancelledShipment } from './cancel-shipment.service.ts';
-
-interface ShipmentDetail {
-  readonly id: string;
-  readonly trackingCode: string;
-  readonly status: string;
-  readonly merchantReference: string | null;
-  readonly senderName: string;
-  readonly senderPhone: string;
-  readonly recipientName: string;
-  readonly recipientPhone: string;
-  readonly parcelWeightGrams: number;
-  readonly parcelDescription: string;
-  readonly codAmountMinor: number;
-  readonly codCurrency: string;
-  readonly pricingVersion: number;
-  readonly createdAt: string;
-}
+import { CancelShipmentService } from './cancel-shipment.service.ts';
+import { GetShipmentService } from './get-shipment.service.ts';
+import { CancelledShipmentDto, ShipmentDetailDto } from './shipment-response.dto.ts';
 
 @ApiTags('shipments')
 @Controller('v1/shipments')
 @UseGuards(ApiKeyGuard)
 export class ShipmentDetailController {
   constructor(
-    @InjectDataSource('shipment') private readonly shipments: DataSource,
+    @Inject(GetShipmentService) private readonly get: GetShipmentService,
     @Inject(CancelShipmentService) private readonly cancel: CancelShipmentService,
   ) {}
 
-  private merchantId(request: AuthenticatedRequest): string {
-    return request.principal!.merchantId!;
-  }
-
+  @ApiErrors()
   @Get(':id')
   @UseGuards(new ScopeGuard('shipments:read'), new RateLimitGuard('merchant', false))
   @ApiOperation({ summary: 'Get one of your shipments' })
+  @ApiParam({
+    name: 'id',
+    description:
+      "The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the " +
+      '404 never confirms the parcel exists.',
+  })
+  @ApiOkResponse({
+    type: ShipmentDetailDto,
+    description:
+      'The whole parcel record: both contacts, the parcel, the COD amount, and the tracking timeline ' +
+      'oldest first. This is the only read that returns personal data, so it leaves an audit trail — ' +
+      'the read is recorded whether or not the caller ever sees that row.',
+  })
   async detail(
     @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<ShipmentDetail> {
-    const merchantId = this.merchantId(request);
-    const rows = await this.shipments.query(
-      `SELECT id, tracking_code, status, merchant_reference, sender_name, sender_phone,
-              recipient_name, recipient_phone, parcel_weight_grams, parcel_description,
-              cod_amount_minor, cod_currency, pricing_version, created_at
-         FROM shipment.shipments WHERE id = $1 AND merchant_id = $2`,
-      [id, merchantId],
-    );
-    const row = rows[0] as Record<string, unknown> | undefined;
-    if (!row) throw new ResourceNotFoundError('Shipment not found.');
-    return {
-      id: String(row.id),
-      trackingCode: String(row.tracking_code),
-      status: String(row.status),
-      merchantReference: (row.merchant_reference as string | null) ?? null,
-      senderName: String(row.sender_name),
-      senderPhone: String(row.sender_phone),
-      recipientName: String(row.recipient_name),
-      recipientPhone: String(row.recipient_phone),
-      parcelWeightGrams: Number(row.parcel_weight_grams),
-      parcelDescription: String(row.parcel_description),
-      codAmountMinor: Number(row.cod_amount_minor),
-      codCurrency: String(row.cod_currency),
-      pricingVersion: Number(row.pricing_version),
-      createdAt: new Date(row.created_at as string).toISOString(),
-    };
+    @Req() req: AuthenticatedRequest & { requestId?: string },
+  ): Promise<ShipmentDetailDto> {
+    const principal = req.principal!;
+    return this.get.execute(principal.merchantId!, id, {
+      actorType: principal.kind,
+      actorId: principal.credentialId,
+      ip: req.ip ?? null,
+      requestId: req.requestId ?? null,
+    });
   }
 
+  @ApiErrors()
   @Post(':id/cancel')
   @UseGuards(new ScopeGuard('shipments:write'), new RateLimitGuard('merchant', true))
   @ApiOperation({ summary: 'Cancel a shipment that has not shipped yet' })
+  @ApiParam({
+    name: 'id',
+    description:
+      "The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the " +
+      '404 never confirms the parcel exists.',
+  })
+  @ApiOkResponse({
+    type: CancelledShipmentDto,
+    description:
+      'Confirms the parcel is CANCELLED. Only states that may still stop can be cancelled: a delivered ' +
+      'parcel is a return, not a cancel, and the state machine refuses the edge with 409. A retried ' +
+      'cancel hits the same 409 rather than applying twice.',
+  })
   async cancelShipment(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<CancelledShipment> {
-    return this.cancel.execute(this.merchantId(request), id);
+  ): Promise<CancelledShipmentDto> {
+    return this.cancel.execute(request.principal!.merchantId!, id);
   }
 }

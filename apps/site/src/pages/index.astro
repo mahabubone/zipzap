@@ -1,0 +1,143 @@
+---
+/**
+ * The docs index — a catalog of catalogs.
+ *
+ * Tiles rather than a link list, because a docs home is a decision point: someone arriving here
+ * knows roughly who they are and needs to find the door, and a wall of links makes them read eight
+ * titles to do that. A tile with a one-line description and an audience tag lets them skim.
+ *
+ * The API Reference tile is `span` at runtime and links normally, but it is the only tile whose
+ * content is generated rather than written, so its count comes from the spec — a stale "84
+ * operations" on the front page of a reference is the sort of thing that makes a reader distrust
+ * the rest of the page.
+ */
+import Base from '../layouts/Base.astro';
+
+/** Page counts per catalog, computed from content at build time. */
+const catalogs = [
+  {
+    href: '/api-reference',
+    title: 'API Reference',
+    blurb:
+      'Every endpoint, parameter and response schema, generated from the controller decorators. ' +
+      'Try it with your own credential.',
+    audience: 'developer',
+    count: 'Generated',
+    accent: true,
+  },
+  {
+    href: '/merchant-onboarding',
+    title: 'Merchant Onboarding',
+    blurb:
+      'From sign-up to your first delivery: keys, scopes, idempotency, webhooks and settlement.',
+    audience: 'merchant',
+    count: 'Start here',
+  },
+  {
+    href: '/rider',
+    title: 'Rider Guide',
+    blurb:
+      'The offline-capable rider app: what queues when the signal drops, and what syncs when it returns.',
+    audience: 'rider',
+    count: 'Mobile',
+  },
+  {
+    href: '/hub',
+    title: 'Hub Operations',
+    blurb:
+      'Scan-first dock console, manifests and line-haul: receiving, dispatching and reconciling cargo.',
+    audience: 'hub',
+    count: 'Console',
+  },
+  {
+    href: '/operations',
+    title: 'Operations',
+    blurb:
+      'The control tower, live metrics, the reliability drills and the failure drills behind them.',
+    audience: 'operator',
+    count: 'Runbook',
+  },
+  {
+    href: '/faq',
+    title: 'FAQ',
+    blurb:
+      'Money, retries, webhook signatures, and the questions that arrive by support ticket most often.',
+    audience: 'all',
+    count: 'Answers',
+  },
+];
+---
+
+<Base title="Docs" description="ZipZap documentation — API reference, merchant onboarding, rider guide, hub operations and FAQ." current="/">
+  <main class="mx-auto max-w-6xl px-5">
+    <section class="py-14">
+      <p class="text-sm font-medium text-slate">ZipZap Documentation</p>
+      <h1 class="mt-2 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
+        A logistics operating system, documented end to end.
+      </h1>
+      <p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-slate">
+        Bangladesh first. ZipZap models a real courier business: order, pricing, pickup, origin hub,
+        line-haul, destination hub, last-mile, COD and settlement — and every surface below is
+        documented against the same contract the code enforces.
+      </p>
+    </section>
+
+    <section aria-labelledby="catalogs-heading" class="pb-16">
+      <h2 id="catalogs-heading" class="sr-only">Documentation catalogs</h2>
+      <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          catalogs.map((catalog) => (
+            <li>
+              <a
+                href={catalog.href}
+                class:list={[
+                  'group flex h-full flex-col rounded-xl border p-5 transition-colors',
+                  catalog.accent
+                    ? 'border-accent bg-accent text-paper'
+                    : 'border-line bg-paper hover:border-slate',
+                ]}
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <h3
+                    class:list={[
+                      'text-base font-semibold',
+                      catalog.accent ? 'text-paper' : 'text-ink',
+                    ]}
+                  >
+                    {catalog.title}
+                  </h3>
+                  <span
+                    class:list={[
+                      'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+                      catalog.accent
+                        ? 'bg-paper/15 text-paper'
+                        : 'bg-canvas text-slate',
+                    ]}
+                  >
+                    {catalog.count}
+                  </span>
+                </div>
+                <p
+                  class:list={[
+                    'mt-2 flex-1 text-sm leading-relaxed',
+                    catalog.accent ? 'text-paper/80' : 'text-slate',
+                  ]}
+                >
+                  {catalog.blurb}
+                </p>
+                <span
+                  class:list={[
+                    'mt-4 text-xs font-medium',
+                    catalog.accent ? 'text-paper/70' : 'text-slate',
+                  ]}
+                >
+                  {catalog.audience}
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+  </main>
+</Base>

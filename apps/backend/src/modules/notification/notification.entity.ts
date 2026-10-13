@@ -2,7 +2,7 @@
  * Notification entities. Own schema `notification` only.
  */
 
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('templates')
 export class NotificationTemplateEntity {
@@ -98,4 +98,23 @@ export class NotificationDeliveryEntity {
 
   @CreateDateColumn()
   attemptedAt!: Date;
+}
+
+/**
+ * A merchant's opt-out. Owns schema `notification` only — `merchantId` is a bare identifier
+ * (rule 2), resolved through the shipment contract rather than read from `merchant`.
+ */
+@Entity('merchant_preferences')
+export class NotificationPreferenceEntity {
+  @PrimaryColumn('uuid')
+  merchantId!: string;
+
+  @PrimaryColumn('text')
+  eventType!: string;
+
+  @Column('boolean')
+  enabled!: boolean;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }

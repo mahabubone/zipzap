@@ -30,11 +30,37 @@ pnpm dev                      # turbo: api + worker + publisher
 | ---------- | ----------------------------------- |
 | API        | http://localhost:3000               |
 | Swagger    | http://localhost:3000/docs          |
+| Spec JSON  | http://localhost:3000/docs-json     |
+| Spec YAML  | http://localhost:3000/docs-yaml     |
 | Health     | http://localhost:3000/healthz       |
 | Prometheus | http://localhost:9090               |
 | Grafana    | http://localhost:3001 (admin/admin) |
 
 `pnpm infra:logs` follows all container logs. `pnpm infra:down` stops them.
+
+`/docs-json` and `/docs-yaml` are served in every environment: they are the machine-readable
+contract the generated client and CI are built from. The interactive `/docs` UI is development-only,
+because it is a debugger rather than an interface.
+
+### Web apps talk to the API through `/api` on their own origin
+
+```bash
+pnpm --filter @zipzap/merchant-web dev           # http://localhost:5173
+pnpm --filter @zipzap/control-tower dev          # http://localhost:5174
+pnpm --filter @zipzap/hub-console dev            # http://localhost:5175
+```
+
+Each app's dev server proxies `/api/*` to `API_ORIGIN` (default `http://localhost:3000`), so the
+browser sees one origin. That is what makes `zipzap_session` a first-party cookie — a cross-origin
+request cannot carry one without `SameSite=None`, which is a deprecated third-party cookie with no
+CSRF protection. See
+[../ADR/0016-http-only-sessions.md](../ADR/0016-http-only-sessions.md).
+
+The proxy is not a plain forward: it also strips the `/api` prefix, rewrites `Origin` to the API's
+own, and drops `sec-fetch-*`. Without those three the backend reads the request as cross-site and
+rejects it with a 401 that looks exactly like a wrong password.
+
+`VITE_API_URL` is gone. There is no API URL for the browser to know.
 
 ## Processes
 

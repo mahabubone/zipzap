@@ -11,14 +11,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./generated": {
+      "types": "./src/generated.d.ts"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "generate": "openapi-typescript ../../apps/backend/openapi.json -o src/generated.d.ts",
+    "//build": "tsc does not emit .d.ts inputs to outDir, so dist/index.d.ts imports ./generated.js and never finds it. Every consumer then degrades to `any` silently — which is exactly what the hub console hit. Copy it explicitly.",
+    "build": "pnpm generate && tsc -p tsconfig.json && cp src/generated.d.ts dist/generated.d.ts",
     "generate": "openapi-typescript ../../apps/backend/openapi.json -o src/generated.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "pretest": "pnpm generate"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

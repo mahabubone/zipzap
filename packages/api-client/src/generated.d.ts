@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Liveness — the process is up */
+        /**
+         * Liveness — the process is up
+         * @description Deliberately checks nothing: a Postgres blip must not restart every process at once. Use /readyz for dependency health. Never returns an error envelope.
+         */
         get: operations["HealthController_healthz"];
         put?: never;
         post?: never;
@@ -45,7 +48,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The authenticated principal */
+        /**
+         * The authenticated principal
+         * @description For a client that needs to render itself: which business it is acting inside, every business it may act inside, and the scopes it holds. `merchantId` is the ACTIVE business and is derived from the credential, never taken from the request.
+         */
         get: operations["MeController_me"];
         put?: never;
         post?: never;
@@ -64,8 +70,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Log in with email + password, returns a bearer session token */
+        /**
+         * Sign in with email and password (browser flow)
+         * @description Issues a session as an `HttpOnly; Secure; SameSite=Lax` cookie, and returns the expiry and the businesses it may act inside. The token itself is not in the response body — script can read that. A native or machine client that needs the raw token calls `POST /v1/auth/token` instead, which returns it and sets no cookie.
+         */
         post: operations["LoginController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in and receive the bearer token (machine flow)
+         * @description For native and server-side clients that cannot hold a cookie. Returns the token in the body, sets no cookie, and is rate limited exactly as `/auth/login` is.
+         */
+        post: operations["LoginController_token"];
         delete?: never;
         options?: never;
         head?: never;
@@ -81,9 +110,60 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke the current bearer session */
+        /**
+         * Revoke the current session
+         * @description Revokes the session identified by the presented credential — `Authorization: Bearer` or the `zipzap_session` cookie — and clears the cookie if one was sent. An API key principal has no session, so it revokes nothing and still returns 204. Indistinguishable by design.
+         */
         post: operations["LogoutController_logout"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchants/{merchantId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List this business members
+         * @description Every person who may act inside this business and the role they hold in it. Ordered owner-first, so the account owner is the first row on a business of any size.
+         */
+        get: operations["MembershipController_list"];
+        put?: never;
+        /**
+         * Add a member to this business
+         * @description Enrols a person by email, creating an account for them if they have none. An email that already has an account gains a second membership — that is what makes one login able to act inside two businesses, and why this is not a "create user" endpoint.
+         */
+        post: operations["MembershipController_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchants/{merchantId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a member role
+         * @description Changes what a member may do and ends every session they hold, because a demotion narrows the scopes a session asserts and those are derived from the membership on each request. Setting the role they already hold changes nothing and signs nobody out.
+         */
+        put: operations["MembershipController_changeRole"];
+        post?: never;
+        /**
+         * Remove a member from this business
+         * @description Removes the membership and ends every session the person holds, immediately. The last owner cannot be removed: a business with no owner has nobody who can add one back, so the lockout would be permanent.
+         */
+        delete: operations["MembershipController_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -99,7 +179,10 @@ export interface paths {
         /** List your webhook endpoints */
         get: operations["WebhookController_list"];
         put?: never;
-        /** Register a webhook endpoint; secret returned once */
+        /**
+         * Register a webhook endpoint; secret returned once
+         * @description Registers a delivery URL and an event list, and returns the signing secret once. An event outside the `x-webhook-events` catalogue is rejected with 404 rather than accepted quietly, and the body carries no business identity at all — that comes from your credential.
+         */
         post: operations["WebhookController_create"];
         delete?: never;
         options?: never;
@@ -158,6 +241,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/webhooks/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every webhook delivery attempt for your endpoints, newest first
+         * @description The evidence trail that makes replay reachable: every attempt, the status code your server answered with, the error when it answered none, and whether the retry ladder has ended. Scoped to your business in the query itself, not filtered afterwards, and never mutated here.
+         */
+        get: operations["WebhookController_deliveryLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks/deliveries/{deliveryId}/replay": {
         parameters: {
             query?: never;
@@ -167,7 +270,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Replay a terminal delivery with a fresh delivery id */
+        /**
+         * Replay a terminal delivery with a fresh delivery id
+         * @description Re-enqueues a terminal delivery, so a merchant can pause, fix the endpoint and replay instead of reconciling by hand. A delivery still climbing its ladder is refused: it will arrive on its own, and re-firing it now would double-deliver.
+         */
         post: operations["WebhookController_replayDelivery"];
         delete?: never;
         options?: never;
@@ -184,7 +290,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a scoped API key (secret shown once) */
+        /**
+         * Create a scoped API key (secret shown once)
+         * @description Mints a machine credential for your own business, so no business is named in the request. You can only grant what you already hold: anything outside your scopes is dropped from the key rather than refused, and a scope outside the vocabulary is a 400.
+         */
         post: operations["CreateApiKeyController_create"];
         delete?: never;
         options?: never;
@@ -199,8 +308,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Live timeline events for one tracking code (SSE) */
+        /**
+         * Live timeline events for one tracking code (SSE)
+         * @description Server-sent events. Emits the same shape as the timeline array on the tracking route, one event per message, filtered to this tracking code. Requires no credential. Each message is a `MessageEvent` whose `data` is the SSE event schema below.
+         */
         get: operations["PublicTrackingController_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/track/token/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public tracking by unguessable token (26 chars, 130 bits) — not enumerable
+         * @description The strong form of the public route, for links sent in a message rather than printed on a label: 130 bits, so it cannot be walked. Resolves the shipment behind the link, then reads the same projection the code route reads. Rate limited identically.
+         */
+        get: operations["PublicTrackingController_trackByToken"];
         put?: never;
         post?: never;
         delete?: never;
@@ -216,7 +348,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Public shipment tracking */
+        /**
+         * Public shipment tracking by tracking code
+         * @description The route every printed label and inbox link points at, so it is rate limited hard: enough to stop a walk, not enough to stop a customer. Codes are short enough to guess, which is why nothing a courier should not publish is in the projection it reads.
+         */
         get: operations["PublicTrackingController_track"];
         put?: never;
         post?: never;
@@ -319,7 +454,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Poll job progress */
+        /**
+         * Poll job progress
+         * @description Returns the job view in its current state. Poll it; there is no push.
+         */
         get: operations["BulkImportController_progress"];
         put?: never;
         post?: never;
@@ -414,6 +552,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pricing/rate-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your rate card, with worked examples */
+        get: operations["PricingController_rateCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cod/collect": {
         parameters: {
             query?: never;
@@ -465,6 +620,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cod/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Unreviewed COD reconciliation exceptions, newest first */
+        get: operations["ListCodExceptionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/coverage": {
         parameters: {
             query?: never;
@@ -476,6 +648,143 @@ export interface paths {
         get: operations["CoverageController_coverage"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every zone you can ship to */
+        get: operations["CoverageController_zones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Manifests, newest first, optionally by status */
+        get: operations["ManifestController_list"];
+        put?: never;
+        /** Schedule a trip, or create a DRAFT manifest on an existing one */
+        post: operations["ManifestController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One manifest and the parcels on it */
+        get: operations["ManifestController_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Schedule one run of a seeded route */
+        post: operations["ManifestController_scheduleTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/seal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → SEALED. A sealed manifest is evidence of what left. */
+        post: operations["ManifestController_seal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SEALED → DISPATCHED */
+        post: operations["ManifestController_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DISPATCHED → RECEIVED */
+        post: operations["ManifestController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/manifests/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RECEIVED → RECONCILED, refused while any parcel has not arrived */
+        post: operations["ManifestController_reconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -551,6 +860,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/riders/{riderId}/sync/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A device pushing its own offline commands back, in device order, exactly once each */
+        post: operations["RiderSyncController_replay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/riders/{riderId}/sync/ack": {
         parameters: {
             query?: never;
@@ -562,6 +888,23 @@ export interface paths {
         put?: never;
         /** Acknowledge one queued command */
         post: operations["RiderSyncController_ack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/riders/{riderId}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a rider position. Never visible on public tracking. */
+        post: operations["RiderPositionController_record"];
         delete?: never;
         options?: never;
         head?: never;
@@ -687,6 +1030,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deliveries/{id}/proof/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a delivery code for the recipient to read out
+         * @description Returns the code once, in plaintext. It is stored only as a salted SHA-256 hash and is valid for ten minutes or five attempts, whichever comes first.
+         */
+        post: operations["DeliveryProofController_issueCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deliveries/{id}/proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem a delivery code with a photo and a location
+         * @description Writes an immutable proof. The delivery itself is a separate call: POST /:id/complete refuses to mark a parcel delivered until this has succeeded.
+         */
+        post: operations["DeliveryProofController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settlements": {
         parameters: {
             query?: never;
@@ -697,7 +1080,7 @@ export interface paths {
         /** List your settlements, newest first */
         get: operations["ListSettlementsController_listSettlements"];
         put?: never;
-        /** Freeze unsettled entries into a settlement */
+        /** Freeze your unsettled entries into a settlement */
         post: operations["CreateSettlementController_create"];
         delete?: never;
         options?: never;
@@ -716,23 +1099,6 @@ export interface paths {
         put?: never;
         /** Approve a settlement — the point of no return */
         post: operations["ApproveSettlementController_approve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/merchants/{id}/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Derived merchant balance in minor units */
-        get: operations["BalanceController_balance"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -767,6 +1133,57 @@ export interface paths {
         put?: never;
         /** Confirm the provider payout and settle */
         post: operations["SettlementPaymentController_confirmPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your derived balance, itemised, with anything blocking a payout */
+        get: operations["MerchantBalanceController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settlements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One settlement, itemised */
+        get: operations["GetSettlementController_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settlements/{id}/statement.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the itemised statement */
+        get: operations["GetSettlementController_csv"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -842,6 +1259,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which parcel notifications your customers receive
+         * @description Every event that can notify, answered either way. Absent means on: a merchant is opted out of an event by writing a row, never by leaving one out.
+         */
+        get: operations["NotificationPreferencesController_list"];
+        /**
+         * Opt one event out, or back in
+         * @description Setting enabled=true removes the row rather than storing "on", so absence stays the single way to say "default".
+         */
+        put: operations["NotificationPreferencesController_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hubs/scans": {
         parameters: {
             query?: never;
@@ -853,6 +1294,40 @@ export interface paths {
         put?: never;
         /** Record a hub scan for a shipment */
         post: operations["HubScanController_scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hubs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every hub and how many parcels are waiting at it */
+        get: operations["HubConsoleController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hubs/{hubCode}/parcels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parcels waiting at one hub, and the scan each needs next */
+        get: operations["HubConsoleController_parcels"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -893,6 +1368,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/control-tower/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hubs and rider positions for the live map. Rider positions never reach public tracking. */
+        get: operations["MapController_getMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/analytics/merchant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own daily parcel counts and COD money, one point per day */
+        get: operations["MerchantAnalyticsController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/riders/{riderId}/jobs": {
         parameters: {
             query?: never;
@@ -914,20 +1423,400 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        HealthzDto: {
+            /**
+             * @example ok
+             * @enum {string}
+             */
+            status: "ok";
+            /**
+             * @description Whole seconds this process has been up. Rests on restart, as liveness does.
+             * @example 4321
+             */
+            uptimeSeconds: number;
+        };
+        ReadyzDto: {
+            /**
+             * @example ready
+             * @enum {string}
+             */
+            status: "ready";
+            /**
+             * @description Postgres only. Redis and NATS are deliberately absent: see the controller.
+             * @example up
+             * @enum {string}
+             */
+            database: "up";
+        };
+        ErrorEnvelopeDto: {
+            /**
+             * @description RFC 9457 problem type. A stable URI derived from `code`, so the same failure always has the same type.
+             * @example https://api.zipzap.example/errors/permission-denied
+             */
+            type: string;
+            /**
+             * @description Short, human-readable summary of the class.
+             * @example Forbidden
+             */
+            title: string;
+            /**
+             * @description HTTP status, repeated from the response.
+             * @example 403
+             */
+            status: number;
+            /**
+             * @description Stable machine-readable code. Clients switch on this, never on `title` or `detail`. Both change with wording.
+             * @example PERMISSION_DENIED
+             */
+            code: string;
+            /**
+             * @description Human-readable detail. Safe to show an end user; never contains a secret.
+             * @example Missing scope shipments:write.
+             */
+            detail: string;
+            /**
+             * @description Request correlation id. Quote this when reporting a failure.
+             * @example req-01J8Z9K3QW4V5N6M7P8R9S0T1U
+             */
+            request_id: string;
+        };
+        ApiPrincipalResponseDto: {
+            /**
+             * @description Which credential kind proved identity. Never interchangeable.
+             * @example human
+             * @enum {string}
+             */
+            kind: "human" | "machine";
+            /**
+             * @description The user behind a human principal, or the API key behind a machine one.
+             * @example 9f8e7d6c-5b4a-3210-fedc-ba9876543210
+             */
+            subjectId: string;
+            /**
+             * @description The ACTIVE business — the one this request acts inside, always one of merchantIds. Null for a platform administrative key.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string | null;
+            /**
+             * @description Every business this principal may act inside. A machine key has exactly one.
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            merchantIds: string[];
+            /**
+             * @description Scopes this principal holds. An endpoint requires one of its declared scopes.
+             * @example [
+             *       "shipments:read",
+             *       "shipments:write"
+             *     ]
+             */
+            scopes: string[];
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            credentialId: string;
+            /**
+             * @description Per-minute request ceiling this credential carries. Null = the tier default.
+             * @example null
+             */
+            rateLimitPerMin: number | null;
+        };
         LoginDto: {
-            /** Format: email */
+            /**
+             * Format: email
+             * @description The address the account is registered under.
+             * @example owner@example.com
+             */
             email: string;
+            /**
+             * @description The account password, checked against a scrypt hash. An unknown address, a disabled user, a wrong password and an inactive business all answer the same 401.
+             * @example correct horse battery staple
+             */
             password: string;
+            /**
+             * Format: uuid
+             * @description Business to open the session against
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId?: string;
+        };
+        AuthSessionResponseDto: {
+            /**
+             * @description Absolute expiry, as an ISO 8601 instant. Sliding: activity extends it, up to 7 days.
+             * @example 2026-10-10T19:58:00.000Z
+             */
+            expiresAt: string;
+            /**
+             * @description The ACTIVE business this session acts inside — always one of `merchantIds`.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string;
+            /**
+             * @description Every business the signed-in person belongs to.
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            merchantIds: string[];
+        };
+        AuthTokenResponseDto: {
+            /**
+             * @description The raw session token. Returned exactly once; store it securely.
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.…
+             */
+            token: string;
+            /**
+             * @description The Authorization scheme this token goes with.
+             * @example Bearer
+             * @enum {string}
+             */
+            tokenType: "Bearer";
+            /**
+             * @description Seconds until expiry. The session is sliding: extend by this much on each use.
+             * @example 43200
+             */
+            expiresInSeconds: number;
+            /**
+             * @description Absolute expiry, as an ISO 8601 instant.
+             * @example 2026-10-10T19:58:00.000Z
+             */
+            expiresAt: string;
+            /**
+             * @description The ACTIVE business this token acts inside.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string;
+            /**
+             * @description Every business the signed-in person belongs to.
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            merchantIds: string[];
+        };
+        MemberDto: {
+            /**
+             * @description The person, not the membership. One person may hold several memberships.
+             * @example 9f8e7d6c-5b4a-3210-fedc-ba9876543210
+             */
+            userId: string;
+            /**
+             * @description The business this membership is of, taken from the path.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            merchantId: string;
+            /**
+             * @description The login identity, lower-cased.
+             * @example staff@shop.example
+             */
+            email: string;
+            /**
+             * @description The role held in THIS business. The same person may be an owner of one and an operator of another — the role lives on the membership, not on the user.
+             * @example MERCHANT_OPERATOR
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+            /**
+             * @description Always null today. Filling it would need a read of another schema store, which rule 2 forbids, and an approximation would be worse than an honest null.
+             * @example null
+             */
+            lastUsedAt: string | null;
+            /**
+             * @description When the account was disabled, if it was. Suspension of a person is deliberately separate from the suspension of a merchant: one suspended business must not lock them out of every other one they belong to.
+             * @example null
+             */
+            disabledAt: string | null;
+        };
+        MemberListDto: {
+            members: components["schemas"]["MemberDto"][];
+        };
+        InviteMemberDto: {
+            /**
+             * Format: email
+             * @description The email to enrol. A person who already has an account gains a second membership — that is what lets one login act inside two businesses.
+             * @example staff@shop.example
+             */
+            email: string;
+            /**
+             * @description The role to grant. Platform roles are refused: a merchant granting one would be a tenant writing itself out of its own tenancy.
+             * @example MERCHANT_OPERATOR
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+        };
+        ChangeRoleDto: {
+            /**
+             * @description The new role. The same value as the current role is a no-op that signs nobody out.
+             * @example MERCHANT_OWNER
+             * @enum {string}
+             */
+            role: "MERCHANT_OWNER" | "MERCHANT_OPERATOR";
+        };
+        EndpointViewDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example m-1 */
+            merchantId: string;
+            /** @example https://example.com/webhook */
+            url: string;
+            /**
+             * @example [
+             *       "shipment.delivered",
+             *       "shipment.exception"
+             *     ]
+             */
+            events: string[];
+            /**
+             * @example ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "PAUSED" | "FAILING";
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
         };
         CreateWebhookDto: {
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description The URL deliveries are POSTed to. Only its being a URL is checked here — TLS and reachability are not, so a plain-http URL is accepted and then fails delivery.
+             * @example https://hooks.example.com/zipzap
+             */
             url: string;
+            /**
+             * @description Event types to subscribe to, from the wire catalogue on the `webhooks` tag. One that is not in the catalogue is rejected rather than silently accepted.
+             * @example [
+             *       "shipment.delivered",
+             *       "cod.collected"
+             *     ]
+             */
             events: string[];
         };
+        CreatedEndpointDto: {
+            endpoint: components["schemas"]["EndpointViewDto"];
+            /**
+             * @description Signing secret, shown once at creation
+             * @example whsec_abc123...
+             */
+            secret: string;
+        };
+        RotatedSecretDto: {
+            /**
+             * @description New signing secret, shown once upon rotation
+             * @example whsec_new123...
+             */
+            secret: string;
+        };
+        DeliveryLogRowDto: {
+            /** @example del-123 */
+            id: string;
+            /** @example ep-123 */
+            endpointId: string;
+            /** @example shipment.delivered */
+            eventType: string;
+            /** @example 1 */
+            attempt: number;
+            /** @example 200 */
+            statusCode: number | null;
+            /** @example null */
+            error: string | null;
+            /** @example true */
+            delivered: boolean;
+            /** @example true */
+            terminal: boolean;
+            /** @example 2026-10-10T06:00:00.000Z */
+            attemptedAt: string;
+        };
+        DeliveryLogPageDto: {
+            data: components["schemas"]["DeliveryLogRowDto"][];
+            /** @example cursor_xyz */
+            nextCursor: string | null;
+        };
+        ReplayedDeliveryDto: {
+            /** @example del-456 */
+            deliveryId: string;
+            /** @example ep-123 */
+            endpointId: string;
+            /** @example shipment.delivered */
+            wireEvent: string;
+        };
         CreateApiKeyDto: {
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "keys:manage")[];
+            /**
+             * @description The scopes the key should hold, from the `API_SCOPES` vocabulary. A scope you do not hold yourself is dropped rather than refused, so read the returned scopes.
+             * @example [
+             *       "shipments:read",
+             *       "tracking:read"
+             *     ]
+             */
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "members:manage" | "network:read")[];
+        };
+        CreatedApiKeyDto: {
+            /** @example key_123456789 */
+            keyId: string;
+            /**
+             * @description Raw secret, shown once at creation
+             * @example zz_live_abc123...
+             */
+            secret: string;
+            /**
+             * @description Granted API scopes
+             * @example [
+             *       "shipments:read",
+             *       "shipments:write"
+             *     ]
+             */
+            scopes: string;
+        };
+        PublicTrackingEventDto: {
+            /**
+             * @description The tracking code this event belongs to.
+             * @example ZZ-7F3K9Q2M
+             */
+            trackingCode: string;
+            /**
+             * @description Monotonic counter within a tracking code. NOT unique, so a client must not use it as a key.
+             * @example 4
+             */
+            sequence: number;
+            /**
+             * @description The event type, uppercase snake case.
+             * @example OUT_FOR_DELIVERY
+             */
+            event: string;
+            /**
+             * @description ISO 8601 instant. The projection is eventually consistent with the live log.
+             * @example 2026-10-10T11:42:00.000Z
+             */
+            occurredAt: string;
+        };
+        PublicTimelineEventDto: {
+            /**
+             * @description Monotonic counter within a tracking code. NOT unique — see the ordering note on timelineFor — so a client must not use it as a key.
+             * @example 4
+             */
+            sequence: number;
+            /**
+             * @description The event type, uppercase snake case.
+             * @example OUT_FOR_DELIVERY
+             */
+            event: string;
+            /**
+             * @description ISO 8601 instant. The projection is eventually consistent with the live log.
+             * @example 2026-10-10T11:42:00.000Z
+             */
+            occurredAt: string;
+        };
+        PublicTrackingViewDto: {
+            /** @example ZZ-7F3K9Q2M */
+            trackingCode: string;
+            /**
+             * @description The latest event type. Null only when the timeline is empty, which 404s first.
+             * @example OUT_FOR_DELIVERY
+             */
+            status: string | null;
+            /** @description Ordered by sequence, then occurredAt, then id — a total order, because `sequence` alone is not one and `status` is read off the last row. */
+            timeline: components["schemas"]["PublicTimelineEventDto"][];
         };
         CreateShipmentDto: {
+            /** @description Cash on delivery, in integer minor units (poisha). Omit for a non-COD shipment; zero is not the same as omitted. */
+            codAmountMinor?: number;
             senderName: string;
             senderPhone: string;
             senderAddress: string;
@@ -936,18 +1825,175 @@ export interface components {
             recipientAddress: string;
             parcelWeightGrams: number;
             parcelDescription: string;
-            /** @description Money as integer minor units. A decimal here is a bug, not a convenience. */
-            codAmountMinor?: number;
             codCurrency?: string;
             zone: string;
             remoteArea: boolean;
             fragile: boolean;
             packagingKind?: string;
-            merchantPlan: string;
+        };
+        CodAmountDto: {
+            /**
+             * @description Integer minor units (poisha)
+             * @example 125050
+             */
+            amountMinor: number;
+            /**
+             * @description ISO currency code
+             * @example BDT
+             */
+            currency: string;
+        };
+        CreatedShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            cod: components["schemas"]["CodAmountDto"];
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        ShipmentSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            /** @example INV-1001 */
+            merchantReference: string | null;
+            /** @example 125050 */
+            codAmountMinor: number;
+            /** @example BDT */
+            codCurrency: string;
+            /** @example dhaka-metro */
+            zone: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CursorPaginationDto: {
+            /**
+             * @description Opaque cursor for the next page; null on the last page
+             * @example eyJsYXN0SWQiOiIxMjMifQ==
+             */
+            nextCursor: string | null;
+            /**
+             * @description True when more rows exist past this page
+             * @example false
+             */
+            hasMore: boolean;
+        };
+        ShipmentPageDto: {
+            data: components["schemas"]["ShipmentSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        TimelineEntryDto: {
+            /** @example ShipmentCreated */
+            eventType: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            occurredAt: string;
+            /**
+             * @description human | system | rider
+             * @example human
+             */
+            actorType: string;
+            /**
+             * @example {
+             *       "hubCode": "DHK-01"
+             *     }
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** @example null */
+            correctsEventId: string | null;
+        };
+        ShipmentDetailDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example CREATED */
+            status: string;
+            /** @example INV-1001 */
+            merchantReference: string | null;
+            /** @example Rahim */
+            senderName: string;
+            /** @example +8801700000000 */
+            senderPhone: string;
+            /** @example House 1, Road 2, Dhanmondi, Dhaka */
+            senderAddress: string;
+            /** @example Karim */
+            recipientName: string;
+            /** @example +8801800000000 */
+            recipientPhone: string;
+            /** @example Agrabad, Chattogram */
+            recipientAddress: string;
+            /** @example 1000 */
+            parcelWeightGrams: number;
+            /** @example Books and stationery */
+            parcelDescription: string;
+            /** @example 125050 */
+            codAmountMinor: number;
+            /** @example BDT */
+            codCurrency: string;
+            /** @example dhaka-metro */
+            zone: string | null;
+            /** @example 1 */
+            pricingVersion: number;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            timeline: components["schemas"]["TimelineEntryDto"][];
+        };
+        CancelledShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example CANCELLED */
+            status: string;
         };
         UploadBulkDto: {
             csv: string;
             filename: string;
+        };
+        BulkJobViewDto: {
+            /** @example job-123 */
+            id: string;
+            /** @example merchant-456 */
+            merchantId: string;
+            /** @example shipments.csv */
+            filename: string;
+            /** @example PENDING */
+            status: string;
+            /** @example 100 */
+            totalRows: number;
+            /** @example 0 */
+            processedRows: number;
+            /** @example 0 */
+            succeededRows: number;
+            /** @example 0 */
+            failedRows: number;
+            /** @example 0 */
+            skippedRows: number;
+        };
+        BulkPreviewRowDto: {
+            /** @example 2 */
+            lineNumber: number;
+            /** @example INV-1001 */
+            invoice: string;
+            /** @example VALID */
+            outcome: string;
+            /** @example null */
+            reason: string | null;
+        };
+        BulkPreviewDto: {
+            job: components["schemas"]["BulkJobViewDto"];
+            rows: components["schemas"]["BulkPreviewRowDto"][];
         };
         AcceptBulkDto: {
             jobId: string;
@@ -957,35 +2003,376 @@ export interface components {
             reason: "LOST" | "DAMAGED";
             note?: string | null;
         };
+        ReportedExceptionDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description Target exception status (e.g. LOST, DAMAGED)
+             * @example LOST
+             */
+            status: string;
+        };
         HoldDto: {
             reason?: string | null;
         };
+        HeldShipmentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /** @example HOLD */
+            status: string;
+        };
         QuoteDto: {
-            weightGrams: number;
+            /** @description Cash on delivery, in integer minor units (poisha). Zero means no COD. */
             codAmountMinor: number;
+            weightGrams: number;
             zone: string;
             remoteArea: boolean;
             fragile: boolean;
             packagingKind?: string;
-            merchantPlan: string;
             /** @enum {string} */
             currency?: "BDT";
             version?: number;
         };
+        MoneyDto: {
+            /**
+             * @description Integer minor units (poisha). 125050 is ৳1,250.50 — never a decimal amount.
+             * @example 125050
+             */
+            amountMinor: number;
+            /** @example BDT */
+            currency: string;
+        };
+        QuoteLineDto: {
+            /**
+             * @example BASE
+             * @enum {string}
+             */
+            kind: "BASE" | "WEIGHT" | "COD_FEE" | "REMOTE_AREA" | "HANDLING" | "PACKAGING" | "TAX" | "DISCOUNT";
+            /**
+             * @description A sentence for a human.
+             * @example Weight surcharge (2 kg)
+             */
+            label: string;
+            amount: components["schemas"]["MoneyDto"];
+        };
+        QuoteResponseDto: {
+            /**
+             * @description The frozen version this quote was computed against — the dispute evidence.
+             * @example 3
+             */
+            version: number;
+            /** @example BDT */
+            currency: string;
+            /** @description In the order the rules add them. */
+            lines: components["schemas"]["QuoteLineDto"][];
+            /** @description The sum of the lines, in the quoted currency. */
+            total: components["schemas"]["MoneyDto"];
+        };
+        RateCardExampleDto: {
+            /** @example 1 kg parcel, inside Dhaka, no COD */
+            label: string;
+            /**
+             * @description Integer minor units (poisha).
+             * @example 95000
+             */
+            totalMinor: number;
+        };
+        RateCardResponseDto: {
+            /**
+             * @description The frozen version the coefficients were read from.
+             * @example 3
+             */
+            version: number;
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description The plan THIS merchant is on. Not a list of plans — theirs.
+             * @example growth
+             */
+            plan: string;
+            /**
+             * @description Base delivery fee in integer minor units (poisha).
+             * @example 6000
+             */
+            baseFeeMinor: number;
+            /**
+             * @description Per billable kilogram, in integer minor units (poisha).
+             * @example 2000
+             */
+            perKgMinor: number;
+            /**
+             * @description COD fee in basis points: 180 is 1.8%.
+             * @example 180
+             */
+            codFeeBps: number;
+            /**
+             * @description Remote-area surcharge in integer minor units (poisha).
+             * @example 4000
+             */
+            remoteAreaFeeMinor: number;
+            /**
+             * @description Fragile handling surcharge in integer minor units (poisha).
+             * @example 1500
+             */
+            fragileFeeMinor: number;
+            /**
+             * @description Packaging fee per kind, in integer minor units (poisha).
+             * @example {
+             *       "box_s": 800,
+             *       "box_m": 1500
+             *     }
+             */
+            packagingFeesMinor: {
+                [key: string]: number;
+            };
+            /**
+             * @description VAT in basis points: 500 is 5%.
+             * @example 500
+             */
+            taxBps: number;
+            /**
+             * @description This merchant's plan discount in basis points. Zero is a real answer.
+             * @example 500
+             */
+            planDiscountBps: number;
+            /** @description Worked examples, run through the quote engine itself so they cannot drift from a real quote. */
+            examples: components["schemas"]["RateCardExampleDto"][];
+        };
         CollectCodDto: {
+            /** @description Integer minor units (poisha). A decimal here is a bug, not a convenience. */
+            collectedMinor: number;
             /** Format: uuid */
             shipmentId: string;
-            /** @description Integer minor units. A decimal here is a bug, not a convenience. */
+        };
+        CollectedCodDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description Expected COD amount in minor units (poisha)
+             * @example 125050
+             */
+            expectedMinor: number;
+            /**
+             * @description Collected COD amount in minor units (poisha)
+             * @example 125050
+             */
             collectedMinor: number;
+            /**
+             * @description Shortfall: expected - collected, 0 when fully collected
+             * @example 0
+             */
+            shortfallMinor: number;
+            /**
+             * @description COLLECTED | PARTIALLY_COLLECTED
+             * @example COLLECTED
+             */
+            status: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
         };
         ReconcileCodDto: {
             /** Format: uuid */
             shipmentId: string;
             note: string;
         };
+        ReconciledCodDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /** @example RECONCILED */
+            status: string;
+        };
+        CodRecordSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /** @example COLLECTED */
+            status: string;
+            /** @example 125050 */
+            expectedMinor: number;
+            /** @example 125050 */
+            collectedMinor: number | null;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CodRecordPageDto: {
+            data: components["schemas"]["CodRecordSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        CodExceptionDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /** @example 125050 */
+            expectedMinor: number;
+            /** @example 100000 */
+            collectedMinor: number | null;
+            /**
+             * @description collected - expected; negative means shortfall
+             * @example -25050
+             */
+            differenceMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example null */
+            reviewNote: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        CodExceptionPageDto: {
+            data: components["schemas"]["CodExceptionDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        CoverageCheckDto: {
+            /** @example dhaka-metro */
+            zone: string;
+            /**
+             * @description False when no coverage row exists — absence is never a default-allow.
+             * @example true
+             */
+            serviceable: boolean;
+            /**
+             * @description Null when serviceable; a sentence for a human when not.
+             * @example Zone "chittagong-hills" is not serviceable.
+             */
+            reason: string | null;
+            /**
+             * @description Estimated delivery days, when the zone is serviceable.
+             * @example 2
+             */
+            estimatedDays: number | null;
+            /**
+             * @description Whether a rider can be dispatched to collect.
+             * @example true
+             */
+            pickupAvailable: boolean;
+            /** @example true */
+            deliveryAvailable: boolean;
+            /**
+             * @description Whether cash-on-delivery is accepted on this zone.
+             * @example true
+             */
+            codAvailable: boolean;
+        };
+        ServiceableZonesDto: {
+            /**
+             * @example [
+             *       "chattogram-metro",
+             *       "dhaka-metro"
+             *     ]
+             */
+            zones: string[];
+        };
+        ManifestViewDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @description Human-readable code, spoken on the dock.
+             * @example MNF-4F2A9C1B7D
+             */
+            code: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            tripId: string;
+            /**
+             * @description Current state. Moves only through the validated transitions.
+             * @example SEALED
+             * @enum {string}
+             */
+            status: "DRAFT" | "SEALED" | "DISPATCHED" | "RECEIVED" | "RECONCILED";
+        };
+        ManifestListDto: {
+            data: components["schemas"]["ManifestViewDto"][];
+        };
+        ManifestItemDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description True once the destination hub has scanned the parcel in. Always false before RECEIVED — nobody has looked yet, which is not the same as nothing missing.
+             * @example false
+             */
+            arrived: boolean;
+        };
+        ManifestDetailDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @description Human-readable code, spoken on the dock.
+             * @example MNF-4F2A9C1B7D
+             */
+            code: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            tripId: string;
+            /**
+             * @description Current state. Moves only through the validated transitions.
+             * @example SEALED
+             * @enum {string}
+             */
+            status: "DRAFT" | "SEALED" | "DISPATCHED" | "RECEIVED" | "RECONCILED";
+            /**
+             * @description How many cargo items are on the manifest.
+             * @example 3
+             */
+            itemCount: number;
+            /** @description Ordered as loaded, not by arrival. */
+            items: components["schemas"]["ManifestItemDto"][];
+            /**
+             * @description How many items have not arrived. Zero before RECEIVED because nobody has looked yet — "not checked" and "nothing missing" must not render as the same number.
+             * @example 0
+             */
+            missingCount: number;
+        };
+        CreateManifestDto: {
+            /** Format: uuid */
+            tripId: string;
+            shipmentIds: string[];
+        };
+        TripDto: {
+            routeCode: string;
+        };
+        ScheduledTripDto: {
+            /**
+             * @description The scheduled trip. One actual movement of the route.
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            tripId: string;
+            /**
+             * @description The seeded route.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            routeId: string;
+        };
         RequestPickupDto: {
             shipmentIds: string[];
             totalWeightGrams: number;
+        };
+        RequestedPickupDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example REQUESTED
+             * @enum {string}
+             */
+            status: "CANCELLED" | "COMPLETED" | "FAILED" | "REQUESTED" | "SCHEDULED" | "ASSIGNED" | "IN_PROGRESS" | "EXPIRED";
+            /**
+             * @description Member shipments, as identifiers — never foreign keys (ADR-0002).
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            shipmentIds: string[];
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
         };
         AssignmentCandidateDto: {
             /** Format: uuid */
@@ -998,18 +2385,253 @@ export interface components {
         AssignPickupDto: {
             candidates: components["schemas"]["AssignmentCandidateDto"][];
         };
+        AssignedPickupDto: {
+            /**
+             * @description The pickup that was assigned.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            pickupId: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            riderId: string;
+            /**
+             * @description Always ASSIGNED — the machine asserted the walk to it.
+             * @example ASSIGNED
+             * @enum {string}
+             */
+            status: "CANCELLED" | "COMPLETED" | "FAILED" | "REQUESTED" | "SCHEDULED" | "ASSIGNED" | "IN_PROGRESS" | "EXPIRED";
+            /**
+             * @description Deterministic score; higher is better.
+             * @example 120
+             */
+            score: number;
+            /**
+             * @description The scoring breakdown in words, for the audit trail.
+             * @example [
+             *       "2km away",
+             *       "20% spare capacity"
+             *     ]
+             */
+            reasons: string[];
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        PickupSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example ASSIGNED
+             * @enum {string}
+             */
+            status: "CANCELLED" | "COMPLETED" | "FAILED" | "REQUESTED" | "SCHEDULED" | "ASSIGNED" | "IN_PROGRESS" | "EXPIRED";
+            /**
+             * @description Member shipments, as identifiers.
+             * @example [
+             *       "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+             *     ]
+             */
+            shipmentIds: string[];
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            riderId: string | null;
+            /**
+             * @description The state a FAILED pickup reschedules from; null once terminal.
+             * @example Rider refused the batch
+             */
+            failureReason: string | null;
+            /**
+             * @description Declared batch weight in grams.
+             * @example 1000
+             */
+            totalWeightGrams: number;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /** @example 2026-10-10T06:05:00.000Z */
+            updatedAt: string;
+        };
+        PickupPageDto: {
+            data: components["schemas"]["PickupSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
         RegisterRiderDto: {
             displayName: string;
             phone: string;
             capacity?: number;
         };
+        RegisteredRiderDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example AVAILABLE
+             * @enum {string}
+             */
+            status: "SUSPENDED" | "OFFLINE" | "AVAILABLE" | "ON_PICKUP" | "ON_DELIVERY" | "ON_BREAK";
+        };
+        PullCommandDto: {
+            /** @example cmd-123 */
+            id: string;
+            /** @example zipzap.rider.command */
+            commandType: string;
+            /**
+             * @example {
+             *       "note": "device-supplied"
+             *     }
+             */
+            payload: Record<string, never>;
+            /** @example null */
+            expectedState: Record<string, never> | null;
+            /** @example 1 */
+            deviceSequence: number;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            createdAt: string;
+        };
+        PullResultDto: {
+            commands: components["schemas"]["PullCommandDto"][];
+            /** @example 5 */
+            queueSize: number;
+            /** @example false */
+            capWarning: boolean;
+        };
+        DeviceCommandDto: {
+            /** @description The device's own monotonic counter. With `createdAt` it forms the dedupe key and the order. */
+            deviceSequence: number;
+            /** @description The device's clock. Deliberately not the server's — the server cannot know when it was pressed. */
+            createdAt: string;
+            commandType: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description What the device believed at the time. `{ status }` for a command about the rider,
+             *     `{ shipmentId, shipmentStatus }` for one about a parcel — the latter is what lets the server
+             *     reject a scan of something that was cancelled while the phone was in a pocket.
+             */
+            expectedState?: {
+                [key: string]: unknown;
+            };
+        };
+        ReplayDto: {
+            commands: components["schemas"]["DeviceCommandDto"][];
+        };
+        ReplayOutcomeDto: {
+            /** @example 1 */
+            deviceSequence: number;
+            /** @example cmd-123 */
+            commandId: string;
+            /**
+             * @example applied
+             * @enum {string}
+             */
+            kind: "applied" | "rejected" | "duplicate";
+            /** @example null */
+            reason: string | null;
+        };
+        ReplayResultDto: {
+            results: components["schemas"]["ReplayOutcomeDto"][];
+            /** @example 10 */
+            queueSize: number;
+            /** @example false */
+            capWarning: boolean;
+        };
         AckDto: {
             commandId: string;
+        };
+        AckOutcomeDto: {
+            /**
+             * @description A fresh ack is delivered or rejected; the already_* variants return what a prior Idempotency-Key recorded.
+             * @example delivered
+             * @enum {string}
+             */
+            kind: "delivered" | "rejected" | "already_delivered" | "already_rejected";
+            /** @example false */
+            replayed: boolean;
+        };
+        AckResultDto: {
+            /** @description Outcome of command acknowledgement */
+            outcome: components["schemas"]["AckOutcomeDto"];
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        RecordPositionDto: {
+            latitude: number;
+            longitude: number;
+            /** @description The device's clock. A stale ping is refused by the service rather than applied. */
+            recordedAt: string;
+            accuracyMeters?: number;
+        };
+        RiderPositionDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            riderId: string;
+            /** @example 23.8103 */
+            latitude: number;
+            /** @example 90.4125 */
+            longitude: number;
+            /** @example 2026-10-10T06:00:00.000Z */
+            recordedAt: string;
+            /** @example 3 */
+            ageSeconds: number;
+        };
+        RiderLoadDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            riderId: string;
+            /** @example 20 */
+            capacity: number;
+            /** @example 1 */
+            activeJobs: number;
+            /**
+             * @description 0..1 current load factor
+             * @example 0.05
+             */
+            loadFactor: number;
+        };
+        PoolUtilisationDto: {
+            /** @example 500 */
+            totalCapacity: number;
+            /** @example 250 */
+            inUseCapacity: number;
+            /** @example 0.5 */
+            loadFactor: number;
+            /** @example 0.48 */
+            meanLoadFactor: number;
+            /** @example 1 */
+            maxLoadFactor: number;
+            /** @example 0 */
+            minLoadFactor: number;
         };
         RecordAttemptDto: {
             /** @enum {string} */
             reason: "CUSTOMER_UNAVAILABLE" | "WRONG_ADDRESS" | "PHONE_UNREACHABLE" | "CUSTOMER_REFUSED" | "ADDRESS_INCOMPLETE" | "PAYMENT_ISSUE" | "DAMAGED_PACKAGE" | "WEATHER" | "OPERATIONAL_EXCEPTION";
             note?: string;
+        };
+        RecordedAttemptDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /** @example 1 */
+            sequence: number;
+            /**
+             * @example OUT_FOR_DELIVERY
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+            /** @example true */
+            retryScheduled: boolean;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
         };
         CreateDeliveryDto: {
             /** Format: uuid */
@@ -1017,17 +2639,273 @@ export interface components {
             /** Format: uuid */
             riderId?: string;
         };
+        CreatedDeliveryJobDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example shp-123 */
+            shipmentId: string;
+            /** @example r-123 */
+            riderId?: string | null;
+            /**
+             * @example CREATED
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        DeliveryStatusDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example ACCEPTED
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+        };
         CompleteDeliveryDto: {
-            /** @description Integer minor units collected at the door. A decimal here is a bug, not a convenience. */
+            /** @description Integer minor units (poisha). A decimal here is a bug, not a convenience. */
             collectedMinor: number;
         };
-        CreateSettlementDto: {
-            /** Format: uuid */
+        IssuedDeliveryCodeDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /**
+             * @example PENDING
+             * @enum {string}
+             */
+            status: "PENDING";
+            /** @example 2026-10-10T06:10:00.000Z */
+            expiresAt: string;
+            /** @example 5 */
+            attemptsRemaining: number;
+            /**
+             * @description Plaintext OTP returned once and never stored
+             * @example 123456
+             */
+            code: string;
+        };
+        SubmitProofDto: {
+            /** @description Exactly OTP_LENGTH digits. Anything else is a wrong guess, not a malformed request. */
+            code: string;
+            /** @description Raw base64, no data: prefix — the client encodes the bytes and sends them. */
+            photoBase64: string;
+            /** @enum {string} */
+            photoContentType: "image/jpeg" | "image/png" | "image/webp";
+            /** @description Where the parcel was handed over. Checked against Bangladesh, not trusted as a number. */
+            latitude: number;
+            longitude: number;
+        };
+        SubmittedDeliveryProofDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            jobId: string;
+            /** @example prf-123 */
+            proofId: string;
+            /**
+             * @example VERIFIED
+             * @enum {string}
+             */
+            status: "VERIFIED";
+            /** @example e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 */
+            photoSha256: string;
+            /** @example 254321 */
+            photoByteLength: number;
+            /** @example 2026-10-10T06:05:00.000Z */
+            otpVerifiedAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        SettlementItemDto: {
+            /** @example entry-123 */
+            entryId: string;
+            /** @example COD_COLLECTED */
+            type: string;
+            /** @example 1 */
+            direction: number;
+            /** @example 125050 */
+            amountMinor: number;
+        };
+        CreatedSettlementDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example m-1 */
             merchantId: string;
+            /** @example PENDING */
+            status: string;
+            items: components["schemas"]["SettlementItemDto"][];
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
         };
         ApproveSettlementDto: {
             /** Format: uuid */
             approverId: string;
+        };
+        ApprovedSettlementDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example APPROVED */
+            status: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example u-1 */
+            approvedBy: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            approvedAt: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        SettlementSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example SETTLED */
+            status: string;
+            /** @example 1250500 */
+            frozenNetMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        SettlementPageDto: {
+            data: components["schemas"]["SettlementSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        InitiatedSettlementPaymentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example PROCESSING */
+            status: string;
+            /** @example PAY-PROVIDER-123 */
+            paymentReference: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        ConfirmedSettlementPaymentDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example SETTLED */
+            status: string;
+            /** @example PAY-PROVIDER-123 */
+            paymentReference: string;
+            /** @example COMPLETED */
+            providerStatus: string;
+            /** @example 1250500 */
+            netMinor: number;
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
+        BalanceLineDto: {
+            /** @example DELIVERY_FEE */
+            type: string;
+            /**
+             * @description 1 for credit (owed to merchant), -1 for debit (owed by merchant)
+             * @example 1
+             */
+            direction: number;
+            /**
+             * @description Sum of entries of this type in minor units
+             * @example 125050
+             */
+            amountMinor: number;
+            /**
+             * @description How many ledger rows made up this line
+             * @example 42
+             */
+            entries: number;
+        };
+        BalanceBlockDto: {
+            /** @example RECONCILIATION_EXCEPTION */
+            status: string;
+            /** @example 2 */
+            count: number;
+        };
+        NextSettlementSummaryDto: {
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example 250000 */
+            netMinor: number;
+        };
+        MerchantBalanceDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            merchantId: string;
+            /**
+             * @description Signed minor units: negative means owed to merchant
+             * @example -1250500
+             */
+            balanceMinor: number;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            asOf: string;
+            lines: components["schemas"]["BalanceLineDto"][];
+            blocked: components["schemas"]["BalanceBlockDto"][];
+            /** @example null */
+            blockedReason: string | null;
+            nextSettlement: components["schemas"]["NextSettlementSummaryDto"] | null;
+        };
+        StatementLineDto: {
+            /** @example entry-123 */
+            entryId: string;
+            /** @example COD_COLLECTED */
+            type: string;
+            /** @example 1 */
+            direction: number;
+            /** @example 125050 */
+            amountMinor: number;
+            /** @example Delivery to Dhanmondi */
+            memo: string | null;
+            /** @example 2026-10-10T06:00:00.000Z */
+            occurredAt: string;
+            /** @example shp-123 */
+            shipmentId: string | null;
+        };
+        SettlementStatementDto: {
+            /** @example SET-2610-0001 */
+            reference: string;
+            /** @example APPROVED */
+            status: string;
+            /** @example BDT */
+            currency: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+            /** @example 1250500 */
+            netMinor: number;
+            lines: components["schemas"]["StatementLineDto"][];
         };
         RequestReturnDto: {
             /** Format: uuid */
@@ -1035,10 +2913,80 @@ export interface components {
             /** @enum {string} */
             reason: "CUSTOMER_REFUSED" | "CUSTOMER_UNAVAILABLE" | "WRONG_ADDRESS" | "DAMAGED" | "MERCHANT_REQUEST" | "OTHER";
         };
+        RequestedReturnDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /**
+             * @description Where the return sits in the decision-then-custody machine.
+             * @example RETURN_REQUESTED
+             * @enum {string}
+             */
+            status: "RETURN_INITIATED" | "RETURN_IN_TRANSIT" | "RETURN_AT_HUB" | "RETURN_OUT_FOR_DELIVERY" | "RETURNED" | "RETURN_REQUESTED" | "RETURN_APPROVED" | "RETURN_REJECTED";
+            /**
+             * @description True when request was replayed via Idempotency-Key
+             * @example false
+             */
+            replayed: boolean;
+        };
         DecideReturnDto: {
             /** Format: uuid */
             approverId: string;
             note: string;
+        };
+        ReturnStatusDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /**
+             * @example RETURN_APPROVED
+             * @enum {string}
+             */
+            status: "RETURN_INITIATED" | "RETURN_IN_TRANSIT" | "RETURN_AT_HUB" | "RETURN_OUT_FOR_DELIVERY" | "RETURNED" | "RETURN_REQUESTED" | "RETURN_APPROVED" | "RETURN_REJECTED";
+        };
+        ReturnSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            shipmentId: string;
+            /**
+             * @description One of RETURN_STATUSES.
+             * @example RETURN_REQUESTED
+             */
+            status: string;
+            /** @example 2026-10-10T06:00:00.000Z */
+            createdAt: string;
+        };
+        ReturnPageDto: {
+            data: components["schemas"]["ReturnSummaryDto"][];
+            pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        NotificationPreferenceDto: {
+            /**
+             * @description The parcel event this switch governs.
+             * @example ShipmentCreated
+             */
+            eventType: string;
+            /**
+             * @description The versioned template rendered for this event.
+             * @example shipment.created
+             */
+            templateName: string;
+            /**
+             * @description Whether this event notifies. Absent means on, so an untouched event reports true.
+             * @example true
+             */
+            enabled: boolean;
+            /**
+             * @description True when no row is stored; the screen can say "default" rather than a choice.
+             * @example false
+             */
+            isDefault: boolean;
+        };
+        SetNotificationPreferenceDto: {
+            /** @enum {string} */
+            eventType: "ShipmentCreated" | "DeliveryOutForDelivery" | "DeliveryCompleted";
+            enabled: boolean;
         };
         HubScanDto: {
             /** Format: uuid */
@@ -1046,6 +2994,640 @@ export interface components {
             /** @enum {string} */
             scan: "INBOUND" | "SORT" | "OUTBOUND" | "DEPARTED" | "ARRIVED";
             hubCode?: string | null;
+        };
+        HubScanResultDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /**
+             * @description The hub gesture that was recorded (INBOUND, SORT, OUTBOUND, DEPARTED, ARRIVED).
+             * @example INBOUND
+             * @enum {string}
+             */
+            scan: "INBOUND" | "SORT" | "OUTBOUND" | "DEPARTED" | "ARRIVED";
+            /**
+             * @description The shipment status after the scan.
+             * @example AT_ORIGIN_HUB
+             */
+            status: string;
+            /**
+             * @description Hub code when the scan named one; null for a hubCode-less scan.
+             * @example DHK-01
+             */
+            hubCode: string | null;
+        };
+        HubSummaryDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example DHK-01 */
+            code: string;
+            /** @example Dhaka Central Hub */
+            name: string;
+            /** @example DISTRICT */
+            kind: string;
+            /** @example dhaka-metro */
+            networkZone: string | null;
+            /** @example 90.4125 */
+            lng: number | null;
+            /** @example 23.8103 */
+            lat: number | null;
+            /**
+             * @description Parcels currently waiting at this hub.
+             * @example 42
+             */
+            countAtHub: number;
+        };
+        ParcelPresenceDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            shipmentId: string;
+            /** @example ZZ-2610-ABCD */
+            trackingCode: string;
+            /** @example DHK-01 */
+            hubCode: string;
+            /**
+             * @description The hub gesture most recently recorded for this parcel.
+             * @example INBOUND
+             */
+            lastScan: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            scannedAt: string;
+            /**
+             * @description Next hub gesture this parcel needs, derived from the scan order. Null once arrived.
+             * @example SORT
+             */
+            nextScan: string | null;
+        };
+        HubParcelsViewDto: {
+            hub: components["schemas"]["HubSummaryDto"];
+            parcels: components["schemas"]["ParcelPresenceDto"][];
+        };
+        LiveShipmentCountsDto: {
+            /** @example 120 */
+            total: number;
+            /**
+             * @description Created since the Asia/Dhaka day began.
+             * @example 14
+             */
+            todayNew: number;
+            /** @example 23 */
+            inTransit: number;
+            /** @example 18 */
+            atHub: number;
+            /** @example 6 */
+            sorting: number;
+            /** @example 9 */
+            outForDelivery: number;
+            /** @example 45 */
+            delivered: number;
+            /** @example 3 */
+            failed: number;
+            /** @example 2 */
+            returned: number;
+            /**
+             * @description Mid-return: RETURN_IN_TRANSIT or later.
+             * @example 1
+             */
+            returning: number;
+            /** @example 4 */
+            cancelled: number;
+            /** @example 0 */
+            onHold: number;
+            /**
+             * @description LOST + DAMAGED.
+             * @example 0
+             */
+            lostOrDamaged: number;
+            /** @example 0 */
+            exception: number;
+            /**
+             * @description Count per shipment status. Every status is a key; unseen ones are 0, not absent.
+             * @example {
+             *       "DRAFT": 0,
+             *       "CREATED": 1,
+             *       "PICKUP_REQUESTED": 0,
+             *       "PICKUP_ASSIGNED": 0,
+             *       "PICKED_UP": 0,
+             *       "AT_ORIGIN_HUB": 0,
+             *       "SORTING": 0,
+             *       "DISPATCHED": 0,
+             *       "IN_TRANSIT": 1,
+             *       "AT_DESTINATION_HUB": 0,
+             *       "OUT_FOR_DELIVERY": 1,
+             *       "DELIVERED": 2,
+             *       "DELIVERY_FAILED": 1,
+             *       "RETRY_SCHEDULED": 0,
+             *       "RETURN_INITIATED": 0,
+             *       "RETURN_IN_TRANSIT": 0,
+             *       "RETURN_AT_HUB": 0,
+             *       "RETURN_OUT_FOR_DELIVERY": 0,
+             *       "RETURNED": 1,
+             *       "ON_HOLD": 0,
+             *       "CANCELLED": 1,
+             *       "LOST": 0,
+             *       "DAMAGED": 0,
+             *       "EXCEPTION": 0
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        LivePickupCountsDto: {
+            /** @example 60 */
+            total: number;
+            /**
+             * @description ASSIGNED + IN_PROGRESS.
+             * @example 8
+             */
+            active: number;
+            /** @example 3 */
+            pending: number;
+            /** @example 40 */
+            completed: number;
+            /** @example 6 */
+            failed: number;
+            /** @example 2 */
+            expired: number;
+            /** @example 1 */
+            cancelled: number;
+            /**
+             * @description Count per pickup status. Every status is a key; unseen ones are 0, not absent.
+             * @example {
+             *       "REQUESTED": 3,
+             *       "SCHEDULED": 0,
+             *       "ASSIGNED": 5,
+             *       "IN_PROGRESS": 3,
+             *       "COMPLETED": 40,
+             *       "FAILED": 6,
+             *       "EXPIRED": 2,
+             *       "CANCELLED": 1
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        LiveDeliveryCountsDto: {
+            /** @example 50 */
+            total: number;
+            /** @example 9 */
+            outForDelivery: number;
+            /** @example 4 */
+            attempted: number;
+            /**
+             * @description Attempted, with attempts still left to make.
+             * @example 2
+             */
+            attemptsRemaining: number;
+            /** @example 5 */
+            failed: number;
+            /** @example 45 */
+            delivered: number;
+            /**
+             * @description Count per delivery status. Every status is a key; unseen ones are 0, not absent.
+             * @example {
+             *       "CREATED": 0,
+             *       "ASSIGNED": 5,
+             *       "ACCEPTED": 0,
+             *       "OUT_FOR_DELIVERY": 9,
+             *       "ATTEMPTED": 4,
+             *       "DELIVERED": 45,
+             *       "FAILED": 5
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        LiveCodCountsDto: {
+            /** @example 58 */
+            total: number;
+            /** @example 12 */
+            expected: number;
+            /**
+             * @description Collected or payable, not yet settled.
+             * @example 9
+             */
+            outstanding: number;
+            /**
+             * @description Integer minor units (poisha). Never a decimal. A string because an aggregate can exceed 2^53 poisha, which JSON numbers cannot represent exactly.
+             * @example 1250500
+             */
+            outstandingAmountMinor: string;
+            /**
+             * @description Count per COD status. Every status is a key; unseen ones are 0, not absent.
+             * @example {
+             *       "COD_EXPECTED": 12,
+             *       "COD_COLLECTED": 30,
+             *       "COD_RECONCILED": 3,
+             *       "COD_PAYABLE": 4,
+             *       "SETTLEMENT_CREATED": 2,
+             *       "SETTLED": 40,
+             *       "COLLECTION_FAILED": 1,
+             *       "PARTIAL_COLLECTION": 0,
+             *       "RECONCILIATION_EXCEPTION": 0,
+             *       "SETTLEMENT_HOLD": 0
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        LiveRiderCountsDto: {
+            /** @example 24 */
+            total: number;
+            /**
+             * @description AVAILABLE + ON_PICKUP + ON_DELIVERY.
+             * @example 11
+             */
+            online: number;
+            /**
+             * @description Online with no job in hand.
+             * @example 7
+             */
+            available: number;
+            /** @example 12 */
+            offline: number;
+            /** @example 1 */
+            suspended: number;
+            /**
+             * @description Count per rider status. Every status is a key; unseen ones are 0, not absent.
+             * @example {
+             *       "OFFLINE": 12,
+             *       "AVAILABLE": 7,
+             *       "ON_PICKUP": 2,
+             *       "ON_DELIVERY": 2,
+             *       "ON_BREAK": 0,
+             *       "SUSPENDED": 1
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        LiveHubCountsDto: {
+            /**
+             * @description AT_DESTINATION_HUB + SORTING + ON_HOLD everywhere.
+             * @example 24
+             */
+            backlog: number;
+            /** @example 6 */
+            networkHubs: number;
+        };
+        LiveCountsDto: {
+            /**
+             * @description UTC ISO 8601 snapshot instant.
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            timestamp: string;
+            shipments: components["schemas"]["LiveShipmentCountsDto"];
+            pickups: components["schemas"]["LivePickupCountsDto"];
+            deliveries: components["schemas"]["LiveDeliveryCountsDto"];
+            cod: components["schemas"]["LiveCodCountsDto"];
+            riders: components["schemas"]["LiveRiderCountsDto"];
+            hub: components["schemas"]["LiveHubCountsDto"];
+        };
+        ReportRangeDto: {
+            /** @example 2026-09-10 */
+            from: string;
+            /** @example 2026-10-10 */
+            to: string;
+        };
+        ShipmentFlowKpiDto: {
+            /** @example 340 */
+            created: number;
+            /** @example 320 */
+            pickedUp: number;
+            /** @example 280 */
+            delivered: number;
+        };
+        DeliverySuccessKpiDto: {
+            /** @example 280 */
+            delivered: number;
+            /** @example 40 */
+            failed: number;
+            /**
+             * @description delivered / (delivered + failed). Null when the window resolved no delivery.
+             * @example 0.875
+             */
+            rate: number | null;
+        };
+        ReturnRateKpiDto: {
+            /** @example 280 */
+            delivered: number;
+            /** @example 12 */
+            returned: number;
+            /**
+             * @description returned / delivered. Null when the window saw no delivery.
+             * @example 0.043
+             */
+            rate: number | null;
+        };
+        CodCurrencyKpiDto: {
+            /** @example BDT */
+            currency: string;
+            /**
+             * @description COD expected over the range.
+             * @example 4250000
+             */
+            expectedMinor: number;
+            /**
+             * @description COD collected over the range.
+             * @example 3800000
+             */
+            collectedMinor: number;
+            /**
+             * @description COD settled over the range.
+             * @example 3500000
+             */
+            settledMinor: number;
+            /**
+             * @description collected / expected. Null when nothing was expected in the window.
+             * @example 0.894
+             */
+            collectionRate: number | null;
+        };
+        RiderWorkKpiDto: {
+            /** @example 280 */
+            delivered: number;
+            /** @example 310 */
+            attempts: number;
+            /** @example 40 */
+            failed: number;
+        };
+        HubVolumeKpiDto: {
+            /** @example DHK-01 */
+            hubCode: string;
+            /** @example 412 */
+            scans: number;
+        };
+        ReportLiveHubDto: {
+            /** @example 24 */
+            backlog: number;
+            /** @example 6 */
+            networkHubs: number;
+        };
+        ReportLiveExceptionsDto: {
+            /** @example 0 */
+            lostOrDamaged: number;
+            /** @example 0 */
+            exception: number;
+        };
+        ReportLiveRidersDto: {
+            /** @example 24 */
+            total: number;
+            /** @example 11 */
+            online: number;
+            /** @example 7 */
+            available: number;
+        };
+        ReportLiveDto: {
+            /**
+             * @description UTC ISO 8601 snapshot instant.
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            timestamp: string;
+            hub: components["schemas"]["ReportLiveHubDto"];
+            exceptions: components["schemas"]["ReportLiveExceptionsDto"];
+            riders: components["schemas"]["ReportLiveRidersDto"];
+            poolUtilisation: components["schemas"]["PoolUtilisationDto"];
+        };
+        OperationsReportDto: {
+            range: components["schemas"]["ReportRangeDto"];
+            shipments: components["schemas"]["ShipmentFlowKpiDto"];
+            deliverySuccess: components["schemas"]["DeliverySuccessKpiDto"];
+            returns: components["schemas"]["ReturnRateKpiDto"];
+            /** @description One entry per currency. */
+            cod: components["schemas"]["CodCurrencyKpiDto"][];
+            riderWork: components["schemas"]["RiderWorkKpiDto"];
+            /** @description Busiest hub first. */
+            hubVolume: components["schemas"]["HubVolumeKpiDto"][];
+            live: components["schemas"]["ReportLiveDto"];
+        };
+        MapHubDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example DHK-01 */
+            code: string;
+            /** @example Dhaka Sorting Hub */
+            name: string;
+            /**
+             * @description HUB | LINE_HAUL_NODE — never ranged here.
+             * @example HUB
+             */
+            kind: string;
+            /** @example dhaka-metro */
+            networkZone: string | null;
+            /**
+             * @description Longitude, WGS84 degrees.
+             * @example 90.4125
+             */
+            lng: number;
+            /**
+             * @description Latitude, WGS84 degrees.
+             * @example 23.8103
+             */
+            lat: number;
+            /**
+             * @description Parcels sitting at this hub right now.
+             * @example 18
+             */
+            parcelsWaiting: number;
+        };
+        MapRiderDto: {
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            id: string;
+            /** @example Rahim */
+            displayName: string;
+            /** @example ON_DELIVERY */
+            status: string;
+            /**
+             * @description Longitude, WGS84 degrees.
+             * @example 90.4125
+             */
+            lng: number;
+            /**
+             * @description Latitude, WGS84 degrees.
+             * @example 23.8103
+             */
+            lat: number;
+            /**
+             * @description Seconds since the rider’s last ping. 0 is live.
+             * @example 45
+             */
+            staleSeconds: number;
+            /** @example c3d4e5f6-a7b8-9012-cdef-123456789012 */
+            currentJobId: string | null;
+        };
+        NetworkMapDto: {
+            hubs: components["schemas"]["MapHubDto"][];
+            riders: components["schemas"]["MapRiderDto"][];
+            /**
+             * @description Riders with no ping yet. Counted, not plotted — a dot at (0,0) is in the ocean.
+             * @example 2
+             */
+            ridersWithoutPosition: number;
+            /**
+             * @description UTC ISO 8601 snapshot instant.
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            generatedAt: string;
+        };
+        MerchantDayPointDto: {
+            /**
+             * @description Asia/Dhaka day bucket
+             * @example 2026-10-09
+             */
+            day: string;
+            /**
+             * @description Shipments created that day
+             * @example 42
+             */
+            shipmentsCreated: number;
+            /**
+             * @description Parcels picked up that day
+             * @example 38
+             */
+            pickedUp: number;
+            /**
+             * @description Parcels delivered that day
+             * @example 31
+             */
+            delivered: number;
+            /**
+             * @description Null when no COD was recorded that day
+             * @example BDT
+             */
+            currency: string | null;
+            /**
+             * @description Expected COD in minor units (poisha), as a string
+             * @example 1250500
+             */
+            expectedMinor: string;
+            /**
+             * @description Collected COD in minor units (poisha), as a string
+             * @example 900000
+             */
+            collectedMinor: string;
+            /**
+             * @description Settled COD in minor units (poisha), as a string
+             * @example 700000
+             */
+            settledMinor: string;
+        };
+        MerchantSeriesDto: {
+            /**
+             * @description First day of the requested window, inclusive
+             * @example 2026-09-10
+             */
+            from: string;
+            /**
+             * @description Last day of the requested window, inclusive
+             * @example 2026-10-09
+             */
+            to: string;
+            days: components["schemas"]["MerchantDayPointDto"][];
+        };
+        RiderPickupJobDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b1c2d3e4-f6a7-8901-bcde-f12345678901 */
+            merchantId: string;
+            /**
+             * @example [
+             *       "shp-1",
+             *       "shp-2"
+             *     ]
+             */
+            shipmentIds: string[];
+            /** @example r-123 */
+            riderId: string | null;
+            /**
+             * @example ASSIGNED
+             * @enum {string}
+             */
+            status: "CANCELLED" | "COMPLETED" | "FAILED" | "REQUESTED" | "SCHEDULED" | "ASSIGNED" | "IN_PROGRESS" | "EXPIRED";
+            /** @example null */
+            failureReason: string | null;
+            /**
+             * @description Total batch weight, integer grams
+             * @example 12000
+             */
+            totalWeightGrams: number;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:05:00.000Z
+             */
+            updatedAt: string;
+        };
+        ShipmentHandoffDto: {
+            /**
+             * @description Shipment id this handoff describes.
+             * @example shp-1
+             */
+            shipmentId: string;
+            /**
+             * @description Cash to collect, in integer minor units (poisha). Zero means prepaid: nothing to take.
+             * @example 125050
+             */
+            codAmountMinor: number;
+            /**
+             * @description Currency of the cash to collect.
+             * @example BDT
+             */
+            codCurrency: string;
+        };
+        RecipientDto: {
+            /** @example +8801711223344 */
+            phone: string | null;
+            /** @example Ayesha Rahman */
+            name: string | null;
+            /** @example House 12, Road 7, Dhanmondi, Dhaka 1205 */
+            address: string | null;
+        };
+        RiderDeliveryJobDto: {
+            /** @example a1b2c3d4-e6f7-4890-abcd-ef1234567890 */
+            id: string;
+            /** @example shp-123 */
+            shipmentId: string;
+            /** @example r-123 */
+            riderId: string;
+            /**
+             * @example ACCEPTED
+             * @enum {string}
+             */
+            status: "CREATED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "ASSIGNED" | "ACCEPTED" | "ATTEMPTED";
+            /** @example 0 */
+            attemptsMade: number;
+            /** @example null */
+            lastFailureReason: string | null;
+            /** @description What to collect and in which currency, read from the shipment that owns the parcel. Without it a rider is asked for cash without being told how much. */
+            shipment: components["schemas"]["ShipmentHandoffDto"] | null;
+            /** @description Who to call and where to go. `phone` is null only when the shipment carries no number; the rider app says so rather than offering a call that cannot connect. */
+            recipient: components["schemas"]["RecipientDto"] | null;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:05:00.000Z
+             */
+            updatedAt: string;
+        };
+        RiderJobsDto: {
+            /** @description Pickup batches assigned to this rider, newest first */
+            pickups: components["schemas"]["RiderPickupJobDto"][];
+            /** @description Delivery jobs assigned to this rider, newest first, each carrying what to collect and who to call — read through `SHIPMENT_HANDOFF_LOOKUP` because the parcel lives in shipment’s schema and a module may not join across it */
+            deliveries: components["schemas"]["RiderDeliveryJobDto"][];
         };
     };
     responses: never;
@@ -1065,11 +3647,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The process is up, and for how long, in whole seconds. Nothing is checked and nothing can fail here, so this route has no error responses at all — use /readyz for dependencies. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HealthzDto"];
+                };
             };
         };
     };
@@ -1082,11 +3667,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description `ready`, once a `SELECT 1` round-trip to Postgres has succeeded. Redis and NATS are deliberately absent from the answer: the system degrades without them, and refusing traffic here would turn a cache or rate-limit outage into an availability one. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReadyzDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1099,11 +3750,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The principal this request proved itself as, read off the credential and off nothing else in the request: its kind, the business it is acting inside, every business it may act inside, the scopes it holds, and its per-minute ceiling. `merchantId` is null only for a platform administrative key. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApiPrincipalResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1114,17 +3831,172 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description Email and password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginDto"];
             };
         };
         responses: {
+            /** @description Session issued. The token is in the Set-Cookie header, not in this body. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    LoginController_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Email and password, and optionally which business to act inside. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginDto"];
+            };
+        };
+        responses: {
+            /** @description Session issued. The token is in this body — store it securely. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokenResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1137,11 +4009,433 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The session is revoked, or there was none to revoke. */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business whose members to read. */
+                merchantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members, owner first then by email. An empty list is possible and means a business nobody can act inside — which the orphaning rules exist to prevent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberListDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business to add the member to. */
+                merchantId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The email to enrol and the role to grant. No merchant id is accepted here. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteMemberDto"];
+            };
+        };
+        responses: {
+            /** @description The membership as stored. A disabled account is refused rather than reactivated by an invite — enabling it is a separate decision from enrolling it. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_changeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business the member belongs to. */
+                merchantId: string;
+                /** @description The person whose role is changing. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The new role. Setting the role the member already holds is a no-op that changes nothing and signs nobody out. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRoleDto"];
+            };
+        };
+        responses: {
+            /** @description The membership with its new role. Sessions for this person have been revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MembershipController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The business to remove the member from. */
+                merchantId: string;
+                /** @description The person to remove. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The membership as it was, so the removal is confirmable before it is reported back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1154,11 +4448,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Every endpoint registered to your business, oldest first and never paginated — a merchant has a handful, not thousands. No signing secret is in here: the secret exists in the create and rotate responses and nowhere else. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"][];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1169,17 +4529,84 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The URL to POST deliveries to, and the events to send it. Any other field is rejected, so there is nothing here through which to name a business. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateWebhookDto"];
             };
         };
         responses: {
+            /** @description The endpoint as it was stored, and its signing secret this one time. The secret is kept to sign deliveries and is never returned again — there is no route that shows it, so store it now or rotate to get a fresh one. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedEndpointDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1188,17 +4615,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint whose signing secret is replaced. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The new signing secret, returned exactly once, as at create. Deliveries dispatched from now on are signed with it, while jobs already queued keep the old secret until their retry ladder ends — so expect both to verify until the ladder drains. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RotatedSecretDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1207,17 +4701,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint to stop delivering to. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The endpoint with status PAUSED. New events stop being dispatched to it immediately, and replay refuses while it is paused; attempts already queued still run their ladder out. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1226,17 +4787,174 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The endpoint to resume delivering to. Must be one of your own. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The endpoint back to status ACTIVE, receiving events again from the next dispatch. Pause and resume are the only statuses this route writes. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["EndpointViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    WebhookController_deliveryLog: {
+        parameters: {
+            query?: {
+                /** @description Restrict the log to one endpoint. Omit for every endpoint you own. */
+                endpointId?: string;
+                /** @description A `nextCursor` from the previous page — the id of the last row you saw. The next page continues strictly below it, so no row is returned twice and none is skipped as the log grows. */
+                cursor?: string;
+                /** @description Page size, 1 to 200. Defaults to 50, and anything larger is clamped to 200. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of attempts, newest first: status code, error, delivered, and whether the row is terminal. Follow `nextCursor` rather than an offset — the log grows while it is being read, and `null` means there is nothing after this page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryLogPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1245,17 +4963,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description A delivery id from the delivery log. It must be terminal — delivered, permanently failed, or out of retries. */
                 deliveryId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The fresh delivery id the replay was enqueued under, with the endpoint and event it repeats. The original id is deliberately not reused: a receiver that deduplicates on `ZipZap-Delivery` would drop the replay as a duplicate. The payload carries `replayOf` pointing at the original. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReplayedDeliveryDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1266,17 +5051,84 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The scopes to grant, at least one and all from the `API_SCOPES` vocabulary. Everything the returned key can do is in `scopes` — nothing broader leaks in. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateApiKeyDto"];
             };
         };
         responses: {
+            /** @description The key id to send, and its raw secret, returned exactly once. Only a scrypt hash is stored, so a lost secret cannot be recovered — make another key. The mint is audited in the same transaction as the insert. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedApiKeyDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1285,17 +5137,121 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The tracking code whose events are streamed. Emits nothing until one occurs. */
                 trackingCode: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description A stream of `text/event-stream` messages. Each `data` payload is a PublicTrackingEventDto. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "text/event-stream": components["schemas"]["PublicTrackingEventDto"];
+                };
+            };
+            /** @description The tracking code is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PublicTrackingController_trackByToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 26-character token from the tracking link a customer is sent. Unknowable without it, so an unknown token gets the same 404 as a known one — this route is not a validity oracle. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public timeline for the shipment the link names. Read from `public_timeline` rather than the tracking log, so the internal detail that must not be public is absent by construction rather than by a filter — and it can trail the live log by a beat, because a consumer builds it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicTrackingViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1304,25 +5260,107 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The ZZ- code printed on the label, e.g. ZZ-7F3K9Q2M. */
                 trackingCode: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The public timeline for that tracking code, or 404 when no shipment has it. Ordering is sequence, then occurredAt, then id, so it is stable across identical requests even though `sequence` alone is not unique — the last row of that order is what `status` reports. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PublicTrackingViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     ListShipmentsController_listShipments: {
         parameters: {
             query?: {
+                /** @description How many rows to ask for. Anything above 200, or below 1, is clamped rather than refused. */
                 limit?: string;
+                /**
+                 * @description The opaque position from the previous page's `nextCursor`. Unsigned on purpose — it only
+                 *     repositions inside your own list, which the merchant scope has already fenced.
+                 */
                 cursor?: string;
+                /** @description A shipment status, or several — `?status=CREATED,IN_TRANSIT`. */
+                status?: string;
+                /** @description The zone a parcel was priced against, e.g. `dhaka-metro`. */
+                zone?: string;
+                /** @description Tracking code or phone, partial. */
+                q?: string;
+                /** @description `yyyy-mm-dd`, Asia/Dhaka, inclusive. */
+                from?: string;
+                /** @description `yyyy-mm-dd`, Asia/Dhaka, inclusive of the whole day. */
+                to?: string;
             };
             header?: never;
             path?: never;
@@ -1330,11 +5368,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own shipments, newest first, each carrying the cash the rider is to collect for it (integer minor units). `nextCursor` is null on the last page, and a filter value the machine does not recognise is a 400 naming every bad field at once, never a silently wider list. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ShipmentPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1342,22 +5446,90 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required here (ADR-0010): the same key replayed returns the original response rather than creating a duplicate parcel. The same key with a different body is rejected as key reuse. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description Both contacts, the parcel, and the three surcharge flags — everything the price and the serviceability check depend on. The merchant comes from the credential, never from here. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateShipmentDto"];
             };
         };
         responses: {
+            /** @description The shipment as stored: its tracking code, its status, and the cash the rider will be asked to collect (integer minor units). A retried Idempotency-Key returns this same body with `replayed: true` instead of a second parcel. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedShipmentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1366,17 +5538,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The whole parcel record: both contacts, the parcel, the COD amount, and the tracking timeline oldest first. This is the only read that returns personal data, so it leaves an audit trail — the read is recorded whether or not the caller ever sees that row. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ShipmentDetailDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1385,17 +5624,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description Confirms the parcel is CANCELLED. Only states that may still stop can be cancelled: a delivered parcel is a return, not a cancel, and the state machine refuses the edge with 409. A retried cancel hits the same 409 rather than applying twice. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CancelledShipmentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1406,17 +5712,84 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The CSV text itself plus the filename it came from. The column names decide the mapping, so a file with a stray header is refused with the missing columns named rather than silently imported as empty fields. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UploadBulkDto"];
             };
         };
         responses: {
-            201: {
+            /** @description 202 is the honest status: the rows are validated and queued, not created. Nothing exists in the shipment table until `accept` is called. */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkPreviewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1427,17 +5800,84 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The job id from the preview checkpoint. Acceptance is the moment rows become shipments, so it only works on a job still sitting in PREVIEW. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AcceptBulkDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The job is now PROCESSING. Poll it; there is no push. */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkJobViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1446,17 +5886,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The job id returned by `upload`. */
                 jobId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Row counters for one import job: how many rows are done, and of those how many produced a shipment, how many failed, and how many were skipped as duplicate invoices. The counters only move forward — poll until `status` is terminal, because nothing pushes. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BulkJobViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1465,17 +5972,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Bulk import job id. */
                 jobId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Row-level outcome CSV: line_number,invoice,outcome,reason,shipment_id for every row in the job. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1484,21 +6058,89 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Which exception, and an optional note for whoever investigates it. The reason doubles as the target status, so only what the shipment can legally become is accepted. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReportExceptionDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The shipment is now in the reported state, entered through the real state machine — so a report from a state the edge does not leave is a 409, and reporting the same exception twice is a second transition, not a double write. No money moves here; finance reacts to the event. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReportedExceptionDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1507,21 +6149,89 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Optional one-sentence reason, recorded on the tracking event. A hold without one is still honoured, just unexplained. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HoldDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The shipment is now ON_HOLD, and `status` says so. Only states that can be interrupted accept a hold — a parcel still in line-haul is physically moving and gets 409 INVALID_TRANSITION instead of a parkable state it does not have. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HeldShipmentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1530,17 +6240,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The shipment id. It must be one of yours — a stranger's id 404s rather than 403s, so the 404 never confirms the parcel exists. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The shipment is moving again, and `status` is the state it was interrupted from — not ON_HOLD. Releasing a parcel that was never held is a 409, because there is no recorded state to resume. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HeldShipmentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1551,17 +6328,167 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment facts that change the price: weight, the cash the rider would collect, the zone, and the surcharge flags. The merchant plan is read from the credential and cannot be named here, so a caller cannot quote themselves a better plan. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["QuoteDto"];
             };
         };
         responses: {
+            /** @description An itemised quote priced against exactly one frozen version, with `total` the sum of the lines in integer minor units including the COD fee and tax, minus the plan discount. Nothing is written and quoting twice with the same inputs returns the same numbers; keep `version` — it is the version a shipment is charged against, and the evidence a later dispute is settled on. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["QuoteResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    PricingController_rateCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This merchant's own active card: the frozen version it was read from, the plan they are on, every fee and rate as integer minor units or basis points, and four worked examples so the card can be read without holding a parcel in the hand. Read-only. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateCardResponseDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1569,22 +6496,90 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the original response instead of collecting twice. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment being collected against and the cash actually taken, in integer poisha — a decimal amount is rejected here, never rounded. The `Idempotency-Key` header is what makes a retried collection safe. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CollectCodDto"];
             };
         };
         responses: {
-            201: {
+            /** @description What was actually taken beside the frozen quote that promised it: `expectedMinor` is never rewritten by a collection, so `shortfallMinor` is the gap between promise and reality, recorded rather than smoothed over. Partial collection is a recorded outcome, not an error, and a replay of the same `Idempotency-Key` returns this same body with `replayed: true`. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CollectedCodDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1595,24 +6590,93 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment being reviewed and the note explaining what was seen — at least ten characters, because a resolution without a reason is indistinguishable from a cover-up. No amounts are accepted here: this records a human decision, it does not correct one. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReconcileCodDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The reviewed record moves to `COD_RECONCILED` with your note and identity attached, and no amount changes — a mismatch is resolved by decision, not by arithmetic. This is the only transition that clears an exception, which is what unblocks the next settlement freeze. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReconciledCodDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     ListCodRecordsController_listCodRecords: {
         parameters: {
             query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
                 limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every list is merchant-scoped, so a forged cursor only repositions within its owner's own records. */
                 cursor?: string;
             };
             header?: never;
@@ -1621,17 +6685,172 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own COD records, newest first, each carrying the frozen quote's `expectedMinor` beside whatever was collected, in integer poisha. Cursor-paginated and scoped to your credential, so a stranger's cursor only repositions within their own list. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CodRecordPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ListCodExceptionsController_list: {
+        parameters: {
+            query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
+                limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every queue is merchant-scoped, so a forged cursor only repositions within its owner's own queue. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The reconciliation work queue: COD records stuck in `RECONCILIATION_EXCEPTION`, newest first, each row carrying the two figures that disagree — the frozen quote's `expectedMinor` beside what the rider actually took. A negative `differenceMinor` is a shortfall: the server records the gap rather than overwriting the promise, and clearing this queue is what lets a settlement freeze proceed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodExceptionPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     CoverageController_coverage: {
         parameters: {
             query: {
+                /** @description The zone code to ask about, e.g. `dhaka-metro`. Unknown codes are answered `false`, not 404. */
                 zone: string;
             };
             header?: never;
@@ -1640,18 +6859,861 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Whether this zone can be shipped to, and how: `serviceable` false with a human `reason` when it cannot, plus the estimated days and whether pickup, delivery and COD are available when it can. A zone with no coverage row answers false — absence is never a default allow. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CoverageCheckDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    CoverageController_zones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every serviceable zone the network is currently configured with, sorted, for a picker. Read this list rather than hardcoding one: a retired or newly added zone is configuration here. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceableZonesDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_list: {
+        parameters: {
+            query?: {
+                /** @description Show only manifests in this state — one of the five the machine knows. Omit for every manifest; an unrecognised value matches nothing rather than everything, so a typo reads as an empty work list the operator notices. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest work list, newest first — `created_at` then `id` descending, because a timestamp alone is not unique and a console that skips a row loses cargo. Not cursor-paginated: the newest-first tail is the working set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestListDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The trip this cargo travels on and the shipment ids riding it. At least one shipment, none repeated, and a trip that exists. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateManifestDto"];
+            };
+        };
+        responses: {
+            /** @description The new DRAFT manifest, with its dock-facing code. It only ever moves through the validated transitions from here — nothing updates `status` directly. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The manifest to read, with its cargo list. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest, its cargo list in load order, and per parcel whether the destination hub has scanned it in. `missingCount` is 0 before RECEIVED because nobody has looked yet — "not checked" and "nothing missing" must not render as the same number. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestDetailDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_scheduleTrip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The code of the seeded route to run once more. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TripDto"];
+            };
+        };
+        responses: {
+            /** @description The scheduled trip and the route it runs — one actual movement, carrying the trip id a manifest is then created against. An unknown route code is a 404. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledTripDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_seal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The DRAFT manifest to seal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest in SEALED: the cargo list is now evidence of what left the dock. Only a DRAFT can be sealed — any other state is a 409 naming both. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The SEALED manifest to dispatch. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest in DISPATCHED. Only a SEALED manifest can be dispatched; any other state is a 409 naming both. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The DISPATCHED manifest to receive. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest in RECEIVED. Only a DISPATCHED manifest can be received; any other state is a 409 naming both. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ManifestController_reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The RECEIVED manifest to reconcile. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest in RECONCILED — every cargo item confirmed arrived. If any shipment has not arrived the call fails with 422 MANIFEST_INCOMPLETE naming them and the manifest stays RECEIVED, visibly un-reconciled, until the parcel shows up. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManifestViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     ListPickupsController_listPickups: {
         parameters: {
             query?: {
+                /** @description Rows to return, clamped to at most 200; omit or send 0 for the default of 50. */
                 limit?: string;
+                /** @description Opaque position from a previous page's `pagination.nextCursor`. It is unsigned and only repositions within your own list; a malformed value is a 400 with a named reason, never a SQL error. */
                 cursor?: string;
             };
             header?: never;
@@ -1660,11 +7722,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One merchant-scoped page of your pickups, newest first — each row is the batch, its rider (null until assigned), and its status. `pagination.nextCursor` is opaque and repositions within your own list; `hasMore` says whether another page exists. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PickupPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1672,22 +7800,90 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Reuse with the same body replays this pickup; reuse with a different body is a 400, so a retried request never dispatches a second rider. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The batch of shipment ids to collect (1 to 50) and the declared batch weight in grams. The merchant is taken from the credential, never from the body. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequestPickupDto"];
             };
         };
         responses: {
+            /** @description The pickup as born: its id, REQUESTED status, the full member-shipment batch, and createdAt. Every shipment is advanced to PICKUP_REQUESTED in the same transaction, but no rider is attached — that is the separate assign call. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RequestedPickupDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1695,24 +7891,93 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Reuse with the same candidates replays the assignment rather than re-scoring and reassigning; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The pickup aggregate id to assign. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description The candidate rider pool with the signals scoring needs — id plus optional distance in metres, active jobs, capacity, and recent refusals. The rider contract scores the pool deterministically; an omitted signal defaults to a neutral zero. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssignPickupDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The assignment decision: the chosen rider, the deterministic score that picked them (the same candidates always score the same), and the scoring breakdown in words for the audit trail. It moves the pickup to ASSIGNED and advances every member shipment to PICKUP_ASSIGNED; a pickup that is not in REQUESTED or SCHEDULED is a 409. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AssignedPickupDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1723,39 +7988,266 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The rider's name and E.164 phone, plus an optional parcel capacity — 3 when omitted. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RegisterRiderDto"];
             };
         };
         responses: {
+            /** @description The new rider's id and the status it was born with — AVAILABLE unless suspended at creation. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RegisteredRiderDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     RiderSyncController_pull: {
         parameters: {
             query?: {
+                /** @description The rider\'s last acknowledged device sequence — replay only what is newer than this. */
                 sinceSeq?: string;
+                /** @description Cap on the returned window. Defaults to the queue cap. */
                 limit?: string;
             };
             header?: never;
             path: {
+                /** @description The rider whose offline command queue is pulled. */
                 riderId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description Every command still pending for this rider, in the server's total order — `createdAt`, then `deviceSequence` to break ties. A command the server did not mention stays queued, so the device acks rather than assumes; `queueSize` and `capWarning` say how near the queue is to the cap. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PullResultDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    RiderSyncController_replay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The rider whose device is replaying its commands. */
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The device's day of work. The server re-sorts by `createdAt` then `deviceSequence` regardless of the order sent, and dedupes on `(rider, deviceSequence)` — a re-sent batch converges on what the first one recorded. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayDto"];
+            };
+        };
+        responses: {
+            /** @description One outcome per command, in the order the server applied them — the device's `createdAt`, tie-broken by `deviceSequence`. `duplicate` means that `(rider, deviceSequence)` was already submitted and `reason` carries what happened then; a command whose `expectedState` no longer matches is rejected with a reason, not applied. A batch that would overflow the queue is refused whole with 409 COMMAND_QUEUE_FULL, so nothing is half-applied and the device keeps everything to retry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayResultDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1763,24 +8255,184 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Dedupe key for the acknowledgement. Replaying the same key returns the outcome the first ack recorded rather than deciding again. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The rider who owns the command being acknowledged. */
                 riderId: string;
             };
             cookie?: never;
         };
+        /** @description The id of the queued command being acknowledged. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AckDto"];
             };
         };
         responses: {
+            /** @description The verdict on the command, and the same verdict again if the key is replayed — an already-acked command comes back `already_delivered`, never a second delivery. A pending command whose `expectedState` no longer matches is recorded as `rejected` with a reason, never silently dropped. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AckResultDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    RiderPositionController_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The rider whose position is recorded. */
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Where the rider is: latitude, longitude, and the device's clock. The write overwrites the present tense only — the event it publishes is what the network's history keeps. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPositionDto"];
+            };
+        };
+        responses: {
+            /** @description The position now on file, and `ageSeconds` — how old it is. A ping older than the stored one is refused rather than applied, so the response carries the position already on file with its real age instead of letting a phone flushing its buffer rewind the map. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderPositionDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1789,17 +8441,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The rider whose current load factor is read. */
                 riderId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The rider's current load — capacity, the job in hand, and the 0..1 load factor they represent. Null when the rider is unknown. A projection: reading it never mutates state or makes a dispatch decision. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RiderLoadDto"] | null;
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1812,11 +8531,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Pool-wide utilisation: capacity in use against total capacity, plus the mean, max and min per-rider load factor. Read-only — the KPI is a projection, never a decision. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PoolUtilisationDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1824,24 +8609,93 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. A rider confirming twice from a flaky connection must not produce two attempts — replaying the key collapses them; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The delivery job whose failed attempt is being recorded. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description The failure reason from the closed vocabulary — an unknown reason is rejected here, not recorded — and an optional note up to 500 characters. Whether the reason retries the job or ends it into returns is decided server-side by policy, not by the caller. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordAttemptDto"];
             };
         };
         responses: {
-            201: {
+            /** @description Records the failed attempt and moves the job by the reason: a retryable reason (CUSTOMER_UNAVAILABLE, PHONE_UNREACHABLE, ADDRESS_INCOMPLETE, WEATHER, or OPERATIONAL_EXCEPTION) with attempts left returns it to OUT_FOR_DELIVERY with `retryScheduled: true`; a terminal reason, or a third failed attempt, ends it at FAILED and hands the parcel to returns. `status` is where the job sits after that decision. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RecordedAttemptDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1849,22 +8703,90 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. Replaying the key returns the stored job rather than opening a second one; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The shipment to deliver, optionally with the rider to attach now. Omit riderId to open the job as CREATED for assignment later. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateDeliveryDto"];
             };
         };
         responses: {
+            /** @description Opens a delivery job for one shipment — born ASSIGNED when a rider is attached now, CREATED when it is not. The job covers exactly that shipment, and replaying this Idempotency-Key returns the stored job with `replayed: true` instead of opening a second. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedDeliveryJobDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1873,17 +8795,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The delivery job the rider is accepting. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description Moves the job ASSIGNED → ACCEPTED and returns the new status. It takes no body and no Idempotency-Key because it is idempotent by construction: accepting an already-accepted job is an illegal edge and 409s rather than applying twice. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1892,17 +8881,84 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The delivery job the rider is dispatching. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description Moves the accepted job to OUT_FOR_DELIVERY — the rider has the parcel and is heading out — and returns the new status, also advancing the shipment and writing an OUT_FOR_DELIVERY tracking event. Idempotent by construction: a repeat dispatch 409s instead of applying twice. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1910,31 +8966,285 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required. A retried delivery confirmation must replay the delivery and its proof, never trigger a second COD collection; reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description The delivery job being confirmed delivered. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description How much was collected at the door, in integer minor units (poisha): 125050 is 1250.50 taka. A decimal here is a bug, and 0 is correct for a prepaid or zero-COD parcel. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CompleteDeliveryDto"];
             };
         };
         responses: {
-            201: {
+            /** @description Marks the job DELIVERED and returns the new status, but only with evidence: without a verified proof (code + photo + location, minted by the proof endpoints) it 409s rather than confirming a bare tap. The Idempotency-Key is mandatory because completing drives COD collection through the cod module — a retry must replay the delivery, never collect twice. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    DeliveryProofController_issueCode: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional here: issuing a code is a reissue, not a duplicate effect, and each issue replaces the previous code. Send it only if the client needs replay protection on the issue itself. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                /** @description The delivery job to mint a recipient confirmation code for. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mints (or replaces) the recipient's confirmation code and returns it once, in plaintext — it is stored only as a salted SHA-256 hash, so this response is the only moment the code exists. It is valid for ten minutes or five attempts, whichever comes first, and only while the job is OUT_FOR_DELIVERY or ATTEMPTED; reissuing kills the previous code immediately. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedDeliveryCodeDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    DeliveryProofController_submit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required. A guess is evidence: resending the same key re-runs that guess instead of recording a second proof or spending the attempt budget twice; reuse with a different body is a 400. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description The delivery job whose proof is being submitted. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description The four-digit code the recipient read out; the photo as raw base64 (no data: prefix; JPEG, PNG, or WebP; at most 2 MB); and the handover coordinates, checked against Bangladesh rather than trusted as a number. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitProofDto"];
+            };
+        };
+        responses: {
+            /** @description Writes an immutable proof and returns it as VERIFIED — the photo's SHA-256 and its measured byte length, plus when the code was confirmed. The code is checked before the photo is hashed, so a wrong guess costs one of five and never the upload; the delivery itself (POST /:id/complete) will not run until this has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmittedDeliveryProofDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     ListSettlementsController_listSettlements: {
         parameters: {
             query?: {
+                /** @description Page size. Defaults to 50, capped at 200. */
                 limit?: string;
+                /** @description Opaque cursor from the previous page's `pagination.nextCursor`. Deliberately unsigned: every list is merchant-scoped, so a forged cursor only repositions within its owner's own settlements. */
                 cursor?: string;
             };
             header?: never;
@@ -1943,11 +9253,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page of your own settlements, newest first, with `frozenNetMinor` — the integer-poisha net each one pays — frozen at creation and never recalculated afterwards. Cursor-paginated and scoped to your credential, so a stranger's cursor only repositions within their own list. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SettlementPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1958,17 +9334,79 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSettlementDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
+            /** @description Your unsettled COD collections frozen into a settlement: `items` is every ledger entry it contains and `netMinor` their integer-poisha sum, which any later statement must reproduce. The freeze is refused while any collection is still unreviewed, and there is no Idempotency-Key — it reads whatever is unsettled right now, so two identical calls can legitimately produce different settlements. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CreatedSettlementDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -1976,43 +9414,93 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for the money-moving decision: a replay with the same key returns the recorded approval instead of approving twice. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Who is approving, as a subject id. The approval is audited against it — a payout nobody can attribute is the thing approvals exist to prevent. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApproveSettlementDto"];
             };
         };
         responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    BalanceController_balance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
+            /** @description The settlement moves `CREATED` → `APPROVED` and becomes immutable: the approver and the instant are recorded on the row and audited, and a late COD lands in the next settlement instead. A retry with the same `Idempotency-Key` returns this recorded decision with `replayed: true` — never a second approval. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApprovedSettlementDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2020,20 +9508,88 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the recorded payment instead of initiating a second one. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id. It must be in `APPROVED` status — an unapproved freeze is not payable. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The payout is initiated for the frozen `netMinor` in integer poisha and the settlement moves to `PAYMENT_INITIATED`; `paymentReference` is the provider's handle on that payout. A retry with the same `Idempotency-Key` returns the recorded payment rather than initiating a second one — the invoice number is derived from the reference, so the provider converges on one payout. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["InitiatedSettlementPaymentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2041,27 +9597,352 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Retry guard for a money-moving call: a replay with the same key returns the recorded outcome instead of settling twice. */
                 "Idempotency-Key": string;
             };
             path: {
+                /** @description Settlement id. A payment must already be initiated against it, so it is in `PAYMENT_INITIATED` status. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description The provider's terminal answer for the initiated payout, and what the server did with it: `providerStatus` `succeeded` posts the `SETTLEMENT_PAYOUT` ledger entry and moves the settlement to `SETTLED`; anything else leaves it in `PAYMENT_INITIATED` with no ledger entry, because money did not move. A retry returns the recorded outcome rather than confirming twice. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ConfirmedSettlementPaymentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MerchantBalanceController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What you are owed right now, derived from the ledger and never stored: `balanceMinor` is the one signed integer-poisha figure (negative means we owe you), `lines` itemises every entry behind it, and `asOf` is the exact instant it was true. `blocked` says what is withholding a payout, if anything — an unreviewed COD exception blocks a freeze rather than quietly shrinking it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantBalanceDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    GetSettlementController_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frozen snapshot, itemised: `lines` carries every entry in the settlement with its memo, timestamp and shipment id, and the service refuses to return one whose lines do not sum back to the frozen `netMinor` in integer poisha. The CSV endpoint renders exactly these lines, so the screen and the download cannot disagree. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementStatementDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    GetSettlementController_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Settlement id, as returned by `POST /v1/settlements` or `GET /v1/settlements`. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The itemised statement as CSV — the same lines and frozen net as GET /v1/settlements/:id. Content-Disposition names the file after the settlement reference. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     ListReturnsController_listReturns: {
         parameters: {
             query?: {
+                /** @description Rows to return, clamped to at most 200; omit or send 0 for the default of 50. */
                 limit?: string;
+                /** @description Opaque position from a previous page's `pagination.nextCursor`. It is unsigned and only repositions within your own list; a malformed value is a 400 with a named reason, never a SQL error. */
                 cursor?: string;
             };
             header?: never;
@@ -2070,11 +9951,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One merchant-scoped page of your returns, newest first — enough of each to recognise the parcel and read its state. `pagination.nextCursor` is opaque and repositions within your own list; `hasMore` says whether another page exists. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReturnPageDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2082,22 +10029,90 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Required retry guard. One return per shipment: replaying the key returns the original, and reuse with a different body is a 400. */
                 "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
         };
+        /** @description The original shipment to return and the reason, drawn from the closed RETURN_REASONS vocabulary. Merchant scope comes from the credential, not the body. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequestReturnDto"];
             };
         };
         responses: {
-            201: {
+            /** @description The return as opened, in RETURN_REQUESTED — the decision has not been made yet. Exactly one return can ever exist per shipment, so a shipment that already has one is rejected, and replaying this Idempotency-Key returns the stored body with `replayed: true`. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RequestedReturnDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2106,21 +10121,89 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The return aggregate id being decided. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Who decided (approverId) and a note of at least 10 characters explaining what they saw — a decision without an explanation is rejected, by design. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DecideReturnDto"];
             };
         };
         responses: {
-            201: {
+            /** @description Records the merchant's approval: the return moves from RETURN_REQUESTED to RETURN_APPROVED, with the reviewer and note stamped on it. Approving moves no money itself — it unblocks the return to travel toward RETURNED, where finance emits the compensating adjustment. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReturnStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2129,21 +10212,89 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The return aggregate id being decided. */
                 id: string;
             };
             cookie?: never;
         };
+        /** @description Who decided (approverId) and a note of at least 10 characters explaining what they saw — a decision without an explanation is rejected, by design. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DecideReturnDto"];
             };
         };
         responses: {
-            201: {
+            /** @description Records the merchant's rejection: the return moves to terminal RETURN_REJECTED, with the reviewer and note stamped on it. Rejection ends this return and moves no money; the parcel stays with the customer, and a fresh request is filed rather than reopening this one. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReturnStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2152,17 +10303,255 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description The return aggregate id being advanced. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            /** @description Walks the return one transit leg — RETURN_APPROVED → INITIATED → IN_TRANSIT → AT_HUB → OUT_FOR_DELIVERY → RETURNED — and returns the new state. It only advances a return already approved or in transit (a pending or terminal return is a 404); on the RETURNED leg it emits ReturnCompleted carrying the COD amount finance reverses. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReturnStatusDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    NotificationPreferencesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every event that can notify this merchant's customers, answered either way. A row is an opt-out and no row means send, so an untouched event reports enabled with `isDefault` true — and an event switched off sends nothing, which means no SMS to pay for. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferenceDto"][];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    NotificationPreferencesController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The event to switch and whether it should notify, per event type for the merchant on the credential. The event must be one the consumer honours — the vocabulary is closed, so an unknown one is a 400 before it can become a row nothing will ever read. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNotificationPreferenceDto"];
+            };
+        };
+        responses: {
+            /** @description The event as it now stands. `enabled: true` deletes the row rather than storing "on", so absence stays the single way to say default — which the response reports as `isDefault` true. No Idempotency-Key: repeating this is repeating the instruction, not duplicating an effect. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferenceDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2173,17 +10562,256 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        /** @description The gesture and what it is about: the shipment, one of INBOUND, SORT, OUTBOUND, DEPARTED or ARRIVED, and optionally the hub performing it — a hub that is named must exist, and a scan with no hub leaves the parcel at no hub rather than inventing one. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HubScanDto"];
             };
         };
         responses: {
+            /** @description The scan as recorded and the shipment status it moved to. The state machine, the tracking event and the outbox row ran in one transaction — a wrong-order scan is a 409 naming both states, an unknown scan kind a 400. DEPARTED deliberately writes no timeline event; DISPATCHED already told the customer. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HubScanResultDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubConsoleController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every hub in the network, ordered by name, each with how many parcels are waiting there right now. An empty hub reads 0, not null — "nothing waiting" and "we could not find out" are different answers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubSummaryDto"][];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubConsoleController_parcels: {
+        parameters: {
+            query?: {
+                /** @description Cap on the parcel list. Defaults to 100, newest scan first. */
+                limit?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The code of the hub whose waiting parcels are listed. */
+                hubCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubParcelsViewDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2196,11 +10824,77 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One snapshot of the whole network — shipments, pickups, deliveries, COD, riders and hubs — every count read in the same micro-batch, so the numbers describe one instant. `outstandingAmountMinor` is poisha as a decimal string, because the network-wide sum can outgrow what a JSON number holds exactly. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LiveCountsDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
@@ -2218,32 +10912,337 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Two time-views in one response: KPIs summed from the analytics projections over the inclusive Asia/Dhaka day range, and the live hub, exception, rider and pool-utilisation numbers as of `live.timestamp`. Defaults to the last 30 days ending today; the COD money is poisha, one entry per currency. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OperationsReportDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MapController_getMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkMapDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    MerchantAnalyticsController_mine: {
+        parameters: {
+            query?: {
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: 30 days ago. */
+                from?: string;
+                /** @description Inclusive Asia/Dhaka day bucket, yyyy-mm-dd. Defaults: today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One point per day, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantSeriesDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };
     RiderJobsController_jobs: {
         parameters: {
-            query: {
-                limit: string;
+            query?: {
+                /** @description Cap on each list. Defaults to 20, maximum 100 — the rider app merges the two itself. */
+                limit?: string;
             };
             header?: never;
             path: {
+                /** @description The rider whose pickup and delivery jobs are listed. */
                 riderId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            /** @description The rider's home feed: pickup batches and delivery jobs assigned to this rider, each list newest first, both capped by the same limit. The rider app sorts and merges the two client-side — this endpoint hands them over without joining across schemas. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RiderJobsDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
             };
         };
     };

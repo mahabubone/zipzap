@@ -6,16 +6,33 @@
  */
 
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, type AuthenticatedRequest } from './api-key.guard.ts';
 import type { ApiPrincipal } from './rules/api-principal.ts';
+import { ApiPrincipalResponseDto } from './identity-response.dto.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 
 @ApiTags('identity')
 @Controller('v1')
 @UseGuards(ApiKeyGuard)
 export class MeController {
   @Get('me')
-  @ApiOperation({ summary: 'The authenticated principal' })
+  @ApiOperation({
+    summary: 'The authenticated principal',
+    description:
+      'For a client that needs to render itself: which business it is acting inside, every business ' +
+      'it may act inside, and the scopes it holds. `merchantId` is the ACTIVE business and is ' +
+      'derived from the credential, never taken from the request.',
+  })
+  @ApiOkResponse({
+    type: ApiPrincipalResponseDto,
+    description:
+      'The principal this request proved itself as, read off the credential and off nothing else in ' +
+      'the request: its kind, the business it is acting inside, every business it may act inside, the ' +
+      'scopes it holds, and its per-minute ceiling. `merchantId` is null only for a platform ' +
+      'administrative key.',
+  })
+  @ApiErrors()
   me(@Req() request: AuthenticatedRequest): ApiPrincipal {
     return request.principal!;
   }

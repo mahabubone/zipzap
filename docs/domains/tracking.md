@@ -56,6 +56,45 @@ Two reasons this is a separate projection rather than a filtered query:
 - **Cost.** The public page is the highest-QPS read in the system and needs one narrow index,
   not the full event history.
 
+### Lookup: code or token
+
+Two public routes, both rate-limited per IP at 100/min, both reading only this projection:
+
+| Route                  | Space                                             | Use                             |
+| ---------------------- | ------------------------------------------------- | ------------------------------- |
+| `/track/:trackingCode` | `ZP-` + 10 chars of a 32-letter alphabet ≈ 1.1e15 | Links already sent to customers |
+| `/track/token/:token`  | 26 chars of the same alphabet = 130 bits          | Links issued from now on        |
+
+The token is **added alongside** the code, not swapped for it. Every code-shaped link already sits
+in a customer's inbox or on a printed label; replacing the route breaks all of them to fix a problem
+that only exists for new links. Both 404 identically — same envelope, same `detail`, differing only
+in `request_id` — because a token route that answers differently for a hit and a miss is a validity
+oracle for tokens.
+
+`tracking.public_tokens` holds one row per parcel, keyed by `shipment_id`, minted by the projection
+consumer with `ON CONFLICT (shipment_id) DO NOTHING` so a replayed event cannot rotate a link a
+customer has already bookmarked. It lives in this schema rather than on `shipment.shipments` so the
+public route never opens the shipment connection (rule 2).
+
+No revocation, and no second token — one live link per parcel is the whole feature. A merchant who
+wants a link to stop working rotates the tracking code, which is the only other identifier a customer
+would have quoted.
+
+### Known defect: `public_timeline.sequence` is not unique
+
+The consumer allocates `sequence` as `MAX(sequence) + 1` read inside its own transaction, with no
+lock on the tracking code. Two events projected concurrently read the same maximum and write the same
+number. 1,658 colliding `(tracking_code, sequence)` pairs exist on the seeded database.
+
+Reads therefore order by `sequence, occurred_at, id`. Without the tiebreak, `ORDER BY sequence` is a
+partial order and Postgres does not return tied rows the same way twice — two routes over the same
+rows returned them in different orders, and because `status` is read off the last row, one parcel
+reported two current states.
+
+The allocation race itself is unfixed: a unique index cannot be added while duplicates exist, and
+rule 8 forbids tidying history by editing rows. Fixing it means a repair migration (renumber, as new
+appending rows) plus `SELECT ... FOR UPDATE` or an advisory lock in the consumer.
+
 ## Volume
 
 At national courier scale, the internal event table grows by millions of rows daily. Whatever is

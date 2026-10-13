@@ -47,9 +47,7 @@ const browser = await chromium.launch({
               window.innerWidth / 2,
           ) < 4
         : false,
-      headerBottomBorder: header
-        ? getComputedStyle(header).borderBottomWidth
-        : null,
+      headerBottomBorder: header ? getComputedStyle(header).borderBottomWidth : null,
       sections: document.querySelectorAll('main > section').length,
       logos: document.querySelectorAll('header svg').length,
       footer: !!document.querySelector('footer'),
@@ -62,7 +60,11 @@ const browser = await chromium.launch({
   check('hero is a real display size, not body text', home.h1Size, '48px');
   check('hero is semibold', home.h1Weight, '600');
   check('hero is centred', home.h1Centered, true);
-  check('hero spans the container, not the full 1440', home.h1Width > 600 && home.h1Width < 1300, true);
+  check(
+    'hero spans the container, not the full 1440',
+    home.h1Width > 600 && home.h1Width < 1300,
+    true,
+  );
   check('header has a rule under it', home.headerBottomBorder, '1px');
   check('four sections of content', home.sections, 4);
   check('logo is in the header', home.logos >= 1, true);

@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Fourteen decisions. Each records the alternatives, because a decision without its rejected
+Fifteen decisions. Each records the alternatives, because a decision without its rejected
 options cannot be revisited by anyone who was not in the room.
 
 ## Format
@@ -35,6 +35,7 @@ show what was believed at the time. Write a new one and mark the old `superseded
 | [0013](0013-settlement-ledger.md)            | Append-only ledger, derived balances                      | accepted |
 | [0014](0014-future-service-extraction.md)    | Extraction is a decision, not a plan                      | proposed |
 | [0015](0015-local-provider-fakes.md)         | Local provider fakes over real sandbox accounts           | accepted |
+| [0016](0016-http-only-sessions.md)           | HttpOnly sessions behind a same-origin proxy              | accepted |
 
 ## Template
 

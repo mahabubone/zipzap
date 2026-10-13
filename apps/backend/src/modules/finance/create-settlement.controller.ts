@@ -10,17 +10,24 @@
  * Guarded by settlements:read: seeing what is owed is read access. Approving is separate.
  */
 
-import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { CreateSettlementService, type CreatedSettlement } from './create-settlement.service.ts';
+import { CreateSettlementService } from './create-settlement.service.ts';
+import { CreatedSettlementDto } from './finance-response.dto.ts';
 
-export class CreateSettlementDto {
-  @IsUUID('4')
-  merchantId!: string;
-}
-
+/**
+ * **No body at all.**
+ *
+ * The endpoint used to take `merchantId` in the request body and never checked it — so any valid
+ * key could freeze *another* merchant's collections into a settlement. A permission without tenant
+ * scope is a data breach waiting for a missing WHERE, and this was the write case of it. The id now
+ * comes from the credential, where it cannot be tampered with, and there is nothing left to validate.
+ *
+ * The second argument to `execute` is the actor. It was hardcoded `null`, which meant every
+ * settlement was frozen by nobody in particular; the principal's subject id is who it actually was.
+ */
 @ApiTags('settlements')
 @Controller('v1/settlements')
 @UseGuards(ApiKeyGuard)
@@ -29,14 +36,23 @@ export class CreateSettlementController {
     @Inject(CreateSettlementService) private readonly createSettlement: CreateSettlementService,
   ) {}
 
+  @ApiErrors()
   @Post()
   @UseGuards(new ScopeGuard('settlements:read'))
-  @ApiOperation({ summary: 'Freeze unsettled entries into a settlement' })
-  async create(
-    @Body() body: CreateSettlementDto,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<CreatedSettlement> {
-    void request;
-    return this.createSettlement.execute({ merchantId: body.merchantId, actorId: null });
+  @ApiOperation({ summary: 'Freeze your unsettled entries into a settlement' })
+  @ApiCreatedResponse({
+    type: CreatedSettlementDto,
+    description:
+      'Your unsettled COD collections frozen into a settlement: `items` is every ledger entry it ' +
+      'contains and `netMinor` their integer-poisha sum, which any later statement must ' +
+      'reproduce. The freeze is refused while any collection is still unreviewed, and there is ' +
+      'no Idempotency-Key — it reads whatever is unsettled right now, so two identical calls can ' +
+      'legitimately produce different settlements.',
+  })
+  async create(@Req() request: AuthenticatedRequest): Promise<CreatedSettlementDto> {
+    return this.createSettlement.execute({
+      merchantId: request.principal!.merchantId!,
+      actorId: request.principal!.subjectId,
+    });
   }
 }

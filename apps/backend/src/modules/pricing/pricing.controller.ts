@@ -1,12 +1,19 @@
 /**
- * POST /v1/pricing/quote — thin by design: validate, call one use case, return.
+ * Pricing's HTTP surface: a quote, and a card you can read.
  *
- * Read-only and side-effect free, so no Idempotency-Key: a quote changes nothing, and quoting
- * twice with the same inputs returns the same quote by determinism, not by dedupe.
+ * Both are side-effect free, so neither takes an Idempotency-Key. A quote changes nothing and
+ * quoting twice with the same inputs returns the same quote by determinism, not by dedupe.
  */
 
-import { Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
@@ -17,10 +24,11 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ApiKeyGuard } from '../identity/api-key.guard.ts';
+import { ApiKeyGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { QuoteResponseDto, RateCardResponseDto } from './pricing-response.dto.ts';
 import { PricingService } from './pricing.service.ts';
 import type { Currency } from '../../common/money.ts';
-import type { Quote } from './rules/pricing.ts';
 
 export class QuoteDto {
   @IsInt()
@@ -29,6 +37,10 @@ export class QuoteDto {
 
   @IsInt()
   @Min(0)
+  @ApiProperty({
+    type: 'integer',
+    description: 'Cash on delivery, in integer minor units (poisha). Zero means no COD.',
+  })
   codAmountMinor!: number;
 
   @IsString()
@@ -45,10 +57,6 @@ export class QuoteDto {
   @IsString()
   @MaxLength(40)
   packagingKind?: string;
-
-  @IsString()
-  @MaxLength(40)
-  merchantPlan!: string;
 
   @IsOptional()
   @Matches(/^[A-Z]{3}$/)
@@ -68,7 +76,26 @@ export class PricingController {
 
   @Post('quote')
   @ApiOperation({ summary: 'Quote a shipment price' })
-  async quote(@Body() body: QuoteDto): Promise<Quote> {
+  @ApiBody({
+    type: QuoteDto,
+    description:
+      'The shipment facts that change the price: weight, the cash the rider would collect, the zone, ' +
+      'and the surcharge flags. The merchant plan is read from the credential and cannot be named ' +
+      'here, so a caller cannot quote themselves a better plan.',
+  })
+  @ApiCreatedResponse({
+    type: QuoteResponseDto,
+    description:
+      'An itemised quote priced against exactly one frozen version, with `total` the sum of the lines ' +
+      'in integer minor units including the COD fee and tax, minus the plan discount. Nothing is ' +
+      'written and quoting twice with the same inputs returns the same numbers; keep `version` — it is ' +
+      'the version a shipment is charged against, and the evidence a later dispute is settled on.',
+  })
+  @ApiErrors()
+  async quote(
+    @Body() body: QuoteDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<QuoteResponseDto> {
     return this.pricing.quote({
       weightGrams: body.weightGrams,
       codAmountMinor: body.codAmountMinor,
@@ -76,9 +103,25 @@ export class PricingController {
       remoteArea: body.remoteArea,
       fragile: body.fragile,
       packagingKind: body.packagingKind ?? null,
-      merchantPlan: body.merchantPlan,
       currency: body.currency,
       version: body.version,
+      // The plan comes from the credential's merchant, never from the body. It used to be a body
+      // field, which meant a caller could name the plan with the best discount and be quoted it.
+      merchantId: request.principal!.merchantId!,
     });
+  }
+
+  @Get('rate-card')
+  @ApiOperation({ summary: 'Your rate card, with worked examples' })
+  @ApiOkResponse({
+    type: RateCardResponseDto,
+    description:
+      "This merchant's own active card: the frozen version it was read from, the plan they are on, " +
+      'every fee and rate as integer minor units or basis points, and four worked examples so the ' +
+      'card can be read without holding a parcel in the hand. Read-only.',
+  })
+  @ApiErrors()
+  async rateCard(@Req() request: AuthenticatedRequest): Promise<RateCardResponseDto> {
+    return this.pricing.rateCard(request.principal!.merchantId!);
   }
 }

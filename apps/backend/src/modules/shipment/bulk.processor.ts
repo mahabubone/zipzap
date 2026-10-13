@@ -126,7 +126,6 @@ export class BulkProcessor extends WorkerHost {
     try {
       const { result } = await this.createShipment.execute({
         merchantId,
-        merchantPlan: 'standard',
         zone: (snapshot.fields.destination_area ?? '').trim() || 'dhaka-metro',
         remoteArea: false,
         fragile: false,

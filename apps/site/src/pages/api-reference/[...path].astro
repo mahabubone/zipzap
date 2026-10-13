@@ -1,0 +1,122 @@
+---
+/**
+ * `/api-reference` and every path under it.
+ *
+ * One catch-all route, but with `getStaticPaths` enumerating the real tags from the spec rather
+ * than a single fallback page. That gives a statically generated page per tag with a real
+ * `<title>` — eighty pages all titled "API Reference" would be worse for search than no index at
+ * all.
+ *
+ * Stoplight Elements still does its own routing client-side: it reads `/openapi.json`, builds the
+ * sidebar from the tags, and deep-links to `#tag/Shipments/operation/create`. Generating an Astro
+ * page per *operation* would mean either duplicating that renderer or shipping eighty static pages
+ * that are thinner versions of one component.
+ *
+ * The tags are read from `public/openapi.json`, which `scripts/sync-openapi.mjs` refreshes from
+ * the backend artefact — so the tags listed here are the tags in the contract and cannot drift from
+ * what the endpoint list shows.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import Base from '../../layouts/Base.astro';
+import ApiReference from '../../components/ApiReference.astro';
+
+export const prerender = true;
+
+interface Operation {
+  tags?: string[];
+}
+
+interface Spec {
+  paths?: Record<string, Record<string, Operation>>;
+  tags?: Array<{ name?: string; description?: string }>;
+}
+
+/** One statically generated page: `/api-reference/<slug>` — or the index. */
+interface TagPage {
+  params: { path: string };
+  /** The tag as the spec spells it, for the title. Not the slug: a URL wants `shipments`, a human wants `Shipments`. */
+  props: { tag: string | null };
+}
+
+/**
+ * One page per tag, read from the spec.
+ *
+ * `getStaticPaths` is evaluated in its own module context. It cannot close over a helper defined at
+ * the top of this file — `tagsFromSpec` there is `undefined` here, and the failure is a bare
+ * `tagsFromSpec is not defined` with no hint that the helper is eight lines above. So everything is
+ * inlined, which is uglier and works.
+ */
+export async function getStaticPaths(): Promise<TagPage[]> {
+  // `process.cwd()`, not `import.meta.url` relative to this file. Astro re-executes `getStaticPaths`
+  // from `.prerender/chunks/` during the build, so a path resolved against this file's own location
+  // points at `dist/.prerender/public/openapi.json` — a path that does not exist, and whose failure
+  // is an ENOENT deep inside Astro's build, which reads like an Astro bug rather than a wrong base.
+  const spec: Spec = JSON.parse(
+    readFileSync(join(process.cwd(), 'public', 'openapi.json'), 'utf8'),
+  );
+
+  // Every tag the spec declares, whether or not an operation is filed under it.
+  const tags = new Set<string>((spec.tags ?? []).map((tag) => tag.name ?? '').filter(Boolean));
+  for (const item of Object.values(spec.paths ?? {})) {
+    for (const operation of Object.values(item ?? {})) {
+      for (const tag of operation.tags ?? []) tags.add(tag);
+    }
+  }
+
+  // Inlined too: `getStaticPaths` cannot see a helper defined at the top of this file, which is the
+  // same constraint as everything else in this function.
+  const toSlug = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+  const pages: TagPage[] = [{ params: { path: '' }, props: { tag: null } }];
+  for (const tag of tags) {
+    pages.push({ params: { path: toSlug(tag) }, props: { tag } });
+  }
+  return pages;
+}
+
+const { tag } = Astro.props as { tag: string | null };
+// `Shipments`, not `shipments`: the page this links to is titled with the word, so the link should
+// be too. A slug in a `<title>` reads as a 404 in a search result.
+const title = tag ?? 'API Reference';
+---
+
+<Base
+  title={title}
+  description={
+    tag
+      ? `ZipZap API reference — the ${tag} endpoints, with their scopes, parameters and response schemas.`
+      : 'ZipZap API reference, generated from the OpenAPI contract.'
+  }
+  current="/api-reference"
+>
+  <main class="mx-auto max-w-[100rem] px-5">
+    <div class="py-8">
+      <h1 class="text-2xl font-bold tracking-tight">{title}</h1>
+      {
+        tag ? (
+          <p class="mt-2 max-w-2xl text-sm text-slate">
+            Every operation under{' '}
+            <code class="rounded bg-canvas px-1.5 py-0.5 font-mono text-[13px]">{tag}</code>, with
+            its required scopes, parameters and response schemas.
+          </p>
+        ) : (
+          <p class="mt-2 max-w-2xl text-sm text-slate">
+            Generated from the same OpenAPI document{' '}
+            <code class="rounded bg-canvas px-1.5 py-0.5 font-mono text-[13px]">packages/api-client</code>{' '}
+            is generated from, so the contract here and the types you compile against cannot drift.
+            Every operation lists its required scopes and its rate-limit bucket.
+          </p>
+        )
+      }
+    </div>
+
+    <div class="rounded-xl border border-line bg-paper">
+      <ApiReference />
+    </div>
+  </main>
+</Base>

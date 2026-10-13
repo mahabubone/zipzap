@@ -7,12 +7,14 @@
  */
 
 import { Body, Controller, Headers, Inject, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsPositive, IsUUID } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { RequestPickupService, type RequestedPickup } from './request-pickup.service.ts';
+import { RequestPickupService } from './request-pickup.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
 import { MAX_BATCH_PARCELS } from './rules/pickup.ts';
+import { RequestedPickupDto } from './pickup-response.dto.ts';
 
 export class RequestPickupDto {
   @IsArray()
@@ -35,12 +37,32 @@ export class RequestPickupController {
   @Post()
   @UseGuards(new ScopeGuard('pickup:create'))
   @ApiOperation({ summary: 'Request a pickup' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    type: RequestPickupDto,
+    description:
+      'The batch of shipment ids to collect (1 to 50) and the declared batch weight in grams. ' +
+      'The merchant is taken from the credential, never from the body.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required retry guard. Reuse with the same body replays this pickup; reuse with a different ' +
+      'body is a 400, so a retried request never dispatches a second rider.',
+  })
+  @ApiCreatedResponse({
+    type: RequestedPickupDto,
+    description:
+      'The pickup as born: its id, REQUESTED status, the full member-shipment batch, and createdAt. ' +
+      'Every shipment is advanced to PICKUP_REQUESTED in the same transaction, but no rider is ' +
+      'attached — that is the separate assign call.',
+  })
+  @ApiErrors()
   async create(
     @Body() body: RequestPickupDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<RequestedPickup & { replayed: boolean }> {
+  ): Promise<RequestedPickupDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       // Mandatory on this operation: a retried pickup request would dispatch a second rider.
       throw new DuplicateRequestError('Idempotency-Key header is required.');

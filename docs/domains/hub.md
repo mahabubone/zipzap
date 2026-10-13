@@ -8,12 +8,22 @@ owns the schema; staff, capacity, schedules and the scan workflow arrive with th
 consumer. Nobody outside this module reads `hub.*` — route legs reference hubs by bare
 identifier (ADR-0002).
 
+**Landed 2026-10-09**: `parcel_presence` (migration 0040) — what is physically waiting at a hub,
+and the first table here whose consumer is a screen. Before it, a scan only _validated_ the
+`hubCode` it was given; "what is waiting at my hub" had no answer. `shipment.shipments` has no
+`hub_id`, and adding one would mean the hub module writing another module's table (rule 2), so
+presence is recorded here at scan time and joined to nothing.
+
+Not append-only, deliberately: this is the present tense, not history. A parcel that has left is
+**deleted**, not flagged — because "not at any hub" and "at a hub but we forgot to clear it" are
+different states, and a soft flag would collapse them.
+
 ---
 
 ## Owns
 
-`hub` schema: `hubs` (landed); `zones`, `staff`, `capacity`, `schedules`, `routes` still to
-come.
+`hub` schema: `hubs` (landed); `parcel_presence` (landed); `zones`, `staff`, `capacity`,
+`schedules`, `routes` still to come.
 
 ## Types
 
@@ -43,6 +53,27 @@ Shipment → Dispatch batch → Manifest → Vehicle / Rider → Scan out
 3. **Staff assignments are scoped to a hub.** A hub operator sees that hub, not all of them.
 4. **Discrepancies surface as exceptions.** Received-but-not-on-manifest, manifested-but-not-
    received, and received-twice all raise rather than silently reconcile.
+
+## The two consoles that exist, and the one that does not
+
+There is no `hub.staff` table and no per-hub assignment. A `HUB_OPERATOR` holds a membership against
+a merchant, because the session model requires one — a workaround, not a design, since a hub
+operator has no merchant. **This is unresolved and Stage 5's ops console has the same problem**: a
+platform employee is not a merchant employee, and the session shape says they are. The honest fix is a
+platform-staff session, which touches every authenticated screen and is larger than this stage.
+
+What _is_ settled is the permission split. `hub:read` and `hub:scan` are platform scopes, listed in
+`PLATFORM_SCOPES` and subtracted from `MERCHANT_SCOPES`, so a scope added tomorrow is withheld from
+merchants by default rather than granted by omission. See [identity.md](identity.md).
+
+## The arrival gesture belongs to the manifest
+
+`DEPARTED` removes a parcel from `parcel_presence` — it has left the building. That has a consequence
+the API never revealed and the browser proof did: `ARRIVED` is therefore on **no hub's work list**,
+because a parcel in line-haul is at no hub. The hub console records it from the manifest detail
+instead, against the cargo list that still knows the parcel was expected. If a second arrival path is
+ever wanted — a walk-in at a destination hub — that is a screen decision, not a schema one, and
+`parcel_presence` already holds what it would need.
 
 ## Design constraint: the console
 

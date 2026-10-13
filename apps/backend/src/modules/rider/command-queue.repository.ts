@@ -59,7 +59,15 @@ export class CommandQueueRepository {
     return { count: row.count };
   }
 
-  enqueue(
+  /**
+   * Insert a command, or report that this `(rider_id, device_sequence)` already exists.
+   *
+   * `ON CONFLICT DO NOTHING` is the dedupe, and it is why the method returns a boolean. The unique
+   * index was always the real constraint, but without the clause a replayed enqueue surfaced as a
+   * raw Postgres 23505 — a 500 for what is the most ordinary event in an offline protocol. The
+   * JSDoc above this repository claimed idempotency the code did not have.
+   */
+  async enqueue(
     manager: EntityManager,
     row: {
       id: string;
@@ -70,11 +78,13 @@ export class CommandQueueRepository {
       expectedState: object | null;
       createdAt: Date;
     },
-  ): Promise<void> {
-    return manager.query(
+  ): Promise<boolean> {
+    const rows = (await manager.query(
       `INSERT INTO rider.command_queue
          (id, rider_id, device_sequence, command_type, payload, expected_state, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (rider_id, device_sequence) DO NOTHING
+       RETURNING id`,
       [
         row.id,
         row.riderId,
@@ -84,7 +94,17 @@ export class CommandQueueRepository {
         row.expectedState ? JSON.stringify(row.expectedState) : null,
         row.createdAt,
       ],
-    );
+    )) as unknown[];
+    return rows.length > 0;
+  }
+
+  /** The existing row for a `(rider_id, device_sequence)`, so a duplicate can be reported honestly. */
+  findByDeviceSequence(
+    manager: EntityManager,
+    riderId: string,
+    deviceSequence: number,
+  ): Promise<CommandQueueEntity | null> {
+    return manager.getRepository(CommandQueueEntity).findOneBy({ riderId, deviceSequence });
   }
 
   markDelivered(manager: EntityManager, id: string): Promise<void> {

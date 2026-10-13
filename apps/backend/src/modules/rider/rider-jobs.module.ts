@@ -12,10 +12,11 @@ import { Module } from '@nestjs/common';
 import { PickupModule } from '../pickup/pickup.module.ts';
 import { DeliveryModule } from '../delivery/delivery.module.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
+import { ShipmentModule } from '../shipment/shipment.module.ts';
 import { RiderJobsController } from './rider-jobs.controller.ts';
 
 @Module({
-  imports: [PickupModule, DeliveryModule, IdentityModule],
+  imports: [PickupModule, DeliveryModule, IdentityModule, ShipmentModule],
   controllers: [RiderJobsController],
 })
 export class RiderJobsModule {}

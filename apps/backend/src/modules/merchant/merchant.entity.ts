@@ -22,6 +22,15 @@ export class MerchantEntity {
   @Column('integer', { nullable: true })
   rateLimitPerMin!: number | null;
 
+  /**
+   * The pricing plan this merchant is on. Decides the `plan_discount_bps` applied to every quote.
+   *
+   * Server-side, never request-side: `POST /v1/pricing/quote` used to accept `merchantPlan` in the
+   * body, which let any caller name the plan with the best discount. See migration 1759000000039.
+   */
+  @Column('text', { default: 'standard' })
+  plan!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

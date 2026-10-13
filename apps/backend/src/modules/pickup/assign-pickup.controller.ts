@@ -6,11 +6,20 @@
  */
 
 import { Body, Controller, Headers, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsArray, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 import { ApiKeyGuard, ScopeGuard, type AuthenticatedRequest } from '../identity/api-key.guard.ts';
-import { AssignPickupService, type AssignedPickup } from './assign-pickup.service.ts';
+import { AssignPickupService } from './assign-pickup.service.ts';
 import { DuplicateRequestError } from '../../common/domain-error.ts';
+import { ApiErrors } from '../../common/api-errors.decorator.ts';
+import { AssignedPickupDto } from './pickup-response.dto.ts';
 
 export class AssignmentCandidateDto {
   @IsUUID('4')
@@ -51,13 +60,36 @@ export class AssignPickupController {
   @Post(':id/assign')
   @UseGuards(new ScopeGuard('pickup:create'))
   @ApiOperation({ summary: 'Assign a rider to a pickup' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiParam({ name: 'id', description: 'The pickup aggregate id to assign.' })
+  @ApiBody({
+    type: AssignPickupDto,
+    description:
+      'The candidate rider pool with the signals scoring needs — id plus optional distance in ' +
+      'metres, active jobs, capacity, and recent refusals. The rider contract scores the pool ' +
+      'deterministically; an omitted signal defaults to a neutral zero.',
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Required retry guard. Reuse with the same candidates replays the assignment rather than ' +
+      're-scoring and reassigning; reuse with a different body is a 400.',
+  })
+  @ApiOkResponse({
+    type: AssignedPickupDto,
+    description:
+      'The assignment decision: the chosen rider, the deterministic score that picked them (the ' +
+      'same candidates always score the same), and the scoring breakdown in words for the audit ' +
+      'trail. It moves the pickup to ASSIGNED and advances every member shipment to PICKUP_ASSIGNED; ' +
+      'a pickup that is not in REQUESTED or SCHEDULED is a 409.',
+  })
+  @ApiErrors()
   async assign(
     @Param('id') id: string,
     @Body() body: AssignPickupDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() request: AuthenticatedRequest,
-  ): Promise<AssignedPickup & { replayed: boolean }> {
+  ): Promise<AssignedPickupDto> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new DuplicateRequestError('Idempotency-Key header is required.');
     }
