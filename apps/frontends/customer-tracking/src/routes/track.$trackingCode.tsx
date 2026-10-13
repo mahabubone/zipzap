@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Badge, ErrorState, Skeleton } from '@zipzap/ui';
+import { Badge, BrandMark, ErrorState, Skeleton } from '@zipzap/ui';
 import { anonClient } from '../lib/api.ts';
 import { useAsync } from '@zipzap/web-kit';
 import { formatWhen, humanStatus, statusTone } from '@zipzap/web-kit';
-import { Logo } from '../lib/brand.tsx';
 
 export const Route = createFileRoute('/track/$trackingCode')({
   component: TrackParcel,
@@ -24,7 +23,7 @@ function TrackParcel() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <Logo />
+          <BrandMark />
           <Link to="/track" className="text-sm text-slate-600 hover:text-slate-900">
             Track another
           </Link>

@@ -60,4 +60,10 @@ export { DataTable, type DataTableProps, type DataTableColumn } from './organism
 export { FilterBar, type FilterBarProps } from './organisms/FilterBar.tsx';
 export { BulkActionBar, type BulkActionBarProps } from './organisms/BulkActionBar.tsx';
 export { KpiRow, type KpiRowProps, type Kpi } from './organisms/KpiRow.tsx';
+export {
+  BrandMark,
+  Wordmark,
+  type BrandMarkProps,
+  type WordmarkProps,
+} from './organisms/Brand.tsx';
 export { cx } from './lib/cx.ts';

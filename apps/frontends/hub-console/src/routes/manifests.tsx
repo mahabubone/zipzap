@@ -1,6 +1,6 @@
 import { Outlet } from '@tanstack/react-router';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Logo } from '../lib/brand.tsx';
+import { BrandMark } from '@zipzap/ui';
 
 export const Route = createFileRoute('/manifests')({
   component: ManifestsLayout,
@@ -22,7 +22,7 @@ function ManifestsLayout() {
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <Link to="/" className="flex items-center gap-2">
-            <Logo className="size-8" />
+            <BrandMark className="size-8" />
             <span className="font-semibold">Manifests</span>
           </Link>
         </div>

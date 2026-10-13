@@ -3,8 +3,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
 import { ZipZapApiError } from '@zipzap/api-client';
-import { Button, EmptyState } from '@zipzap/ui';
-import { Logo } from '../lib/brand.tsx';
+import { BrandMark, Button, EmptyState } from '@zipzap/ui';
 
 /**
  * Loads the caller's assigned hub on the server.
@@ -76,7 +75,7 @@ function MyHubScreen() {
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Logo className="size-8" />
+            <BrandMark className="size-8" />
             <span className="font-semibold">Hub console</span>
           </div>
           <Button variant="ghost" size="sm" onClick={signOut}>

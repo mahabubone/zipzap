@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './map.css';
 import type { MapHub, MapRider } from '@zipzap/api-client';
 import { Badge, Button } from '@zipzap/ui';
+import { formatAgo, humanStatus } from '@zipzap/web-kit';
 import { BOUNDS, isInBounds } from './map-projection.ts';
 
 /**
@@ -242,7 +243,18 @@ function MapContents({
           <Tooltip direction="top" offset={[0, -8]}>
             <strong>{rider.displayName}</strong>
             <br />
-            {rider.status} · last seen {rider.staleSeconds}s ago
+            {/*
+                Words, not enums, and a duration a person can read.
+
+                This tooltip read `ON_PICKUP · last seen 1614s ago` — a raw enum and a raw count of
+                seconds, on the one screen whose entire purpose is telling an operations manager
+                something about a dot at a glance. It is the same defect the hub console already had
+                and fixed once; it had simply not reached this surface yet.
+              */}
+            {humanStatus(rider.status)} ·{' '}
+            {rider.lastSeenAt
+              ? `last seen ${formatAgo(rider.lastSeenAt)}`
+              : 'has never reported a position'}
           </Tooltip>
         </Marker>
       ))}

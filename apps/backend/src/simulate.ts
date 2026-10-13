@@ -141,6 +141,45 @@ function simPhone(): string {
   return `+88017${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
 }
 
+/**
+ * A name for the rider this run invents.
+ *
+ * The simulator registered every one of them as `Simulated Rider`, which is correct and useless: the
+ * control tower's tooltip is the one place a person reads a rider's name at a glance, and every dot on
+ * the board opened onto the same two words. Six markers on a map is a picture of a fleet; six identical
+ * names is a picture of a test.
+ *
+ * Drawn without replacement per process, so two riders on the same board never share a name either.
+ * The list is Bangladeshi because the network is, and because a demo that shows `Rider 0` next to
+ * `৳1,250.50` tells a reader which parts of it are real.
+ */
+const SIM_NAMES = [
+  'Nasir Hossain',
+  'Rezaul Karim',
+  'Shahidul Islam',
+  'Mizanur Rahman',
+  'Jahangir Alam',
+  'Bashir Ahmed',
+  'Rafiqul Hasan',
+  'Aminul Haque',
+  'Kamrul Hasan',
+  'Shafiqur Rahman',
+  'Nazmul Haque',
+  'Delwar Hossain',
+] as const;
+
+const usedNames = new Set<string>();
+
+function simName(): string {
+  const available = SIM_NAMES.filter((name) => !usedNames.has(name));
+  // Exhausted — an operator shift with more riders than names on this list is a demo fixture that has
+  // been run an absurd number of times, and repeating is better than failing a simulation.
+  const name =
+    available.length > 0 ? available[Math.floor(Math.random() * available.length)]! : 'Rider';
+  usedNames.add(name);
+  return name;
+}
+
 export async function runSimulation(
   trackingCode: string,
   scenario: Scenario,
@@ -215,7 +254,7 @@ async function drive(
   // A fresh rider every run: unique phone, capacity for the parcel, and the
   // actor id every later step records (scans, attempts, returns, exceptions).
   const rider = await app.get(RegisterRiderService).execute({
-    displayName: 'Simulated Rider',
+    displayName: simName(),
     phone: simPhone(),
     capacity: 3,
   });

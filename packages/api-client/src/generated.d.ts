@@ -3643,10 +3643,15 @@ export interface components {
              */
             lat: number;
             /**
-             * @description Seconds since the rider’s last ping. 0 is live.
+             * @description Seconds since the rider’s last ping, at the instant `generatedAt` was taken. 0 is live. Use `lastSeenAt` for anything that has to keep counting while the client sits open.
              * @example 45
              */
             staleSeconds: number;
+            /**
+             * @description When the rider last reported a position, UTC ISO 8601. Null only for a rider with no ping yet, which the response also counts in `ridersWithoutPosition`. Sent alongside `staleSeconds` because a duration is true for one instant and frozen for every instant after.
+             * @example 2026-10-13T04:18:07.221Z
+             */
+            lastSeenAt: string | null;
             /** @example c3d4e5f6-a7b8-9012-cdef-123456789012 */
             currentJobId: string | null;
         };
@@ -11636,7 +11641,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness. */
+            /** @description Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed, and `lastSeenAt` so the age keeps counting while the board is left open — a duration computed server-side is correct for one instant and frozen for every instant after it. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness. */
             200: {
                 headers: {
                     [name: string]: unknown;

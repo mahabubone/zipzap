@@ -38,7 +38,16 @@ export interface MapRider {
   readonly status: string;
   readonly lng: number;
   readonly lat: number;
-  /** Seconds since the last ping. The operator needs this to know whether to believe the dot. */
+  /**
+   * When the last ping was, as well as how stale it is.
+   *
+   * `staleSeconds` was computed on the server and is therefore correct only for the instant the
+   * response was built: a board left open for ten minutes still showed the ages it had at load time,
+   * and the tooltip said "last seen 1614s ago" on a screen whose whole job is saying how old the dot
+   * is. A timestamp cannot go out of date, so the client derives the age from it.
+   */
+  readonly lastSeenAt: string | null;
+  /** Seconds since the last ping. Kept for the server-side classification — live, stale, or never. */
   readonly staleSeconds: number;
   readonly currentJobId: string | null;
 }
@@ -106,6 +115,7 @@ export class MapService {
         status: row.status,
         lng: Number(row.lng),
         lat: Number(row.lat),
+        lastSeenAt: row.last_known_at ? new Date(row.last_known_at as Date).toISOString() : null,
         staleSeconds: Math.max(
           0,
           Math.round((now - new Date(row.last_known_at as Date).getTime()) / 1000),

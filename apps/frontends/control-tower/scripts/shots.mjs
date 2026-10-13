@@ -83,6 +83,41 @@ async function shoot(page, name, fullPage = process.env.FULL_PAGE === '1') {
   console.log(`shot  ${file}`);
 }
 
+/**
+ * Shrink the frame to what the screen actually fills.
+ *
+ * The board is one map and a footer — about 590 pixels of content in a 1,000-pixel viewport, so every
+ * ops shot carried 400 pixels of empty background below it. In a README that white band is half the
+ * image, and a screenshot with half of itself blank reads as a page that failed to load.
+ *
+ * Measured, not guessed: `documentElement.scrollHeight` is useless here because the body is
+ * `min-h-screen`, so the document is always a screen tall no matter how short the content is. What is
+ * measured instead is the bottom of the last thing on the page, plus a margin, clamped to a real
+ * screen's height — so this keeps working when the footer grows a row, and still crops the tall case
+ * the way a reader's screen would.
+ */
+async function shootToContent(page, name) {
+  const height = await page.evaluate(() => {
+    const viewport = window.innerHeight;
+    const bottom = Math.max(
+      ...[...document.body.querySelectorAll('*')]
+        .map((element) => element.getBoundingClientRect())
+        // Anything as tall as the screen is a container that fills it by design (`min-h-screen`), and
+        // Leaflet's pan proxy is a zero-height element reaching 14,000px down. Neither is content.
+        .filter((box) => box.height > 0 && box.height < viewport - 2)
+        .map((box) => box.bottom),
+      0,
+    );
+    return Math.min(Math.max(Math.ceil(bottom) + 32, 480), 1000);
+  });
+  await page.setViewportSize({ width: 1440, height });
+  // One frame's grace: Leaflet resizes its tiles to the container, and a screenshot taken in the same
+  // tick catches the gap where the old tiles were.
+  await page.waitForTimeout(500);
+  await shoot(page, name);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+}
+
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 await page.goto(`${APP}/login`);
 // NOT `settle`. That waits for Leaflet markers, and the login page has none — the shot would time
@@ -103,7 +138,7 @@ if (body.includes('Something went wrong') || body.includes('PERMISSION_DENIED'))
   throw new Error('control tower rendered an error — check the ops account has network:read');
 }
 
-await shoot(page, 'network_map');
+await shootToContent(page, 'network_map');
 
 // Zoomed to Dhaka at the scale an operator actually works at.
 //
@@ -121,7 +156,7 @@ for (let i = 0; i < 2; i++) {
 await page.mouse.move(700, 450);
 await page.mouse.wheel(0, 120);
 await page.waitForTimeout(900);
-await shoot(page, 'network_map_dhaka');
+await shootToContent(page, 'network_map_dhaka');
 
 // The list the map falls back to. Worth its own shot: the fallback is a decision (see
 // docs/ADR/0011-postgis.md and the map's own header), and a decision nobody can see is a decision
@@ -168,7 +203,7 @@ for (let i = 0; i < riderCount && !opened; i++) {
 }
 if (opened) {
   await page.waitForTimeout(400);
-  await shoot(page, 'network_map_rider_detail');
+  await shootToContent(page, 'network_map_rider_detail');
   console.log('      rider detail opened on a tooltip');
 } else {
   console.log(

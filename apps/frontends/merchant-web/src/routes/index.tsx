@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Badge, Button } from '@zipzap/ui';
-import { Logo } from '../lib/brand.tsx';
+import { Badge, BrandMark, Button } from '@zipzap/ui';
 import { TRACKING_URL } from '../lib/apps.ts';
 
 export const Route = createFileRoute('/')({
@@ -27,7 +26,7 @@ function Home() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Logo />
+          <BrandMark />
           <div className="flex items-center gap-2">
             {/* `asChild`, not a wrapper: an `<a>` around a `<Button>` is interactive content inside
                 interactive content. The landing page had four of them — two tab stops per call to
@@ -149,7 +148,7 @@ function Home() {
 
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8 text-sm text-slate-500">
-          <Logo />
+          <BrandMark />
           <p>A logistics operating system for delivery teams.</p>
         </div>
       </footer>

@@ -360,7 +360,7 @@ find elsewhere, because most of these decisions are invisible until they go wron
 | **Async**         | NATS JetStream · BullMQ · Redis  | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                       |
 | **Language**      | TypeScript 6.0                   | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                  |
 | **Web**           | React 19 · TanStack Router/Start | One codebase, SSR. The auth guard runs in `beforeLoad` _on the server_, so an unauthenticated visitor gets a 307 rather than a flash of console                                                 |
-| **Design system** | `packages/ui`                    | 38 components across atoms, molecules and organisms · 361 tests · Storybook. A screen that is not in the kit does not get built                                                                 |
+| **Design system** | `packages/ui`                    | 39 components across atoms, molecules and organisms · 367 tests · Storybook. A screen that is not in the kit does not get built                                                                 |
 | **Web kit**       | `packages/web-kit`               | One place decides how a status is worded, how ৳1,250.50 is written and what a failed load says — because four copies drifted and the differences shipped                                        |
 | **Mobile**        | Expo / React Native              | Offline-first queue with per-command idempotency                                                                                                                                                |
 | **Docs**          | Astro 7                          | The API reference is generated from the same spec the typed client is generated from, so it cannot drift                                                                                        |
@@ -377,7 +377,7 @@ Full reasoning, with the alternatives that were rejected, lives in
 ## 🧪 What proves it works
 
 ```bash
-pnpm verify               # boundaries → format → proofs → typecheck → 2,488 unit tests
+pnpm verify               # boundaries → format → proofs → typecheck → 2,494 unit tests
 pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
 pnpm prove:stack          # the browser and live-stack proofs: client, tokens, webhooks, proofs
 ```
@@ -386,7 +386,7 @@ pnpm prove:stack          # the browser and live-stack proofs: client, tokens, w
 | --------------------------------------------- | ------------------------------------------- |
 | Domain modules, each owning a Postgres schema | **17**                                      |
 | HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
-| Unit tests                                    | **2,488**                                   |
+| Unit tests                                    | **2,494**                                   |
 | Integration tests on live infrastructure      | **86** across 17 files                      |
 | Standalone proofs, reachable from one command | **11**                                      |
 | Reviewed, reversible migrations               | **51**                                      |
@@ -405,7 +405,7 @@ flowchart LR
     P --> F["💅 format:check"]
     P --> V["🧷 pnpm prove<br/><i>11 zero-dependency proofs</i>"]
     P --> T["🔍 typecheck"]
-    P --> U["🧪 2,488 unit tests"]
+    P --> U["🧪 2,494 unit tests"]
     P --> I["🔗 test:integration<br/><i>real PG / NATS / Redis</i>"]
 
     B --> G([✅ green])

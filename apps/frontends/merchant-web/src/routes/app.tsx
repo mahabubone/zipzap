@@ -8,9 +8,8 @@ import {
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
-import { AppShell, type NavGroup, type NavLinkRender } from '@zipzap/ui';
+import { AppShell, BrandMark, type NavGroup, type NavLinkRender } from '@zipzap/ui';
 import { apiClient } from '../lib/api.ts';
-import { Logo } from '../lib/brand.tsx';
 import { UserIdentity } from '../lib/user-identity.tsx';
 
 /**
@@ -142,7 +141,7 @@ function ConsoleLayout() {
 
   return (
     <AppShell
-      brand={<Logo />}
+      brand={<BrandMark />}
       nav={navFor(pathname)}
       renderLink={renderLink}
       sidebarFooter={

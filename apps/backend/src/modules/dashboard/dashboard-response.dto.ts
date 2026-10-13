@@ -534,8 +534,23 @@ export class MapRiderDto {
   @ApiProperty({ example: 23.8103, description: 'Latitude, WGS84 degrees.' })
   lat!: number;
 
-  @ApiProperty({ example: 45, description: 'Seconds since the rider\u2019s last ping. 0 is live.' })
+  @ApiProperty({
+    example: 45,
+    description:
+      'Seconds since the rider\u2019s last ping, at the instant `generatedAt` was taken. 0 is live. ' +
+      'Use `lastSeenAt` for anything that has to keep counting while the client sits open.',
+  })
   staleSeconds!: number;
+
+  @ApiProperty({
+    example: '2026-10-13T04:18:07.221Z',
+    nullable: true,
+    description:
+      'When the rider last reported a position, UTC ISO 8601. Null only for a rider with no ping yet, ' +
+      'which the response also counts in `ridersWithoutPosition`. Sent alongside `staleSeconds` ' +
+      'because a duration is true for one instant and frozen for every instant after.',
+  })
+  lastSeenAt!: string | null;
 
   @ApiProperty({ example: 'c3d4e5f6-a7b8-9012-cdef-123456789012', nullable: true })
   currentJobId!: string | null;
