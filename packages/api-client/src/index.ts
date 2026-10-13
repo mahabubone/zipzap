@@ -108,6 +108,7 @@ type ListQuery =
 type Schemas = components['schemas'];
 
 export type HubSummary = Schemas['HubSummaryDto'];
+export type MyHub = Schemas['MyHubDto'];
 export type HubWorkList = Schemas['HubParcelsViewDto'];
 export type HubScanResult = Schemas['HubScanResultDto'];
 export type HubScanInput = Schemas['HubScanDto'];
@@ -132,6 +133,12 @@ export type StatementLine = Schemas['StatementLineDto'];
 export type SettlementStatement = Schemas['SettlementStatementDto'];
 export type Coverage = Schemas['CoverageCheckDto'];
 export type LiveCounts = Schemas['LiveCountsDto'];
+
+/**
+ * GET /v1/shipments/counts. Every shipment status is present, at zero when there are none, so a
+ * caller never has to treat a missing key as a number.
+ */
+export type ShipmentCounts = Schemas['ShipmentCountsDto'];
 export type PublicTracking = Schemas['PublicTrackingViewDto'];
 export type BulkPreviewRow = Schemas['BulkPreviewRowDto'];
 export type BulkJob = Schemas['BulkJobViewDto'];
@@ -426,6 +433,12 @@ export class ZipZapClient {
     return data;
   }
 
+  /** GET /v1/hubs/my-hub — the hub the caller is assigned to (404 if not assigned). */
+  async myHub(): Promise<HubSummary> {
+    const { data } = await this.request<HubSummary>('/v1/hubs/my-hub', { method: 'GET' });
+    return data;
+  }
+
   /** GET /v1/hubs/:hubCode/parcels — the work list, and the gesture each parcel needs next. */
   async hubParcels(hubCode: string): Promise<HubWorkList> {
     const { data } = await this.request<HubWorkList>(
@@ -587,11 +600,23 @@ export class ZipZapClient {
     return data;
   }
 
-  /** GET /v1/control-tower/live-counts — the control tower snapshot. */
+  /** GET /v1/control-tower/live-counts — the control tower snapshot. Network scope, not a merchant's. */
   async liveCounts(): Promise<LiveCounts> {
     const { data } = await this.request<LiveCounts>('/v1/control-tower/live-counts', {
       method: 'GET',
     });
+    return data;
+  }
+
+  /**
+   * GET /v1/shipments/counts — your own shipments by status.
+   *
+   * The merchant landing screen's data source. `liveCounts` is deliberately `network:read` — it is
+   * every tenant's picture at once — so calling it from a merchant console answers 403, and the list
+   * endpoint cannot be counted because it is paginated.
+   */
+  async shipmentCounts(): Promise<ShipmentCounts> {
+    const { data } = await this.request<ShipmentCounts>('/v1/shipments/counts', { method: 'GET' });
     return data;
   }
 
@@ -605,34 +630,32 @@ export class ZipZapClient {
   }
 
   /**
-   * POST /v1/auth/login — email + scrypt password → 12h bearer session.
+   * POST /v1/auth/login — email + scrypt password → a session.
    *
-   * `merchantId` picks which business to open the session against for a person
-   * who belongs to several. It is a REQUEST for a scope: the server refuses a
-   * business the user does not hold rather than falling back to a default.
+   * **There is no token in the return value, and that is the point.** The server puts it in an
+   * `HttpOnly` `Set-Cookie`, where script cannot read it, so an XSS gets no credential out of a
+   * response body (ADR-0016). A client that needs the token itself uses `loginToken` below.
+   *
+   * `merchantId` picks which business to open the session against for a person who belongs to
+   * several. It is a REQUEST for a scope: the server refuses a business the user does not hold rather
+   * than falling back to a default.
+   *
+   * The return type is the generated schema rather than a hand-written copy of it. It used to be a
+   * hand-written literal that included `token` and `tokenType` — fields this response has never
+   * carried — so `session.token` compiled, typed `string`, and was `undefined` at runtime. That is
+   * the exact failure the header above this class promises cannot happen, and a proof script hit it:
+   * it sent `Authorization: Bearer undefined` and failed with a 401 that said nothing about why.
    */
   async login(
-    email: string,
+    identifier: string,
     password: string,
     merchantId?: string,
-  ): Promise<{
-    token: string;
-    expiresAt: string;
-    tokenType: string;
-    merchantId: string;
-    merchantIds: ReadonlyArray<string>;
-  }> {
+  ): Promise<components['schemas']['AuthSessionResponseDto']> {
     const { data } = await this.request('/v1/auth/login', {
       method: 'POST',
-      body: { email, password, ...(merchantId ? { merchantId } : {}) },
+      body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
-    return data as {
-      token: string;
-      expiresAt: string;
-      tokenType: string;
-      merchantId: string;
-      merchantIds: ReadonlyArray<string>;
-    };
+    return data as components['schemas']['AuthSessionResponseDto'];
   }
 
   /**
@@ -643,31 +666,21 @@ export class ZipZapClient {
    * read bodies — so an XSS would get the credential the cookie was there to protect. This endpoint
    * is the other half of the same session: same service call, same audit, same cost, token in the
    * body because a client with no browser has nowhere else to put it.
+   *
+   * A cookie is per-origin and a token is not, so this is the only way a proof script, a worker or a
+   * load test can authenticate at all — and the reason it is here rather than being optional on
+   * `login`.
    */
   async loginToken(
-    email: string,
+    identifier: string,
     password: string,
     merchantId?: string,
-  ): Promise<{
-    token: string;
-    tokenType: 'Bearer';
-    expiresInSeconds: number;
-    expiresAt: string;
-    merchantId: string;
-    merchantIds: ReadonlyArray<string>;
-  }> {
+  ): Promise<components['schemas']['AuthTokenResponseDto']> {
     const { data } = await this.request('/v1/auth/token', {
       method: 'POST',
-      body: { email, password, ...(merchantId ? { merchantId } : {}) },
+      body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
-    return data as {
-      token: string;
-      tokenType: 'Bearer';
-      expiresInSeconds: number;
-      expiresAt: string;
-      merchantId: string;
-      merchantIds: ReadonlyArray<string>;
-    };
+    return data as components['schemas']['AuthTokenResponseDto'];
   }
 
   /** GET /v1/me — what the server thinks this principal is. */

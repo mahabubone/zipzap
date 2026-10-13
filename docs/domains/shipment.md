@@ -43,6 +43,25 @@ Shipment
 8. **Transitions serialise on the shipment row** (`SELECT … FOR UPDATE`). Two riders scanning
    simultaneously must not both advance the machine.
 
+## Read surfaces
+
+| Endpoint                   | Scope             | What it answers                                                                             |
+| -------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
+| `GET /v1/shipments`        | `shipments:read`  | Your own list, cursor-paginated, filterable by status, zone, code, day                      |
+| `GET /v1/shipments/counts` | `shipments:read`  | Your own shipments per status, complete — every status present, at zero when there are none |
+| `GET /v1/shipments/:id`    | `shipments:read`  | One shipment with its movement history                                                      |
+| `POST /v1/shipments`       | `shipments:write` | Create, `Idempotency-Key` required                                                          |
+
+`counts` exists because a merchant's landing screen needs four numbers and could not get them
+honestly. The list endpoint is paginated, so counting a page is wrong the moment a merchant has more
+parcels than fit on it; and `GET /v1/control-tower/live-counts` is `network:read`, deliberately,
+because it is every tenant's picture at once. So the console asked for the wrong endpoint and got a
+403 on the page it opens first.
+
+The tenancy predicate comes from the credential and nowhere else — never a query parameter. It is
+one `GROUP BY` over `shipment.shipments`, counted in the same statement as `todayNew` so the two
+figures on screen cannot disagree.
+
 ## Scans
 
 Every physical handover is a scan:

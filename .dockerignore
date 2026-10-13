@@ -1,0 +1,39 @@
+# Build contexts for infra/docker/*.Dockerfile start at the REPOSITORY ROOT — a pnpm workspace
+# cannot be installed from a subdirectory — so without this every build uploads node_modules,
+# build output and .git to the daemon. Measured on a clean clone: ~4.5 GB down to ~30 MB.
+#
+# `infra/fakes` builds with its own context (`infra/fakes`), so this file does not apply to it.
+
+# pnpm install and pnpm deploy both read the store, never the checked-out tree.
+**/node_modules
+.pnpm-store
+
+# Produced by the build stage inside the image; shipping the host's copy would make the image
+# depend on a dirty local tree and would silently mask a broken build.
+**/dist
+**/build
+**/out
+**/.turbo
+**/.tanstack
+**/.astro
+**/.next
+**/*.tsbuildinfo
+coverage
+
+# .git is ~100 MB and no layer here needs a single commit.
+.git
+
+# Secret. `.env.example` IS copied — it is committed, it is the template, and a reviewer reading
+# the Dockerfile should be able to see which variables the image expects.
+.env
+.env.*
+!.env.example
+
+# Nothing in an image build touches these, and they are the largest directories in the tree.
+shots
+.cache
+.tmp
+.expo-cache
+.kilo
+openapi-out.log
+prompt.txt

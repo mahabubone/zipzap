@@ -95,7 +95,9 @@ await client.query('BEGIN');
 
 // A real job id keeps the proof inside a shipment the rest of the system can find, and the
 // rollback below means nothing survives this file.
-const { rows: [job] } = await client.query(
+const {
+  rows: [job],
+} = await client.query(
   `INSERT INTO delivery.jobs (id, shipment_id, rider_id, status, attempts_made)
    VALUES ($1, $2, $3, 'OUT_FOR_DELIVERY', 0) RETURNING id`,
   [randomUUID(), randomUUID(), randomUUID()],
@@ -104,7 +106,9 @@ const jobId = job.id;
 
 // A second job, because one job gets exactly one proof and the interesting states below are
 // PENDING and VERIFIED at the same time. Sharing a job would just re-test the unique index.
-const { rows: [job2] } = await client.query(
+const {
+  rows: [job2],
+} = await client.query(
   `INSERT INTO delivery.jobs (id, shipment_id, rider_id, status, attempts_made)
    VALUES ($1, $2, $3, 'OUT_FOR_DELIVERY', 0) RETURNING id`,
   [randomUUID(), randomUUID(), randomUUID()],
@@ -150,9 +154,7 @@ for (const [what, missing] of [
 console.log('\nthe attempt budget\n');
 
 {
-  const state = await sqlstate(() =>
-    insert(client, { ...PENDING, jobId, attemptsUsed: 6 }),
-  );
+  const state = await sqlstate(() => insert(client, { ...PENDING, jobId, attemptsUsed: 6 }));
   check('attempts_used = 6 (one past MAX_OTP_ATTEMPTS) violates the CHECK', () => {
     assert.equal(state, '23514');
   });
@@ -187,7 +189,9 @@ console.log('\nappend-only and immutability\n');
 
 const verifiedId = randomUUID();
 {
-  const state = await sqlstate(() => insert(client, { ...completeProof(), jobId: verifiedJobId, id: verifiedId }));
+  const state = await sqlstate(() =>
+    insert(client, { ...completeProof(), jobId: verifiedJobId, id: verifiedId }),
+  );
   check('a complete VERIFIED proof is accepted', () => {
     assert.equal(state, null);
   });
@@ -215,7 +219,9 @@ const verifiedId = randomUUID();
 }
 {
   const state = await sqlstate(() =>
-    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 0 WHERE id = $1`, [verifiedId]),
+    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 0 WHERE id = $1`, [
+      verifiedId,
+    ]),
   );
   check('even refilling the attempt budget on a verified proof is refused', () => {
     assert.equal(state, '23001');
@@ -234,7 +240,9 @@ console.log('\nreissue\n');
 
 {
   const state = await sqlstate(() =>
-    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 1 WHERE id = $1`, [pendingId]),
+    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 1 WHERE id = $1`, [
+      pendingId,
+    ]),
   );
   check('a PENDING challenge can spend an attempt', () => {
     assert.equal(state, null);
@@ -242,11 +250,16 @@ console.log('\nreissue\n');
 }
 {
   const state = await sqlstate(() =>
-    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 0 WHERE id = $1`, [pendingId]),
+    client.query(`UPDATE delivery.delivery_proofs SET attempts_used = 0 WHERE id = $1`, [
+      pendingId,
+    ]),
   );
-  check('resetting the budget WITHOUT rotating the code is refused — that is a free unlimited retry', () => {
-    assert.equal(state, '23001');
-  });
+  check(
+    'resetting the budget WITHOUT rotating the code is refused — that is a free unlimited retry',
+    () => {
+      assert.equal(state, '23001');
+    },
+  );
 }
 {
   const state = await sqlstate(() =>
@@ -263,10 +276,9 @@ console.log('\nreissue\n');
 }
 {
   const state = await sqlstate(() =>
-    client.query(
-      `UPDATE delivery.delivery_proofs SET otp_verified_at = now() WHERE id = $1`,
-      [pendingId],
-    ),
+    client.query(`UPDATE delivery.delivery_proofs SET otp_verified_at = now() WHERE id = $1`, [
+      pendingId,
+    ]),
   );
   check('writing evidence onto a still-PENDING row is refused', () => {
     assert.equal(state, '23001');

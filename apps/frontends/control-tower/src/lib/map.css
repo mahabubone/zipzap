@@ -1,0 +1,68 @@
+/*
+ * Marker styling for the control tower's map.
+ *
+ * Leaflet's default markers are the pink teardrop pins from a 2010 image set, and a control tower
+ * full of them reads as a tourist map. These are div icons instead — plain DOM, themed with the
+ * same tokens as the rest of the console, and sized by load so a busy hub is visibly busier.
+ *
+ * Kept out of the component because it is presentation with no logic in it, and because Leaflet
+ * injects these class names into the page outside React's tree.
+ */
+
+.zz-hub-icon {
+  background: transparent;
+  border: 0;
+}
+
+.zz-hub-box {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: rgb(79 70 229 / 0.85);
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.9),
+    0 1px 3px rgb(15 23 42 / 0.35);
+}
+
+.zz-rider-icon {
+  background: transparent;
+  border: 0;
+}
+
+.zz-rider-dot {
+  display: block;
+  border-radius: 9999px;
+  background: rgb(5 150 105 / 0.9);
+  /* A white ring separates overlapping riders, which is the whole reason a rider marker exists. */
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.9),
+    0 1px 3px rgb(15 23 42 / 0.3);
+}
+
+/* Stale is grey, and deliberately desaturated rather than red: a stale rider is not an emergency,
+   it is a rider who has not checked in, and an ops console that paints everything red stops being
+   read. */
+.zz-rider-dot.is-stale {
+  background: rgb(148 163 184 / 0.9);
+}
+
+/* Leaflet's own chrome, toned to match. The default is a heavy white pill with a shadow that reads
+   as a floating object over a map which is already busy. */
+.leaflet-container {
+  font-family: inherit;
+  background: #f1f5f9;
+}
+
+.leaflet-tooltip {
+  border-radius: 6px;
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.12);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+  background: rgb(255 255 255 / 0.85);
+}

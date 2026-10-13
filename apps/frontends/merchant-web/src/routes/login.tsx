@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { Button, FormField, Input, Spinner } from '@zipzap/ui';
-import { Logo } from '../lib/brand.tsx';
+import { BrandMark, Button, FormField, Input, Spinner } from '@zipzap/ui';
 import { anonClient } from '../lib/api.ts';
 
 export const Route = createFileRoute('/login')({
@@ -38,23 +37,22 @@ function Login() {
       {/* Brand panel — the pitch, hidden on small screens where it would just
           push the form below the fold. */}
       <aside className="hidden flex-col justify-between bg-slate-900 p-12 text-white lg:flex">
-        <Logo className="size-9" />
+        <BrandMark className="size-9" />
         <div className="max-w-md">
           <p className="text-3xl font-semibold tracking-tight">
             Every parcel, every rider, every taka.
           </p>
           <p className="mt-4 leading-relaxed text-slate-400">
             One console for live network counts, your shipments and cash-on-delivery — modelled the
-            way delivery actually works across Bangladesh.
+            way delivery actually works.
           </p>
         </div>
-        <p className="text-sm text-slate-500">Bangladesh first.</p>
       </aside>
 
       <main className="flex flex-col justify-center px-6 py-12">
         <div className="mx-auto w-full max-w-sm">
           <div className="lg:hidden">
-            <Logo className="size-9" />
+            <BrandMark className="size-9" />
           </div>
 
           <h1 className="mt-8 text-2xl font-semibold tracking-tight text-slate-900 lg:mt-0">

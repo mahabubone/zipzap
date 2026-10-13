@@ -18,11 +18,12 @@
   },
   "scripts": {
     "generate": "openapi-typescript ../../apps/backend/openapi.json -o src/generated.d.ts",
-    "//build": "tsc does not emit .d.ts inputs to outDir, so dist/index.d.ts imports ./generated.js and never finds it. Every consumer then degrades to `any` silently — which is exactly what the hub console hit. Copy it explicitly.",
     "build": "pnpm generate && tsc -p tsconfig.json && cp src/generated.d.ts dist/generated.d.ts",
-    "generate": "openapi-typescript ../../apps/backend/openapi.json -o src/generated.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
+  },
+  "comments": {
+    "build": "tsc does not emit .d.ts inputs to outDir, so dist/index.d.ts imports ./generated.js and never finds it, and every consumer degrades to `any` silently — which is exactly what the hub console hit. Hence `generate` first and `generated.d.ts` copied explicitly. It was a `//build` key before, which is not a comment: JSON has none, so it was a second runnable script that read as a comment, and `generate` was declared twice in the same object for the same reason."
   },
   "devDependencies": {
     "@types/node": "24.10.1",

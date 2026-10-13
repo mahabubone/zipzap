@@ -40,6 +40,7 @@ import { API_SCOPES, type ApiScope } from '../../../common/scopes.ts';
 export const ROLE_NAMES = [
   'PLATFORM_ADMIN',
   'OPERATIONS_MANAGER',
+  'HUB_MANAGER',
   'HUB_OPERATOR',
   'SUPPORT_AGENT',
   'MERCHANT_OWNER',
@@ -69,6 +70,7 @@ export function isRoleName(value: string): value is RoleName {
 export const PLATFORM_SCOPES: readonly ApiScope[] = [
   'hub:read',
   'hub:scan',
+  'hub:manage',
   'rider:sync',
   'network:read',
 ];
@@ -119,6 +121,24 @@ export const ROLE_SCOPES: Readonly<Record<RoleName, readonly ApiScope[]>> = {
     // The control tower is this role's screen. Without it the ops console's own two endpoints
     // answer 403 to the people who run the network.
     'network:read',
+  ],
+
+  /**
+   * Runs one hub. Everything a HUB_OPERATOR can do, plus `hub:manage` — assign and revoke staff
+   * at the hub, approve discrepancies, view capacity. The extra scope is the whole point of the
+   * role: a line operator cannot enrol or revoke the person standing next to them.
+   *
+   * Hub assignment (which hub a manager runs) is enforced by the `hub.staff` table, not by
+   * scopes — a scope says what kind of thing you may do; the assignment says at which hub.
+   */
+  HUB_MANAGER: [
+    'shipments:read',
+    'tracking:read',
+    'pickup:read',
+    'delivery:read',
+    'hub:read',
+    'hub:scan',
+    'hub:manage',
   ],
 
   /**

@@ -294,7 +294,7 @@ describe('ZipZapClient', () => {
     }));
     await withoutBusiness.client.login('a@b.test', 'pw');
     expect(withoutBusiness.seen[0]!.init.body).toBe(
-      JSON.stringify({ email: 'a@b.test', password: 'pw' }),
+      JSON.stringify({ identifier: 'a@b.test', password: 'pw' }),
     );
 
     const withBusiness = stubFetch(() => ({
@@ -309,7 +309,7 @@ describe('ZipZapClient', () => {
     }));
     const session = await withBusiness.client.login('a@b.test', 'pw', 'm-2');
     expect(withBusiness.seen[0]!.init.body).toBe(
-      JSON.stringify({ email: 'a@b.test', password: 'pw', merchantId: 'm-2' }),
+      JSON.stringify({ identifier: 'a@b.test', password: 'pw', merchantId: 'm-2' }),
     );
     // The reachable set comes back so a client can offer the choice.
     expect(session.merchantIds).toEqual(['m-1', 'm-2']);

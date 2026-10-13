@@ -8,6 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "sync:spec": "node scripts/sync-openapi.mjs",
+    "typecheck": "astro sync && tsc --noEmit",
     "astro": "astro"
   },
   "dependencies": {

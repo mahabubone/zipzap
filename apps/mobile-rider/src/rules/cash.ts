@@ -15,6 +15,8 @@
  * too much, and the person is the one holding the phone.
  */
 
+import { formatMinor } from '@zipzap/lexicon';
+
 /** What the queue already knows, restated here so the rule does not depend on it. */
 export interface CashCommand {
   readonly deviceSequence: number;
@@ -147,11 +149,24 @@ export function computeCashInHand(
   };
 }
 
-/** Format poisha the way a rider reads it: ৳237.50, two places, never a float. */
+/**
+ * Format poisha the way a rider reads it: ৳ 237.50, two places, never a float.
+ *
+ * It used to do this itself — correctly, as it happens, which is why nobody had touched it. Three
+ * things changed anyway:
+ *
+ * 1. It called `toLocaleString('en-US')`, which needs `Intl`. Hermes' `Intl` support is partial, and a
+ *    formatting helper that silently degrades on a handset is worse than one that cannot degrade,
+ *    because the degradation is invisible until a rider is holding ৳ 1,250 and the screen says
+ *    `৳1250`.
+ * 2. It was the third implementation of the same rule in this repository, and the other two had already
+ *    disagreed with it — the prose formatter left no space after the symbol and the design system's
+ *    component left one.
+ * 3. A format rule shared by every surface is one that cannot drift, and this is a format rule.
+ *
+ * So it is `@zipzap/lexicon`'s now. The arithmetic it performs is unchanged: integer split, no float,
+ * sign outside the symbol. See docs/ADR/0009.
+ */
 export function formatCash(minor: number): string {
-  const sign = minor < 0 ? '-' : '';
-  const absolute = Math.abs(minor);
-  const major = Math.floor(absolute / 100);
-  const rest = absolute % 100;
-  return `${sign}৳${major.toLocaleString('en-US')}.${String(rest).padStart(2, '0')}`;
+  return formatMinor(minor, 'BDT');
 }

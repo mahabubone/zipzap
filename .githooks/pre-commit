@@ -1,0 +1,44 @@
+#!/bin/sh
+# The commit gate.
+#
+# There is no CI in this repository, so the things CI used to catch are caught here or not at all.
+# That matters most for `boundaries:check`: the failure modes it looks for — a module querying a
+# schema it does not own, a framework import inside `rules/`, a provider's wire format escaping its
+# adapter, a decimal literal assigned to money — are all invisible in a small diff and all expensive
+# to find later. A pre-commit hook is the only place that sees every commit on this machine.
+#
+# Install once, per clone:
+#     git config core.hooksPath .githooks      (or: pnpm hooks:install)
+#
+# Two deliberate choices about speed. Formatting is checked on the **staged** files only, because a
+# whole-tree `prettier --check` on every commit is how hooks get `--no-verify`'d. Boundaries run in
+# full, because they are the gate's reason to exist and they take well under a second.
+#
+# Nothing here runs the test suite. A hook that takes a minute is a hook that gets bypassed, and the
+# suite is one `pnpm verify` away.
+
+set -e
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|json|md|yml|yaml)$' || true)
+
+if [ -n "$staged" ]; then
+  echo "prettier — $(printf '%s\n' "$staged" | wc -l | tr -d ' ') staged file(s)"
+  # shellcheck disable=SC2086
+  if ! pnpm exec prettier --check $staged; then
+    echo ""
+    echo "  pnpm format   # fixes all of them, not just the staged ones"
+    exit 1
+  fi
+fi
+
+echo "boundaries — cross-schema, rules/ purity, provider wire format, float money"
+if ! node scripts/check-boundaries.mjs; then
+  echo ""
+  echo "  A module may not reach another's tables. See docs/ADR/0002-postgresql-schema-boundaries.md"
+  exit 1
+fi
+
+exit 0

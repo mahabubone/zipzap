@@ -8,9 +8,10 @@ import {
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
-import { AppShell, Button, type NavGroup, type NavLinkRender } from '@zipzap/ui';
+import { AppShell, BrandMark, type NavGroup, type NavLinkRender } from '@zipzap/ui';
 import { apiClient } from '../lib/api.ts';
-import { Logo } from '../lib/brand.tsx';
+import { activeLink } from '../lib/console-nav.ts';
+import { UserIdentity } from '../lib/user-identity.tsx';
 
 /**
  * Resolves the principal on the SERVER, from the request context the global middleware captured.
@@ -66,9 +67,17 @@ export const Route = createFileRoute('/app')({
   component: ConsoleLayout,
 });
 
-/** One place decides which nav item is lit, so a new screen only adds a link. */
+/**
+ * One place decides which nav item is lit, so a new screen only adds a link.
+ *
+ * The first item was labelled "Control tower", which is also the name of a separate application on
+ * a separate port — the operations manager's network map. Two different screens answering to one
+ * name is how a screenshot of the merchant dashboard ends up filed as `ops_network_map`, and it
+ * tells a merchant looking for their parcels that they are somewhere else. This one is the
+ * merchant's own overview, so it says so.
+ */
 const LINKS = [
-  { label: 'Control tower', href: '/app' },
+  { label: 'Overview', href: '/app' },
   { label: 'Shipments', href: '/app/shipments' },
   { label: 'New shipment', href: '/app/shipments/new' },
   { label: 'Bulk import', href: '/app/shipments/bulk' },
@@ -82,19 +91,13 @@ const LINKS = [
 ] as const;
 
 function navFor(pathname: string): NavGroup[] {
+  // In `src/lib/console-nav.ts`, with its own suite: this rule's failure mode is two rows of the
+  // sidebar lit at once, which is visible in a screenshot and invisible in a diff.
+  const lit = activeLink(pathname, LINKS);
   return [
     {
       label: 'Operate',
-      items: LINKS.map((l) => ({
-        ...l,
-        // `/app` must not light up for `/app/shipments`, and `/app/shipments/new`
-        // would light BOTH — so the longer path is matched exactly and only the
-        // list uses a prefix test.
-        active:
-          l.href === '/app'
-            ? pathname === '/app'
-            : pathname === l.href || pathname.startsWith(`${l.href}/`),
-      })),
+      items: LINKS.map((l) => ({ ...l, active: l.href === lit })),
     },
   ];
 }
@@ -119,6 +122,13 @@ function ConsoleLayout() {
 
   // The shell renders plain anchors; without this every nav click is a full
   // document reload and the console loses its session-scoped state.
+  //
+  // `activeOptions={{ exact: true }}` is load-bearing, not a default worth spelling out. TanStack's
+  // `Link` decides activeness itself and writes `aria-current="page"` from that decision — by prefix,
+  // so on `/app/shipments/new` it lit the overview, the list *and* the create form. The shell already
+  // decides which row is lit (`activeLink` in `src/lib/console-nav.ts`); the router's opinion is a
+  // second, looser opinion that overwrites it. `exact` makes the router's answer agree with ours on
+  // every row it has an opinion about, and stay silent on the rest.
   const renderLink: NavLinkRender = ({
     href,
     className,
@@ -126,23 +136,29 @@ function ConsoleLayout() {
     'aria-current': ariaCurrent,
     onNavigate,
   }) => (
-    <Link to={href} className={className} aria-current={ariaCurrent} onClick={onNavigate}>
+    <Link
+      to={href}
+      className={className}
+      activeOptions={{ exact: true }}
+      aria-current={ariaCurrent}
+      onClick={onNavigate}
+    >
       {children}
     </Link>
   );
 
   return (
     <AppShell
-      brand={<Logo />}
+      brand={<BrandMark />}
       nav={navFor(pathname)}
       renderLink={renderLink}
       sidebarFooter={
-        <div className="flex flex-col gap-2">
-          <p className="truncate text-xs text-slate-500">{principal.subjectId}</p>
-          <Button variant="secondary" size="sm" onClick={logout}>
-            Sign out
-          </Button>
-        </div>
+        <UserIdentity
+          displayName={principal.displayName}
+          email={principal.email}
+          kind={principal.kind}
+          onSignOut={logout}
+        />
       }
     >
       <Outlet />

@@ -92,14 +92,21 @@ check('a small file hides nothing', summarisePreview(file(10)).hiddenReady, 0);
   // cap applies to the READY rows, never to the failures.
   const one = summarisePreview([...file(500), row(600, 'FAILED', 'bad phone')]);
   check('a single failure still fits under the cap', one.shown.length, 50);
-  ok('and it is a row that is shown', one.shown.some((r) => r.outcome === 'FAILED'));
+  ok(
+    'and it is a row that is shown',
+    one.shown.some((r) => r.outcome === 'FAILED'),
+  );
   check('problems are shown first', one.shown[0].outcome, 'FAILED');
   check('the omitted rows are counted as ready, not as failures', one.hiddenReady, 500 - 49);
 
   const many = summarisePreview(file(500, 60));
   check('the table grows past the cap rather than dropping failures', many.shown.length, 60);
   check('every failure is present', many.shown.filter((r) => r.outcome === 'FAILED').length, 60);
-  check('and no ready row crowds them out', many.shown.filter((r) => r.outcome !== 'FAILED').length, 0);
+  check(
+    'and no ready row crowds them out',
+    many.shown.filter((r) => r.outcome !== 'FAILED').length,
+    0,
+  );
   check('the counts are still exact', [many.total, many.ready, many.problems], [500, 440, 60]);
 }
 
@@ -241,7 +248,7 @@ check(
   check('the template parses to two rows', grid.length, 2);
 
   const { index, missing } = mapHeader(grid[0]);
-  check('the template header satisfies the backend\'s required columns', missing, []);
+  check("the template header satisfies the backend's required columns", missing, []);
 
   const fields = {};
   for (const column of BULK_COLUMNS) {
@@ -254,7 +261,11 @@ check(
     fields.recipient_address,
     'Agrabad C/A, Chattogram',
   );
-  check('the example phone is E.164, the format the regex requires', fields.recipient_phone, '+8801810000001');
+  check(
+    'the example phone is E.164, the format the regex requires',
+    fields.recipient_phone,
+    '+8801810000001',
+  );
   check('the example COD is integer minor units, not a decimal', fields.cod_amount, '125050');
   check('the example weight is integer grams', fields.parcel_weight, '1200');
 }

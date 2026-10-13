@@ -92,7 +92,7 @@ transaction leaves nothing — which is why the outbox row is written _inside_ i
 ## Chaos testing
 
 Deliberately induce each failure and assert the table above. Not once at the end — regularly, in
-CI where possible, and against a seeded environment.
+against a seeded environment, as part of a deliberate run rather than as a side effect.
 
 The questions worth asking:
 

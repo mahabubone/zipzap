@@ -91,7 +91,7 @@ const operations: Array<{ path: string; method: string; operation: Operation }> 
 );
 
 /** Operations that legitimately carry no success body: 204 has none, by definition. */
-const BODYLESS = new Set(['LogoutController_logout']);
+const BODYLESS = new Set(['LogoutController_logout', 'HubStaffController_revoke']);
 
 /** Status codes that a body may arrive on. Bulk import uses 202 — queued, not done. */
 const SUCCESS_STATUSES = ['200', '201', '202'];

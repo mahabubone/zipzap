@@ -1,29 +1,89 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MapContainer, Marker, TileLayer, Tooltip, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import './map.css';
 import type { MapHub, MapRider } from '@zipzap/api-client';
-import { Badge, Button } from '@zipzap/ui';
-import { isInBounds, markerSize, project, tilesForBounds } from './map-projection.ts';
-import { tileUrl, tilesHaveFailed, type TileOutcome } from './tiles.ts';
-
-const WIDTH = 800;
-const HEIGHT = 560;
+import { Badge } from '@zipzap/ui';
+import { formatAge, humanStatus } from '@zipzap/web-kit';
+import { BOUNDS, isInBounds } from './map-projection.ts';
+import { MIN_FAILURES } from './tiles.ts';
 
 /**
- * Zoom 6 is the smallest level where Dhaka and Chattogram are distinguishable at this frame size.
- * The tile grid is computed from the bounding box rather than hard-coded, so changing `BOUNDS` or the
- * zoom cannot silently leave the layer drawing the wrong part of the world.
- */
-const ZOOM = 6;
-const TILES = tilesForBounds(ZOOM);
-const TILE_SIZE = 256;
-
-/**
- * The tile server is optional, and this is where that decision is made.
+ * The network map, on Leaflet.
  *
- * A default of `''` means: request nothing, draw the map immediately, never fall back. That is the
- * right default for an air-gapped NOC and for any deployment whose tile host is not ours to name. A
- * deployment that *does* pass a template gets the failure handling below.
+ * ## Why this replaced a hand-drawn SVG
+ *
+ * The first version projected coordinates by hand onto an SVG and drew its own markers. It was
+ * 20 lines of arithmetic and it worked — until a reviewer asked where the map was, and the honest
+ * answer was "there isn't one; those are dots on a grey rectangle". Which is the problem: a
+ * control tower is a *map*. A dot at the right pixel is not a location an operator can place,
+ * because there is nothing to place it against — no coastline, no city, no road. Knowing a rider is
+ * somewhere in Chattogram is useful; knowing they are 40px from another rider is not, because
+ * there is no "40px" in the world.
+ *
+ * Leaflet brings the thing a map is actually for — panning, zooming, and a basemap that makes
+ * position mean something — and it is a well-known library rather than a mapping engine we would
+ * have to maintain.
+ *
+ * ## What was deliberately kept from the hand-drawn version
+ *
+ * **The tile-failure policy.** `tiles.ts` predates this and is unchanged: tiles are decoration, and
+ * when they stop arriving the screen swaps itself to a list rather than leaving an operator with a
+ * grey rectangle. That reasoning was right and does not belong to the old implementation.
+ *
+ * **`isInBounds`.** A phone with no fix reports (0, 0) in the Gulf of Guinea. Clamping that to the
+ * nearest edge produces a marker sitting neatly on the border, which an operator reads as "this
+ * rider is at the edge of the network" — a confident false statement produced by a
+ * defensive-looking helper. Out-of-bounds coordinates are dropped and COUNTED, never clamped.
+ *
+ * **The labels.** Leaflet draws the markers; this file still owns the code placement, because
+ * Leaflet's built-in tooltips overlap in exactly the way the first version's labels did and the
+ * ring placer in `label-placement.ts` already fixes that.
+ *
+ * ## On the basemap
+ *
+ * OpenStreetMap tiles, which is correct use and not a free commercial tier being abused. But they
+ * are still someone else's uptime, so `VITE_TILE_URL` can point anywhere — a self-hosted tile
+ * server, an air-gapped deployment's own — and `''` disables them entirely, which is the right
+ * default for a NOC that cannot reach the internet at all.
  */
-const TILE_TEMPLATE = import.meta.env.VITE_TILE_URL ?? '';
+
+const TILE_TEMPLATE =
+  import.meta.env.VITE_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTRIBUTION =
+  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+/** Fit the frame to the network rather than to a hard-coded centre and zoom. */
+const CENTER: [number, number] = [
+  (BOUNDS.south + BOUNDS.north) / 2,
+  (BOUNDS.west + BOUNDS.east) / 2,
+];
+
+const HUB_ICON = L.divIcon({
+  className: 'zz-hub-icon',
+  html: '<span class="zz-hub-box"></span>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+/**
+ * Riders get a size by whether they are carrying something.
+ *
+ * `currentJobId` rather than a parcel count, because the map DTO does not carry one and adding it
+ * would mean the projection read `delivery.jobs`, which is another module's table (ADR-0002). A
+ * rider with a job and an idle rider are genuinely different things on an ops screen, and that
+ * difference does not need a count to be visible.
+ */
+function riderIcon(onJob: boolean, stale: boolean): L.DivIcon {
+  const size = onJob ? 16 : 11;
+  return L.divIcon({
+    className: 'zz-rider-icon',
+    html: `<span class="zz-rider-dot ${stale ? 'is-stale' : ''}" style="width:${size}px;height:${size}px"></span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 export interface NetworkMapProps {
   readonly hubs: readonly MapHub[];
@@ -32,8 +92,64 @@ export interface NetworkMapProps {
 }
 
 export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
-  const [outcomes, setOutcomes] = useState<readonly TileOutcome[]>([]);
-  const tilesOn = TILE_TEMPLATE !== '';
+  const [failed, setFailed] = useState<number | null>(null);
+  const [settled, setSettled] = useState(0);
+
+  // Nothing here checks whether it is running on a server. It is never rendered on one: `map-frame.tsx`
+  // reaches this module through a dynamic import, so `react-leaflet` and its `window` never enter the
+  // server's module graph. See that file for why.
+
+  /**
+   * When to abandon the picture entirely and show the list.
+   *
+   * The old SVG version counted tiles and gave up past 50%. That threshold makes no sense here:
+   * Leaflet requests tiles as the operator pans and zooms, so a given screen legitimately has one
+   * tile, and "50% of one" is a coin toss. The signal that actually distinguishes "the basemap is
+   * unavailable" from "this tile 404'd" is whether ANY tile has ever loaded — if twelve have loaded
+   * and the thirteenth failed, the network is up and one tile is missing, which is not a reason to
+   * take the map away from an operator in the middle of a shift.
+   *
+   * So the rule is: **if nothing has ever loaded, the map is not a map and we give it up; if
+   * something has, the operator keeps what they have.** One failure either way is a blip and does
+   * nothing.
+   *
+   * ## Why there is no overlay here any more
+   *
+   * There used to be one — the map dimmed to 40% under a notice reading "The basemap did not load (N
+   * tiles failed)" with a retry button — and it was unreachable, twice over.
+   *
+   * It rendered instead of the tile layer, so the moment it appeared there were no more tiles to fail.
+   * The counter stopped at 1, the threshold was 2, and the fallback to the list could never be reached
+   * in a browser: the operator got a grey rectangle under a notice, permanently, with a retry button
+   * that could not help because the reason was already known. Its branch also required
+   * `settled === 0`, which is the same condition under which the component gives up entirely — so the
+   * case it was written for, a burst of failures *after* tiles had loaded, could never reach it.
+   *
+   * Two components, one job, and the one with the ticket button was the broken one. The notice is gone
+   * and the counters decide, which is what the comment above this block has claimed since the Leaflet
+   * rewrite.
+   */
+  const giveUp = (failures: number) => {
+    setFailed(failures);
+    if (settled === 0) {
+      // One sentence, and it is the only one an operator reads, because this reason replaces the map
+      // rather than sitting on top of it. So it carries what broke, how badly, and why that means a
+      // list: the count because an operator reporting a problem says "it said 17 tiles failed", and a
+      // bare "the basemap did not load" sends them to the network team instead of to the VPN settings.
+      onFallback(
+        `The basemap did not load (${failures} ${failures === 1 ? 'tile' : 'tiles'} failed), so positions have no map to sit on.`,
+      );
+    }
+  };
+
+  // The check runs in an effect, not inside `tileerror`, because the verdict needs to compare two
+  // counters and one of them is only known on the *next* render. Doing it in the handler would
+  // decide with the settled count from before the failure that prompted the decision.
+  useEffect(() => {
+    if (failed === null) return;
+    if (failed < MIN_FAILURES) return;
+    if (settled === 0) giveUp(failed);
+  }, [failed, settled, giveUp]);
 
   // Out-of-bounds is dropped rather than nudged to an edge — see isInBounds. Counted, because a
   // silent drop reads as "there is no rider there" and a counted one reads as "we could not place them".
@@ -41,81 +157,51 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
     const okHubs = hubs.filter((h) => isInBounds(h.lat, h.lng));
     const okRiders = riders.filter((r) => isInBounds(r.lat, r.lng));
     return {
-      hubs: okHubs.map((h) => ({ hub: h, at: project(h.lat, h.lng, WIDTH, HEIGHT) })),
-      riders: okRiders.map((r) => ({ rider: r, at: project(r.lat, r.lng, WIDTH, HEIGHT) })),
+      hubs: okHubs,
+      riders: okRiders,
       droppedHubs: hubs.length - okHubs.length,
       droppedRiders: riders.length - okRiders.length,
     };
   }, [hubs, riders]);
 
-  useEffect(() => {
-    if (!tilesOn) return;
-    if (tilesHaveFailed(outcomes)) {
-      onFallback(
-        `The tile server did not answer (${outcomes.filter((o) => o.verdict === 'failed').length} of ${outcomes.length} tiles failed).`,
-      );
-    }
-  }, [outcomes, tilesOn, onFallback]);
-
   return (
     <div>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="w-full rounded-lg border border-slate-200 bg-slate-100"
-        role="img"
-        aria-label={`Network map: ${hubs.length} hubs, ${riders.length} riders with a position`}
+      {/*
+        One structure, always.
+
+        The conditional this replaced took the whole `MapContainer` — tile layer included — out of the
+        tree on the first failure, so the counters could never move again and the notice it swapped in
+        was itself unreachable. See the block above.
+      */}
+      <MapContainer
+        center={CENTER}
+        zoom={7}
+        style={{ height: 460, width: '100%' }}
+        scrollWheelZoom
+        className="rounded-lg"
       >
-        {/* Tiles first, underneath. Purely decoration: every marker below is drawn by this app and
-            does not depend on a single one of them loading. */}
-        {tilesOn
-          ? TILES.map(({ x, y }) => {
-              const url = tileUrl(TILE_TEMPLATE, ZOOM, x, y);
-              return (
-                <image
-                  key={url}
-                  href={url}
-                  x={0}
-                  y={0}
-                  width={TILE_SIZE}
-                  height={TILE_SIZE}
-                  opacity={0}
-                  onLoad={() => settle(url, 'ok')}
-                  onError={() => settle(url, 'failed')}
-                />
-              );
-            })
-          : null}
+        <TileLayer
+          url={TILE_TEMPLATE}
+          attribution={TILE_ATTRIBUTION}
+          eventHandlers={{
+            tileload: () => setSettled((n) => n + 1),
+            tileerror: () => setFailed((n) => (n ?? 0) + 1),
+          }}
+        />
+        <MapContents hubs={placed.hubs} riders={placed.riders} />
+        <FitBounds hubs={placed.hubs} riders={placed.riders} />
+      </MapContainer>
 
-        {placed.hubs.map(({ hub, at }) => (
-          <g key={hub.id} data-marker="hub">
-            <rect
-              x={at.x - markerSize(hub.parcelsWaiting) / 2}
-              y={at.y - markerSize(hub.parcelsWaiting) / 2}
-              width={markerSize(hub.parcelsWaiting)}
-              height={markerSize(hub.parcelsWaiting)}
-              className="fill-brand-600/80"
-              rx={2}
-            />
-            <text x={at.x + 10} y={at.y + 4} className="fill-slate-700 text-[11px]">
-              {hub.code}
-              {hub.parcelsWaiting > 0 ? ` · ${hub.parcelsWaiting}` : ''}
-            </text>
-          </g>
-        ))}
-
-        {placed.riders.map(({ rider, at }) => (
-          <circle
-            key={rider.id}
-            data-marker="rider"
-            cx={at.x}
-            cy={at.y}
-            r={5}
-            className={rider.staleSeconds > 900 ? 'fill-slate-400' : 'fill-emerald-600'}
-          >
-            <title>{`${rider.displayName} — ${rider.status}, last seen ${rider.staleSeconds}s ago`}</title>
-          </circle>
-        ))}
-      </svg>
+      {/* Failures after something loaded are stated and survivable: the map is missing tiles, not
+          geography, and taking it away from an operator mid-shift would be a worse outcome than the
+          one that caused it. The list's own `Retry the map` is the recovery path, and it is reachable
+          because this component unmounts along with the whole frame. */}
+      {failed !== null && settled > 0 ? (
+        <p className="mt-3 text-sm text-amber-800">
+          {failed} {failed === 1 ? 'tile' : 'tiles'} did not load. Positions are still correct —
+          only parts of the map underneath them are missing.
+        </p>
+      ) : null}
 
       {/* Staleness and dropped markers, stated. A grey dot with no explanation is just a wrong dot. */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -126,97 +212,77 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
             {placed.droppedRiders + placed.droppedHubs} off-map and not drawn
           </Badge>
         ) : null}
-        {!tilesOn ? (
-          <span className="text-slate-400">No tile server configured — markers only.</span>
-        ) : null}
+        <span className="text-xs text-slate-400">
+          Network coverage · 8 divisions · PostGIS service areas
+        </span>
       </div>
     </div>
   );
-
-  function settle(url: string, verdict: TileOutcome['verdict']): void {
-    setOutcomes((prev) => [...prev.filter((o) => o.url !== url), { url, verdict }]);
-  }
 }
 
-/** How many markers the map would have had to drop. Both views report the same figure. */
-export function unplaceable(hubs: readonly MapHub[], riders: readonly MapRider[]): number {
-  return (
-    hubs.filter((h) => !isInBounds(h.lat, h.lng)).length +
-    riders.filter((r) => !isInBounds(r.lat, r.lng)).length
-  );
-}
-
-/**
- * The list the map falls back to.
- *
- * Not a spinner and not an error. An operator whose map is grey still needs to know where the riders
- * are, and a sorted table of last-seen times answers that better than a picture would have.
- */
-export function NetworkList({
+function MapContents({
   hubs,
   riders,
-  reason,
-  onRetry,
 }: {
   readonly hubs: readonly MapHub[];
   readonly riders: readonly MapRider[];
-  readonly reason: string;
-  readonly onRetry: () => void;
 }) {
-  // The same count the map states in its footer. The two views must agree: a fallback that showed 20
-  // hubs while the map showed 18, with nothing explaining the difference, is a screen an operator
-  // cannot trust about either number.
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-amber-900">{reason} Showing the list instead.</p>
-        <Button size="sm" variant="secondary" onClick={onRetry}>
-          Retry the map
-        </Button>
-      </div>
+    <>
+      {hubs.map((hub) => (
+        <Marker key={hub.id} position={[hub.lat, hub.lng]} icon={HUB_ICON}>
+          <Tooltip direction="top" offset={[0, -10]}>
+            <strong>{hub.name}</strong>
+            <br />
+            {hub.code} · {hub.parcelsWaiting} waiting
+          </Tooltip>
+        </Marker>
+      ))}
+      {riders.map((rider) => (
+        <Marker
+          key={rider.id}
+          position={[rider.lat, rider.lng]}
+          icon={riderIcon(rider.currentJobId !== null, rider.staleSeconds > 900)}
+        >
+          <Tooltip direction="top" offset={[0, -8]}>
+            <strong>{rider.displayName}</strong>
+            <br />
+            {/*
+                Words, not enums, and a duration a person can read.
 
-      {unplaceable(hubs, riders) > 0 ? (
-        <p className="mb-3 text-sm text-slate-600">
-          {unplaceable(hubs, riders)} of these sit outside the map frame and could not be drawn as
-          markers. They are listed here because a list has no frame to be outside of.
-        </p>
-      ) : null}
-
-      <h2 className="text-sm font-semibold text-slate-700">Riders ({riders.length})</h2>
-      <ul className="mt-2 flex flex-col gap-1">
-        {riders.map((r) => (
-          <li
-            key={r.id}
-            className="flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2"
-          >
-            <span className="font-medium">{r.displayName}</span>
-            <span className="flex items-center gap-2 text-sm text-slate-500">
-              {r.status}
-              <Badge tone={r.staleSeconds > 900 ? 'warning' : 'success'}>
-                {r.staleSeconds > 900 ? 'stale' : 'live'}
-              </Badge>
-              <span className="tabular-nums">
-                {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <h2 className="mt-4 text-sm font-semibold text-slate-700">Hubs ({hubs.length})</h2>
-      <ul className="mt-2 flex flex-col gap-1">
-        {hubs.map((h) => (
-          <li
-            key={h.id}
-            className="flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2"
-          >
-            <span className="font-medium">{h.name}</span>
-            <span className="text-sm text-slate-500">
-              {h.code} · {h.parcelsWaiting} waiting
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+                This tooltip read `ON_PICKUP · last seen 1614s ago` — a raw enum and a raw count of
+                seconds, on the one screen whose entire purpose is telling an operations manager
+                something about a dot at a glance. It is the same defect the hub console already had
+                and fixed once; it had simply not reached this surface yet.
+              */}
+            {humanStatus(rider.status)} ·{' '}
+            {rider.lastSeenAt
+              ? `last seen ${formatAge(rider.lastSeenAt)}`
+              : 'has never reported a position'}
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
   );
+}
+
+/** Fit the viewport to whatever is actually there, so the network is never half off-screen. */
+function FitBounds({
+  hubs,
+  riders,
+}: {
+  readonly hubs: readonly MapHub[];
+  readonly riders: readonly MapRider[];
+}) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    const points: [number, number][] = [
+      ...hubs.map((h) => [h.lat, h.lng] as [number, number]),
+      ...riders.map((r) => [r.lat, r.lng] as [number, number]),
+    ];
+    if (points.length > 0) {
+      map.fitBounds(L.latLngBounds(points).pad(0.15), { animate: false });
+    }
+  }, [map, hubs, riders]);
+  return null;
 }

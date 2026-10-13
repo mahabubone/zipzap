@@ -15,19 +15,35 @@ const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
  * this is the rider app, and your work is safe even without signal. The old version was a white card
  * on grey with three unlabelled boxes, which said none of them.
  *
- * Email + password against `/v1/auth/token`, bearer token into a `RiderSession`. The rider picks
- * which rider id they are on the device they hold, because the auth token identifies the principal
- * and `riderId` scopes the job feed and the sync queue. No auto-login: an explicit sign-in keeps a
- * shared device from silently acting as the previous rider.
+ * **The handle is a mobile number, not an email.** A rider in Dhaka is issued a SIM card at the
+ * depot; they are not issued a mailbox, and they are not choosing a password they will remember at
+ * 6am with a hundred parcels in the bag. Asking for an email meant one of two things, both bad:
+ * the rider invents an address they will not remember, or they share the dispatcher's — and two
+ * people typing the same credentials is indistinguishable from one person on two devices, so
+ * every scan in the offline queue becomes ambiguous.
+ *
+ * The field says "Mobile number" and opens the numeric keypad, because a rider who is asked for an
+ * email will try to type one, and the keyboard is the first thing that tells them what is expected.
+ * The server normalises what arrives, so `01712345678`, `+8801712345678` and `+880 1712-345678` are
+ * one account rather than three.
+ *
+ * Phone + password against `/v1/auth/token`, bearer token into a `RiderSession`. The rider still
+ * picks which rider id they are on the device they hold, because the auth token identifies the
+ * principal and `riderId` scopes the job feed and the sync queue. No auto-login: an explicit
+ * sign-in keeps a shared device from silently acting as the previous rider.
  */
 export function AuthScreen({ onSignIn }: { onSignIn: (s: RiderSession) => void }) {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [riderId, setRiderId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0 && riderId.trim().length > 0;
+  // A rider's number is 11 digits nationally and 13-14 in E.164, so a length floor is enough to
+  // disable the button before they have finished typing. It is a floor and not a check: the server
+  // is the only thing that can say whether a number is reachable, and a client-side rejection that
+  // disagrees with the server is worse than an early submit that fails once.
+  const canSubmit = phone.trim().length >= 10 && password.length > 0 && riderId.trim().length > 0;
 
   const signIn = async () => {
     if (!canSubmit || busy) return;
@@ -38,7 +54,7 @@ export function AuthScreen({ onSignIn }: { onSignIn: (s: RiderSession) => void }
       // deliberately omits the token from its body because a browser console's script could read it
       // there. The token flow exists for exactly this caller.
       const probe = new ZipZapClient({ baseUrl });
-      const session = await probe.loginToken(email.trim(), password);
+      const session = await probe.loginToken(phone.trim(), password);
       onSignIn({
         riderId: riderId.trim(),
         token: session.token,
@@ -81,17 +97,21 @@ export function AuthScreen({ onSignIn }: { onSignIn: (s: RiderSession) => void }
           <Card style={styles.card}>
             <Title level="heading">Sign in</Title>
             <Muted style={styles.cardSub}>
-              The account you were issued at the depot. Your rider id scopes the work you see.
+              The number you were issued at the depot, and the rider id you work under.
             </Muted>
 
             <View style={styles.fields}>
               <Field
-                label="Email"
-                icon="mail-outline"
-                value={email}
-                onChange={setEmail}
-                placeholder="rider@example.com"
-                keyboardType="email-address"
+                label="Mobile number"
+                icon="phone-portrait-outline"
+                value={phone}
+                onChange={setPhone}
+                placeholder="01712345678"
+                // The numeric keypad, not the default. A rider asked for an email will try to type
+                // one; the keyboard is what tells them what is actually being asked for.
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                textContentType="telephoneNumber"
               />
               <Field
                 label="Password"

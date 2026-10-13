@@ -7,6 +7,7 @@ import { contactHint, contactLabel, contactStateFor, telHref } from '../rules/co
 import { formatCash } from '../rules/cash.ts';
 import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
+import { jobTone, statusLabel } from '../status.ts';
 import type { JobRow, ShipmentHandoff } from './JobsScreen.tsx';
 
 /** Statuses a rider cannot act on at all. */
@@ -157,7 +158,7 @@ export function JobDetailScreen({
               {job.kind === 'pickup' ? 'PICKUP' : 'DELIVERY'}
             </Text>
           </View>
-          <Badge label={job.status.replace(/_/g, ' ')} tone={statusTone(job.status)} dot />
+          <Badge label={statusLabel(job.status)} tone={jobTone(job.status)} dot />
         </View>
 
         <Text style={styles.heroTitle}>{job.title}</Text>
@@ -349,7 +350,7 @@ export function JobDetailScreen({
           </View>
           <Muted style={styles.closedDetail}>
             {TERMINAL.has(job.status)
-              ? `This job is ${job.status.toLowerCase().replace(/_/g, ' ')}.`
+              ? `This job is ${statusLabel(job.status).toLowerCase()}.`
               : 'The server will not accept another action on this job right now. Pull to refresh if that looks wrong.'}
           </Muted>
         </Card>
@@ -518,25 +519,6 @@ function ContactRow({ job, handoff }: { job: JobRow; handoff: ShipmentHandoff | 
       )}
     </View>
   );
-}
-
-/** The closed status vocabulary, shared with the jobs list through STATUS_TONE. */
-function statusTone(status: string): 'success' | 'danger' | 'warning' | 'brand' | 'neutral' {
-  switch (status) {
-    case 'DELIVERED':
-    case 'COMPLETED':
-    case 'COLLECTED':
-      return 'success';
-    case 'FAILED':
-      return 'danger';
-    case 'ATTEMPTED':
-    case 'EXCEPTION':
-      return 'warning';
-    case 'OUT_FOR_DELIVERY':
-      return 'brand';
-    default:
-      return 'neutral';
-  }
 }
 
 const styles = StyleSheet.create({

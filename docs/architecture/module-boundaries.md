@@ -73,7 +73,7 @@ The TypeORM entity (`shipment.entity.ts`) lives beside them but outside the `rul
 marker; it is a row shape, not business logic. Domain errors are plain `Error` subclasses.
 This keeps the business rules honest about what they depend on.
 
-**3. A CI grep.** `pnpm boundaries:check` enforces, in order of how much each costs when missed:
+**3. A checker.** `pnpm boundaries:check` enforces, in order of how much each costs when missed. It runs in `pnpm verify` and in `.githooks/pre-commit`, which is the whole enforcement story here — there is no CI in this repository:
 
 ```
 FORBIDDEN: SELECT/INSERT/UPDATE/JOIN against a schema the module does not own

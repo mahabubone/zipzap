@@ -254,7 +254,7 @@ export function buildDocument(app: INestApplication): OpenAPIObject {
         [
           'Logistics operating system for e-commerce fulfillment and last-mile delivery.',
           '',
-          'Bangladesh first. Models a real courier business end to end: order, pricing, pickup,',
+          'Models a real courier business end to end: order, pricing, pickup,',
           'origin hub, line-haul, destination hub, last-mile, COD, settlement.',
           '',
           '## Credentials',

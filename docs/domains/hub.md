@@ -18,11 +18,19 @@ Not append-only, deliberately: this is the present tense, not history. A parcel 
 **deleted**, not flagged — because "not at any hub" and "at a hub but we forgot to clear it" are
 different states, and a soft flag would collapse them.
 
+**Landed 2026-10-12**: `staff` (migration 0050) — who works at which hub, and in what role
+(`MANAGER` | `OPERATOR`). A dated assignment table, not a `hub_id` column on the user, because
+reassignment is normal and a single column keeps no history. A partial unique index on `user_id`
+where `revoked_at IS NULL` enforces one active hub per person at the database, not in app code.
+No FKs to `identity.users` (ADR-0002); the service verifies a user exists via `UserService`
+before assigning. The `HUB_MANAGER` role (`HUB_OPERATOR` scopes + `hub:manage`) and the
+`hub:manage` scope arrived with it.
+
 ---
 
 ## Owns
 
-`hub` schema: `hubs` (landed); `parcel_presence` (landed); `zones`, `staff`, `capacity`,
+`hub` schema: `hubs` (landed); `parcel_presence` (landed); `staff` (landed); `zones`, `capacity`,
 `schedules`, `routes` still to come.
 
 ## Types
@@ -54,17 +62,19 @@ Shipment → Dispatch batch → Manifest → Vehicle / Rider → Scan out
 4. **Discrepancies surface as exceptions.** Received-but-not-on-manifest, manifested-but-not-
    received, and received-twice all raise rather than silently reconcile.
 
-## The two consoles that exist, and the one that does not
+## Hub staff assignment (landed 2026-10-12)
 
-There is no `hub.staff` table and no per-hub assignment. A `HUB_OPERATOR` holds a membership against
-a merchant, because the session model requires one — a workaround, not a design, since a hub
-operator has no merchant. **This is unresolved and Stage 5's ops console has the same problem**: a
-platform employee is not a merchant employee, and the session shape says they are. The honest fix is a
-platform-staff session, which touches every authenticated screen and is larger than this stage.
+`hub.staff` now exists and answers "who works at which hub". A `HUB_OPERATOR` or `HUB_MANAGER` is
+assigned to exactly one active hub (partial unique index on `user_id` where `revoked_at IS NULL`),
+and `GET /v1/hubs/my-hub` returns it — so the hub console lands directly on the operator's hub
+instead of a picker. A person between hubs gets a 404, which the console renders as "contact your
+manager" rather than a login redirect.
 
-What _is_ settled is the permission split. `hub:read` and `hub:scan` are platform scopes, listed in
-`PLATFORM_SCOPES` and subtracted from `MERCHANT_SCOPES`, so a scope added tomorrow is withheld from
-merchants by default rather than granted by omission. See [identity.md](identity.md).
+The session model still expresses a platform employee as a merchant membership (the workaround
+remains), but the assignment is now a real row in `hub.staff` rather than inferred from the
+membership. The permission split is unchanged: `hub:read`, `hub:scan`, and `hub:manage` are
+platform scopes, listed in `PLATFORM_SCOPES` and subtracted from `MERCHANT_SCOPES`, so a scope
+added tomorrow is withheld from merchants by default. See [identity.md](identity.md).
 
 ## The arrival gesture belongs to the manifest
 

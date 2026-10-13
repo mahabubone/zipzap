@@ -7,6 +7,8 @@ import { HubScanController } from './hub-scan.controller.ts';
 import { HubRepository } from './hub.repository.ts';
 import { HubConsoleService } from './hub-console.service.ts';
 import { HubConsoleController } from './hub-console.controller.ts';
+import { HubStaffService } from './hub-staff.service.ts';
+import { HubStaffController } from './hub-staff.controller.ts';
 import { IdentityModule } from '../identity/identity.module.ts';
 
 /**
@@ -26,8 +28,8 @@ import { IdentityModule } from '../identity/identity.module.ts';
  */
 @Module({
   imports: [forModule('hub', []), ShipmentModule, TrackingModule, IdentityModule],
-  providers: [HubScanService, HubRepository, HubConsoleService],
-  controllers: [HubScanController, HubConsoleController],
+  providers: [HubScanService, HubRepository, HubConsoleService, HubStaffService],
+  controllers: [HubScanController, HubConsoleController, HubStaffController],
   exports: [HubScanService, HubRepository],
 })
 export class HubModule {}

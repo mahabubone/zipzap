@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { Button, ErrorState, PageHeader, Skeleton } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
-import { formatMinor, formatWhen } from '../../lib/format.ts';
+import { useAsync } from '@zipzap/web-kit';
+import { formatMinor, formatWhen } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/app/settlements/$id')({
   component: SettlementDetail,

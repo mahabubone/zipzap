@@ -6,7 +6,7 @@
   "license": "MIT",
   "main": "dist/main.js",
   "scripts": {
-    "build": "nest build",
+    "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "start:api": "node --env-file-if-exists=../../.env dist/main.js",
     "start:worker": "node --env-file-if-exists=../../.env dist/worker.js",
@@ -17,11 +17,13 @@
     "db:migrate": "node --env-file-if-exists=../../.env dist/database/cli.js migrate",
     "db:revert": "node --env-file-if-exists=../../.env dist/database/cli.js revert",
     "db:seed": "node --env-file-if-exists=../../.env dist/database/cli.js seed",
+    "seed:console": "node --env-file-if-exists=../../.env scripts/seed-console.mjs",
+    "seed:shots": "node --env-file-if-exists=../../.env scripts/seed-shots.mjs",
     "analytics:rebuild": "node --env-file-if-exists=../../.env dist/database/cli.js rebuild",
     "simulate": "node --env-file-if-exists=../../.env dist/simulate.js",
     "test:load": "node --env-file-if-exists=../../.env scripts/load-test.mjs",
     "openapi:export": "node --env-file-if-exists=../../.env scripts/export-openapi.mjs",
-    "test:integration": "node --experimental-transform-types --test --test-concurrency=1 \"test/integration/*.test.ts\"",
+    "test:integration": "node --env-file-if-exists=../../.env --experimental-transform-types --test --test-concurrency=1 \"test/integration/*.test.ts\"",
     "test:watch": "vitest"
   },
   "dependencies": {

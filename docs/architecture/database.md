@@ -264,7 +264,7 @@ migration fails with `data type uuid has no default operator class for access me
 `btree_gin` supplies `gin_uuid_ops`.
 
 Both extensions must be created **inside the migration, before the index**. Installing them by hand
-to get past the error locally is how this hides until CI: an already-migrated database has the
+to get past the error locally is how this hides indefinitely: an already-migrated database has the
 extension, so the statement passes there, and only a database that has never been migrated reproduces
 the failure. `1759000000037-ShipmentZone` was verified by creating a scratch database and running
 every migration from scratch.

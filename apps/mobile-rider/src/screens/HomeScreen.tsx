@@ -21,6 +21,8 @@ import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
 import { toJobRows } from '../handoff/job-rows.ts';
 import type { JobRow, RiderJobs } from '../handoff/job-rows.ts';
+import { jobTone, statusLabel } from '../status.ts';
+import { statusState } from '../status.ts';
 
 /** The jobs query key, shared with the feed so both read one cache. */
 const JOBS_QUERY_KEY = 'rider-jobs';
@@ -267,12 +269,15 @@ function StatCard({
 }
 
 function JobPreview({ job, onPress }: { job: JobRow; onPress: () => void }) {
-  const tone = job.status === 'DELIVERED' ? 'success' : job.kind === 'pickup' ? 'info' : 'brand';
+  // Was a third answer to the same question: delivered → success, pickup → info, otherwise brand,
+  // which meant a delivery in transit came out brand on this screen and neutral on the jobs list.
+  const tone =
+    job.kind === 'pickup' && statusState(job.status) === 'moving' ? 'info' : jobTone(job.status);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${job.kind === 'pickup' ? 'Pickup' : 'Delivery'}: ${job.title}, ${job.status}`}
+      accessibilityLabel={`${job.kind === 'pickup' ? 'Pickup' : 'Delivery'}: ${job.title}, ${statusLabel(job.status)}`}
       style={({ pressed }) => [pressed && styles.pressed]}
     >
       <Card style={styles.jobCard}>
@@ -280,7 +285,7 @@ function JobPreview({ job, onPress }: { job: JobRow; onPress: () => void }) {
           <Text style={styles.jobTitle} numberOfLines={1}>
             {job.title}
           </Text>
-          <Badge label={job.status.replace(/_/g, ' ')} tone={tone} dot />
+          <Badge label={statusLabel(job.status)} tone={tone} dot />
         </View>
         <Text style={styles.jobDetail} numberOfLines={1}>
           {job.detail}

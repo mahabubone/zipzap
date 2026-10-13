@@ -9,8 +9,10 @@ Four levels. Each exists because the level below cannot catch a class of bug.
 | **API**         | HTTP → service → Postgres                              | yes         | every PR      |
 | **E2E**         | the full shipment lifecycle                            | yes         | main, nightly |
 
-The first three run in CI on every push. E2E runs on `main` and nightly because it is slow and
-stateful — a suite that only runs nightly is a suite that is red when you are fixing something.
+There is no CI in this repository, so "every commit" and "every PR" mean the same thing: you run them — `pnpm verify` and `pnpm test:integration` — and the pre-commit hook catches the two
+cheapest layers for you. E2E is the browser proofs (`pnpm shots`, `pnpm prove:stack`), which need the whole stack up and are therefore run deliberately rather than incidentally, against a seeded environment.
+
+That is a real gap against the table above, and it is stated rather than papered over: a suite that runs only when someone remembers it is a suite that is red while they are fixing something.
 
 ## Unit — pure rules plus services, Vitest
 

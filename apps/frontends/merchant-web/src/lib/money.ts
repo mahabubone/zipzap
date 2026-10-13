@@ -12,7 +12,7 @@
  */
 
 import type { BalanceLine, CodException, MerchantBalance } from '@zipzap/api-client';
-import { formatMinor } from './format.ts';
+import { formatMinor } from '@zipzap/web-kit';
 
 /**
  * The parsed amount as a bare integer, for callers that only want the number.

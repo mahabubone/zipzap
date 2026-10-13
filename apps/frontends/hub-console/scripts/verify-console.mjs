@@ -27,9 +27,29 @@
  * `pg` resolves from the backend workspace via PG (below), so this works without anything installed
  * here. Same convention as merchant-web/scripts/shots.mjs.
  *
- * Run: API_URL=http://localhost:3005 WEB_URL=http://127.0.0.1:5177 \
- *      PG=../../backend/node_modules/pg/esm/index.mjs \
- *      node apps/frontends/hub-console/scripts/verify-console.mjs
+ * ## Current shape
+ *
+ * Three things moved since this was written, and the proof follows all three rather than being left
+ * behind by them:
+ *
+ * 1. **It authenticates with a cookie, not a token.** `POST /v1/auth/login` answers with
+ *    `Set-Cookie: zipzap_session=…` and an empty body (ADR-0016). It was reading `session.token` and
+ *    sending `Authorization: Bearer …`, which stopped working the day the console moved to HttpOnly
+ *    cookies — and it failed at its own first check, with a message about a fixture operator rather than
+ *    about authentication, which is a bad way to find out.
+ * 2. **The fixture person is assigned to a hub.** The console resolves its hub from
+ *    `GET /v1/hubs/my-hub`, which reads `hub.staff`. A membership row alone says nothing about where
+ *    somebody works, so the fixture writes an assignment — and `HUB_MANAGER`, which is what a depot
+ *    actually issues.
+ * 3. **There is no hub picker any more.** `/` used to list every hub, busiest first, and the proof
+ *    asserted that list twice over. A person is assigned to one now, and `/` sends them there. The
+ *    assertions that replaced them check the redirect itself, because that is the behaviour: an operator
+ *    who opens the console lands on their work list without choosing anything.
+ *
+ * Run, with the stack up and the hub console on its dev server:
+ *   API_URL=http://localhost:3000 WEB_URL=http://localhost:5176 DATABASE_URL=… \
+ *   PLAYWRIGHT_CORE=<path>/playwright-core/index.js \
+ *   node apps/frontends/hub-console/scripts/verify-console.mjs
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core').then(
   (m) => m.default ?? m,
@@ -39,12 +59,17 @@ import { createHash, randomUUID } from 'node:crypto';
 
 // The backend's own pg, by default: it is already a workspace dependency there and adding it here
 // would put a database driver in a browser app's dependency tree.
-const pg = (await import(process.env.PG ?? '../../../backend/node_modules/pg/esm/index.mjs')).default;
+const pg = (await import(process.env.PG ?? '../../../backend/node_modules/pg/esm/index.mjs'))
+  .default;
 const { hashSecret } = await import(
   new URL('../../../backend/dist/common/secret.js', import.meta.url).pathname
 );
 
-const WEB = process.env.WEB_URL ?? 'http://127.0.0.1:5177';
+// `WEB_URL` is read from the environment rather than defaulted here, because this proof was the
+// reason `prove:browser` needed per-app variable names: it is about the hub console, and `WEB_URL` left
+// over from the tracking proof would send it to the public tracking app. `HUB_WEB_URL` first, so the
+// combined command can say what each proof is about.
+const WEB = process.env.HUB_WEB_URL ?? 'http://localhost:5176';
 const API = process.env.API_URL ?? 'http://localhost:3000';
 
 // 375x812 is what a current 5" Android reports in CSS pixels. Width is the axis that matters: it is
@@ -66,11 +91,72 @@ function check(label, ok, detail = '') {
   }
 }
 function eq(label, actual, expected) {
-  check(label, actual === expected, `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`);
+  check(
+    label,
+    actual === expected,
+    `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`,
+  );
 }
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
+
+/**
+ * Remove everything this run created, so a proof does not become the thing it measures.
+ *
+ * It ran against a live database and left a merchant, a user, a membership, a staff assignment, four
+ * parcels, their tracking events and a manifest behind on every run — so after a few runs the demo
+ * fixture had rows no seed wrote and the work list was longer than anything a person had scanned. A
+ * proof that only ever adds is not a proof; it is a leak with assertions in it.
+ *
+ * Every delete is scoped by this run's tag, and each one is attempted independently: the tables here
+ * have no foreign keys to cascade through — rule 2 forbids cross-schema references and the schemas do
+ * without them even internally — so this is an ordered list and not a cascade. Anything that cannot be
+ * removed is reported rather than swallowed, because a silent partial cleanup is how the next run
+ * fails for a reason nobody can see.
+ */
+async function cleanupFixture() {
+  // Computed here rather than at module scope: `runTag` is declared below this function, and a
+  // template literal at the top level would evaluate before it exists.
+  const prefix = `ZP-H${runTag.toUpperCase()}`;
+  const removed = [];
+  // No `tracking.events` step, on purpose: that table is append-only and a trigger refuses the
+  // DELETE — rule 8, working. So the scans this proof provoked leave their events behind, referencing a
+  // parcel that no longer exists.
+  //
+  // That is the right way round. The alternative — keeping the fixture parcels so their events still
+  // resolve — leaves four phantom rows on a demo hub's work list after every run, which is a much worse
+  // mess than an orphaned historical record, and it would mean this proof could never be run twice
+  // against the same database. It is also a nice illustration of the trade-off the append-only rule
+  // makes: some rows you cannot take back, so do not write rows you would want to take back.
+  const steps = [
+    [
+      'hub.parcel_presence',
+      'DELETE FROM hub.parcel_presence WHERE tracking_code LIKE $1',
+      [prefix + '%'],
+    ],
+    [
+      'shipment.shipments',
+      'DELETE FROM shipment.shipments WHERE tracking_code LIKE $1',
+      [prefix + '%'],
+    ],
+    ['hub.staff', 'DELETE FROM hub.staff WHERE user_id = $1', [userId]],
+    ['identity.user_merchants', 'DELETE FROM identity.user_merchants WHERE user_id = $1', [userId]],
+    ['identity.users', 'DELETE FROM identity.users WHERE id = $1', [userId]],
+    ['merchant.sessions', 'DELETE FROM merchant.sessions WHERE user_id = $1', [userId]],
+    ['merchant.merchants', 'DELETE FROM merchant.merchants WHERE id = $1', [merchantId]],
+  ];
+
+  for (const [label, sql, params] of steps) {
+    try {
+      const result = await client.query(sql, params);
+      if (result.rowCount > 0) removed.push(`${label} (${result.rowCount})`);
+    } catch (error) {
+      console.error(`  could not clean ${label}: ${error.message}`);
+    }
+  }
+  if (removed.length > 0) console.log(`cleaned ${removed.join(', ')}`);
+}
 
 // ------------------------------------------------------------------ fixture
 //
@@ -91,9 +177,25 @@ await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES
   email,
   await hashSecret(password),
 ]);
+// `HUB_MANAGER`, not `HUB_OPERATOR`: the console resolves its hub from `GET /v1/hubs/my-hub`, which
+// reads `hub.staff`, and a membership row alone no longer says where a person works. The manager role
+// is also what a depot actually issues, so the fixture matches what the product does rather than what
+// the script used to be able to get away with.
 await client.query(
-  `INSERT INTO identity.user_merchants (user_id, merchant_id, role) VALUES ($1,$2,'HUB_OPERATOR')`,
+  `INSERT INTO identity.user_merchants (user_id, merchant_id, role) VALUES ($1,$2,'HUB_MANAGER')`,
   [userId, merchantId],
+);
+
+const hub = (await client.query(`SELECT id, code, name FROM hub.hubs ORDER BY code LIMIT 1`))
+  .rows[0];
+const HUB = hub.code;
+
+// The assignment itself. `assigned_by` is a NOT NULL uuid with no default, so it is its own value
+// rather than a lie about a manager: this row says who was given the depot, and this script is the one
+// doing the giving.
+await client.query(
+  `INSERT INTO hub.staff (user_id, hub_id, role, assigned_by) VALUES ($1,$2,'OPERATOR',$1)`,
+  [userId, hub.id],
 );
 
 /** A parcel in PICKED_UP, so INBOUND is the legal first gesture. */
@@ -110,6 +212,20 @@ async function parcel(label) {
              500,'Box','PICKED_UP',0,'BDT',1,'dhaka-metro', now(), now())`,
     [id, code, merchantId],
   );
+  // Presence, written here rather than left to the seed.
+  //
+  // The proof's first real assertion is "the hub has parcels to scan", and it used to be answered by
+  // whatever the demo seed happened to leave at `ORDER BY code LIMIT 1` — which is Chattogram, while
+  // the demo flow leaves work at Dhaka. So the proof passed or failed depending on a fixture it does not
+  // control, and on a machine with no seed at all it failed with "no targets" and nothing else.
+  //
+  // `PICKED_UP` is the state whose only legal next gesture is `INBOUND`, which is what the refusal
+  // assertions later in this file need.
+  await client.query(
+    `INSERT INTO hub.parcel_presence (shipment_id, hub_id, hub_code, tracking_code, last_scan, scanned_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'INBOUND', now(), now())`,
+    [id, hub.id, HUB, code],
+  );
   return { id, code };
 }
 
@@ -122,17 +238,38 @@ const stale = await parcel('S'); // walked to the end out of band, so it reads D
 const lagging = await parcel('L'); // the stale screen: its button goes out of date
 const absent = await parcel('A'); // never walked, so it is genuinely the missing parcel
 
-const hub = (await client.query(`SELECT code, name FROM hub.hubs ORDER BY code LIMIT 1`)).rows[0];
-const HUB = hub.code;
+/**
+ * A cookie jar, because that is what a browser gets.
+ *
+ * The login response is a `Set-Cookie: zipzap_session=…` and an empty body (ADR-0016). The script used
+ * to read `session.token` and put it in an `Authorization` header, which stopped working the day the
+ * console moved to HttpOnly cookies — and it failed *quietly*, at its own first check, with a message
+ * about a fixture operator rather than about authentication.
+ *
+ * So the jar is a plain string, carried forward by hand. Node's fetch has no cookie jar, and a proof
+ * script that reached for one would add a dependency to a package that must not have one.
+ */
+let cookie = '';
 
-const session = await fetch(`${API}/v1/auth/login`, {
+const login = await fetch(`${API}/v1/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password }),
-}).then((r) => r.json());
-check('the fixture hub operator can sign in', Boolean(session.token), true);
+  body: JSON.stringify({ identifier: email, password }),
+});
+// `getSetCookie` is the only reliable way to read repeated headers; `headers.get('set-cookie')` joins
+// them with a comma, which is indistinguishable from a cookie whose value contains one.
+cookie = (login.headers.getSetCookie?.() ?? [])
+  .map((value) => value.split(';')[0])
+  .filter(Boolean)
+  .join('; ');
+check('the fixture hub operator can sign in', login.status, 201);
+check(
+  'the login hands back a session cookie, not a token',
+  cookie.startsWith('zipzap_session='),
+  cookie.split(';')[0],
+);
 
-const auth = { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' };
+const auth = { Cookie: cookie, 'Content-Type': 'application/json' };
 
 /** The second operator's tablet: same token, out of band. */
 async function otherScan(shipmentId, scan) {
@@ -165,58 +302,105 @@ const browser = await chromium.launch({
 async function settle(page) {
   await page.waitForLoadState('networkidle');
   // A click before React hydrates falls through to a native form submit.
-  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), { timeout: 15000 });
+  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), {
+    timeout: 15000,
+  });
   await page.waitForTimeout(250);
 }
-async function shoot(page, name) {
-  const file = `${OUT}2026-10-09_hub_${name}.png`;
-  await page.screenshot({ path: file });
+/**
+ * Photograph, if anybody asked for it.
+ *
+ * This proof used to write into `shots/` unconditionally, with the date hard-coded to the day it was
+ * written — so `shots/` accumulated eleven phone-width PNGs that no gallery references, under a
+ * four-day-old date prefix, one of them (`hub_picker_desktop`) showing a hub picker this console no
+ * longer has. `shots/` is the visual memory (AGENTS.md), and it should hold what was chosen to be
+ * remembered, not everything a proof happened to capture on its way past.
+ *
+ * So: `pnpm --filter @zipzap/hub-console shots` builds the gallery, and this photographs only when
+ * someone runs it by hand and sets `PROOF_SHOTS=1`. The assertions are the proof; the pictures are a
+ * by-product of a person wanting to look.
+ */
+const WANT_SHOTS = process.env.PROOF_SHOTS === '1';
+
+/**
+ * One place that decides whether a shot happens and where it lands.
+ *
+ * Both screenshot paths used to be inline `page.screenshot({ path })` calls with a hard-coded date, so
+ * gating `shoot()` alone left the desktop ones still writing to `shots/` on every run. A gate that only
+ * covers some of the writes is not a gate.
+ */
+async function photograph(page, name, { fullPage = false } = {}) {
+  if (!WANT_SHOTS) return;
+  const date = process.env.SHOT_DATE ?? new Date().toISOString().slice(0, 10);
+  const file = `${OUT}${date}_hub_${name}.png`;
+  await page.screenshot({ path: file, fullPage });
   console.log(`shot  ${file}`);
 }
+
+const shoot = (page, name) => photograph(page, name);
+
 /** The work-list row for one parcel. */
 const row = (page, code) => page.locator('main ul li', { hasText: code });
 /** One manifest cargo row. Scoped to the cargo list because the exception banner repeats the ids
  *  in a second <ul>, and an unscoped `main li` matches both. */
-const cargoRow = (page, id) =>
-  page.locator('main > ul li', { hasText: id.slice(0, 8) }).last();
+const cargoRow = (page, id) => page.locator('main > ul li', { hasText: id.slice(0, 8) }).last();
 
 const page = await browser.newPage({ viewport: PHONE, deviceScaleFactor: 2 });
 
 // --- sign in -----------------------------------------------------------------------------------
+// Two assertions, and they are the reason this script needed rewriting at all. The console used to
+// open on a picker listing every hub, sorted busiest-first, and the proof asserted both. It no longer
+// does: a person is _assigned_ to a hub, `GET /v1/hubs/my-hub` says which, and `/` sends them there.
+//
+// Which is the better product — one screen fewer, and a screen whose first question ("which of these
+// six rooms am I standing in?") is answered by the staffing record rather than by the person — and also
+// removes the ability to open somebody else's hub by clicking it. The proof follows the product.
 await page.goto(`${WEB}/`);
 await settle(page);
-check('the console root sends an anonymous visitor to sign in', page.url().endsWith('/login'), page.url());
+check(
+  'the console root sends an anonymous visitor to sign in',
+  page.url().endsWith('/login'),
+  page.url(),
+);
 
 await page.fill('#email', email);
 await page.fill('#password', password);
 await page.click('button[type=submit]');
-await page.waitForURL(`${WEB}/`, { timeout: 15000 });
-await settle(page);
-eq('the hub operator lands on the hub picker', (await page.locator('h1').innerText()).trim(), 'Choose your hub');
 
-// --- the picker ---------------------------------------------------------------------------------
-const hubs = (await api('/v1/hubs')).body;
-const rowCount = await page.locator('main ul li').count();
-eq('one row per hub, none dropped', rowCount, hubs.length);
-
-// Busiest-first is the claim the screen makes; assert it rather than trust the sort.
-const counts = (await page.locator('main ul li').allInnerTexts()).map((t) => {
-  const m = t.match(/(\d+) waiting/);
-  return m ? Number(m[1]) : -1;
-});
-check('every row states its count', counts.every((n) => n >= 0), JSON.stringify(counts));
-check(
-  'the busiest hub is first, because that is the room you are standing in',
-  counts.every((n, i) => i === 0 || counts[i - 1] >= n),
-  JSON.stringify(counts),
-);
-await shoot(page, 'picker_phone');
-
-const busiest = hubs.reduce((a, b) => (b.countAtHub > a.countAtHub ? b : a));
-await page.locator(`main ul li a[href*="${busiest.code}"]`).first().click();
+// Through `/` — the landing router — and not straight at `/my-hub`, because the redirect *is* the
+// behaviour: an operator who opens the console lands on their work list without touching a picker.
 await page.waitForURL(/\/hubs\//, { timeout: 15000 });
 await settle(page);
-eq('the chosen hub is the one on screen', (await page.locator('h1').innerText()).trim(), busiest.name);
+eq(
+  'the hub operator lands on their own hub, unprompted',
+  new URL(page.url()).pathname,
+  `/hubs/${HUB}`,
+);
+eq(
+  'and the hub it lands on is the one they were assigned to',
+  (await page.locator('h1').innerText()).trim(),
+  hub.name,
+);
+
+// The assignment is the screen's whole premise, so it is worth asserting that the server agrees rather
+// than that the app agrees: a console showing a hub the credential has no claim on would be the worst
+// possible outcome of this change.
+const mine = (await api('/v1/hubs/my-hub')).body;
+eq('the server resolves the same hub', mine.code, HUB);
+eq('and says which role they hold there', mine.staffRole, 'OPERATOR');
+
+// --- the work list --------------------------------------------------------------------------------
+// Navigated to explicitly, because the hub's *overview* is what `/hubs/:code` now is. The picker this
+// proof used to click through used to link straight here, and when the overview was added the proof
+// carried on measuring the overview — four counts and two quick actions — as though it were the list.
+// Every assertion below passed on an empty set, because `every()` on nothing is true.
+await page.goto(`${WEB}/hubs/${HUB}/work`);
+await settle(page);
+eq(
+  'the work list is the screen that was opened',
+  new URL(page.url()).pathname,
+  `/hubs/${HUB}/work`,
+);
 
 // --- exit check 4: gloves on a 5" phone -------------------------------------------------------
 const targets = await page.evaluate(() =>
@@ -226,6 +410,22 @@ const targets = await page.evaluate(() =>
   }),
 );
 check('the hub has parcels to scan', targets.length > 0, `${targets.length} targets`);
+
+// An empty work list makes every `every()` below vacuously true and leaves `biggest` undefined, which
+// is how this file spent one run reporting four passes and then dying on a `TypeError`. A proof that
+// cannot run should say so in the one sentence an operator can act on.
+if (targets.length === 0) {
+  console.error(
+    [
+      '',
+      `  No scan targets at ${WEB}/hubs/${HUB}/work.`,
+      '  Every size assertion below would pass on an empty list, so this stops here rather than',
+      '  reporting a green file. Either the fixture lost its parcels or the hub has none awaiting a scan.',
+    ].join('\n'),
+  );
+  process.exitCode = 1;
+  throw new Error('no scan targets: the work list is empty, so nothing below it can be asserted');
+}
 check(
   'every scan target is at least 48px tall — a gloved thumb, not a cursor',
   targets.every((t) => t.h >= 48),
@@ -252,7 +452,11 @@ const codeSize = await row(page, driven.code)
   .locator('p')
   .first()
   .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-check('the tracking code is at least 16px — read at a belt, not squinted at', codeSize >= 16, `${codeSize}px`);
+check(
+  'the tracking code is at least 16px — read at a belt, not squinted at',
+  codeSize >= 16,
+  `${codeSize}px`,
+);
 await shoot(page, 'worklist_phone');
 
 // --- exit check 2, part 1: the belt gestures, every one clicked in the UI ----------------------
@@ -269,26 +473,43 @@ const BELT = ['sort', 'outbound', 'departed'];
 const seen = [];
 for (const verb of BELT) {
   const button = row(page, driven.code).locator('button');
-  eq(`${driven.code} offers "Scan ${verb}" next`, (await button.innerText()).trim(), `Scan ${verb}`);
+  eq(
+    `${driven.code} offers "Scan ${verb}" next`,
+    (await button.innerText()).trim(),
+    `Scan ${verb}`,
+  );
   seen.push(verb);
   await button.click();
   await page.waitForTimeout(700);
 }
-check('every belt gesture was a distinct button', new Set(seen).size === BELT.length, JSON.stringify(seen));
+check(
+  'every belt gesture was a distinct button',
+  new Set(seen).size === BELT.length,
+  JSON.stringify(seen),
+);
 eq(
   'the parcel is in line-haul, which is what DEPARTED means',
-  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0].status,
+  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0]
+    .status,
   'IN_TRANSIT',
 );
 check(
-  'and it has left this hub\'s work list, because it left this building',
+  "and it has left this hub's work list, because it left this building",
   (await row(page, driven.code).count()) === 0,
 );
 // A parcel past its last hub gesture must read Done, not offer a button that will 409. `stale` is
 // the one that gets walked to the end.
-for (const kind of ['INBOUND', 'SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED']) await otherScan(stale.id, kind);
-await page.click('button[aria-label="Refresh work list"]');
-await page.waitForTimeout(700);
+for (const kind of ['INBOUND', 'SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED'])
+  await otherScan(stale.id, kind);
+// Re-navigated rather than clicking a refresh control.
+//
+// It asked for `button[aria-label="Refresh work list"]`, which this screen has never had: the hub
+// layout's header carries a `Refresh` and it carries no aria-label at all, so the selector matched
+// nothing and the proof died thirty seconds later on a `waitFor`. A proof that clicks a control is also
+// a proof about that control's existence; re-navigating asks the question actually being asked — is the
+// work list correct after the world moved underneath it — and answers it either way.
+await page.goto(`${WEB}/hubs/${HUB}/work`);
+await settle(page);
 check(
   'a parcel with no further hub gesture reads Done, not a button that would 409',
   (await row(page, stale.code).innerText()).includes('Done'),
@@ -297,7 +518,11 @@ check(
 // --- exit check 1: an out-of-order scan, refused on screen -----------------------------------
 // The stale screen, made real. This work list was fetched before the line above walked `lagging` to
 // the far end on another tablet; its button still names a gesture the parcel has long since passed.
-eq('the stale screen still offers the old gesture', (await row(page, lagging.code).locator('button').innerText()).trim(), 'Scan sort');
+eq(
+  'the stale screen still offers the old gesture',
+  (await row(page, lagging.code).locator('button').innerText()).trim(),
+  'Scan sort',
+);
 for (const kind of ['SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED']) await otherScan(lagging.id, kind);
 
 await row(page, lagging.code).locator('button').click();
@@ -317,10 +542,14 @@ check(
 check('the refusal reads as a sentence, not an enum', /Scan refused/.test(bannerText), bannerText);
 await shoot(page, 'refusal_phone');
 
-// Refreshing is the operator's next move, and it must clear the stale row.
-await page.click('button[aria-label="Refresh work list"]');
-await page.waitForTimeout(700);
-check('refreshing clears the stale gesture', (await row(page, lagging.code).innerText()).includes('Done'));
+// A reload is the operator's next move, and it must clear the stale row. Same reasoning as above:
+// re-navigating rather than clicking a control the screen does not have.
+await page.goto(`${WEB}/hubs/${HUB}/work`);
+await settle(page);
+check(
+  'refreshing clears the stale gesture',
+  (await row(page, lagging.code).innerText()).includes('Done'),
+);
 
 // The same parcel through the API, to prove the UI was not merely catching an error of its own.
 eq(
@@ -367,7 +596,10 @@ for (const label of EDGES) {
   await button.click();
   await page.waitForTimeout(600);
 }
-check('the manifest is now Received', (await page.locator('main').innerText()).includes('Received'));
+check(
+  'the manifest is now Received',
+  (await page.locator('main').innerText()).includes('Received'),
+);
 await shoot(page, 'manifest_received_phone');
 
 // --- exit check 2, part 2: the arrival gesture, from the screen that can still see it ----------
@@ -377,7 +609,8 @@ await cargoRow(page, driven.id).locator('button', { hasText: 'Record arrival' })
 await page.waitForTimeout(800);
 eq(
   'recording an arrival moves the parcel to the destination hub',
-  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0].status,
+  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0]
+    .status,
   'AT_DESTINATION_HUB',
 );
 eq('and recording one leaves one', (await api(`/v1/manifests/${manifestId}`)).body.missingCount, 1);
@@ -404,7 +637,10 @@ check(
   /1 of 4 parcels have not arrived/.test(exceptionText),
   exceptionText.slice(0, 240),
 );
-check('the exception names the parcel that has not arrived', exceptionText.includes(absent.id.slice(0, 8)));
+check(
+  'the exception names the parcel that has not arrived',
+  exceptionText.includes(absent.id.slice(0, 8)),
+);
 check(
   'the cargo row offers an arrival rather than only counting the parcel',
   (await cargoRow(page, absent.id).innerText()).includes('Record arrival'),
@@ -419,7 +655,11 @@ check(
 await shoot(page, 'manifest_exception_phone');
 
 const reconcile = page.locator('main button', { hasText: 'Reconcile' });
-eq('reconcile is still offered, because the exception is a state not a verdict', await reconcile.count(), 1);
+eq(
+  'reconcile is still offered, because the exception is a state not a verdict',
+  await reconcile.count(),
+  1,
+);
 await reconcile.click();
 await page.waitForSelector('[role=alert]', { timeout: 10000 });
 check(
@@ -463,18 +703,19 @@ check(
 await shoot(page, 'manifests_phone');
 
 const desk = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-await desk.goto(`${WEB}/`);
-await settle(desk);
-await desk.screenshot({ path: `${OUT}2026-10-09_hub_picker_desktop.png`, fullPage: true });
 await desk.goto(`${WEB}/hubs/${HUB}`);
 await settle(desk);
-await desk.screenshot({ path: `${OUT}2026-10-09_hub_worklist_desktop.png`, fullPage: true });
+await photograph(desk, 'overview_desktop', { fullPage: true });
 check(
   'no horizontal overflow at 1280px either',
   (await desk.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1,
 );
 
 await browser.close();
+
+// Before `client.end()`: the cleanup needs the connection, and a proof that throws partway through
+// should still remove its fixture rather than leaving it for the next run to trip over.
+await cleanupFixture();
 await client.end();
 
 console.log(

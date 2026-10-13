@@ -33,9 +33,11 @@ export class MapController {
     type: NetworkMapDto,
     description:
       'Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from ' +
-      'twenty minutes ago can be rendered as stale rather than believed. Parcels are never ' +
-      'plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of ' +
-      'placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness.',
+      'twenty minutes ago can be rendered as stale rather than believed, and `lastSeenAt` so the ' +
+      'age keeps counting while the board is left open — a duration computed server-side is correct ' +
+      'for one instant and frozen for every instant after it. Parcels are never plotted, and riders ' +
+      'with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ' +
+      'ocean. `generatedAt` lets the client label its own staleness.',
   })
   @ApiErrors()
   getMap(): Promise<NetworkMapDto> {

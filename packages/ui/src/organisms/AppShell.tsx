@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx.ts';
 
 export interface NavItem {
@@ -122,6 +122,30 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  /**
+   * True from `lg` up, where the sidebar is docked rather than a drawer.
+   *
+   * The drawer is `inert` while it is closed, and that must not apply to a docked sidebar: the
+   * breakpoint is a CSS concern, `inert` is an attribute, and only JavaScript crosses between them.
+   * So the shell asks the viewport directly.
+   *
+   * It starts `false` on purpose. The first render therefore has the drawer inert, which is the safe
+   * direction — a keyboard user can fail to reach a closed drawer for one frame, and cannot tab into
+   * a drawer they cannot see.
+   */
+  const [docked, setDocked] = useState(false);
+  useEffect(() => {
+    // Guarded because `matchMedia` is not universally present outside a browser — jsdom does not
+    // implement it, and a component that assumes it exists cannot be rendered by a test at all.
+    // Falling back leaves the drawer inert when closed, which is the safe direction.
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setDocked(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+
   const closeMobile = () => setMobileOpen(false);
 
   return (
@@ -142,6 +166,15 @@ export function AppShell({
       ) : null}
 
       <aside
+        // `inert` while it is off-canvas, and only while it is off-canvas.
+        // `inert` only while the drawer is genuinely off-canvas.
+        //
+        // Translating a drawer off the viewport hides it visually and nothing else: every link inside
+        // stayed in the tab order, so on a 390px screen a keyboard user tabbed through a navigation
+        // they could not see, and a screen reader announced it as visible content. `inert` removes it
+        // from both in one attribute — and `docked` keeps it off a sidebar that is on screen, where
+        // marking it inert would take a real navigation away from a desktop user.
+        inert={!mobileOpen && !docked}
         className={cx(
           'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
           collapsed ? 'w-16' : 'w-64',
@@ -203,14 +236,24 @@ export function AppShell({
             onClick={() => setMobileOpen((v) => !v)}
             className="-ml-1 inline-flex size-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:hidden"
           >
+            {/*
+              The glyph has to follow the state, or the button lies twice: `aria-label` says
+              "Close navigation" while the picture is still three lines, and a user who cannot see
+              the label has no way to tell whether the press did anything.
+            */}
             <svg
               viewBox="0 0 20 20"
               className="size-5"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.75"
+              aria-hidden="true"
             >
-              <path d="M3 6h14M3 10h14M3 14h14" strokeLinecap="round" />
+              {mobileOpen ? (
+                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+              ) : (
+                <path d="M3 6h14M3 10h14M3 14h14" strokeLinecap="round" />
+              )}
             </svg>
           </button>
 

@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Button, FormField, Input, Spinner } from '@zipzap/ui';
+import { BrandMark, Button, FormField, Input, Spinner } from '@zipzap/ui';
 import { anonClient } from '../lib/api.ts';
-import { Logo } from '../lib/brand.tsx';
 
 export const Route = createFileRoute('/login')({
   component: Login,
@@ -39,7 +38,7 @@ function Login() {
   return (
     <main className="flex min-h-screen flex-col justify-center px-5 py-10">
       <div className="mx-auto w-full max-w-sm">
-        <Logo className="size-11" />
+        <BrandMark className="size-11" />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">Hub console</h1>
         <p className="mt-2 text-slate-600">
           For hub staff. Sign in with the account your depot issued you.

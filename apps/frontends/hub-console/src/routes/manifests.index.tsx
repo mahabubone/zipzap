@@ -3,8 +3,8 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Badge, Button, EmptyState, ErrorState, Spinner } from '@zipzap/ui';
 import type { ManifestStatus } from '@zipzap/api-client';
 import { apiClient } from '../lib/api.ts';
-import { useAsync } from '../lib/useAsync.ts';
-import { statusLabel } from '../lib/scans.ts';
+import { useAsync } from '@zipzap/web-kit';
+import { statusLabel } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/manifests/')({
   component: ManifestList,

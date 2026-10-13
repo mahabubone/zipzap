@@ -37,9 +37,23 @@ import { RegisterRiderService } from './modules/rider/register-rider.service.ts'
 import { HubScanService } from './modules/hub/hub-scan.service.ts';
 import { CreateDeliveryService } from './modules/delivery/create-delivery.service.ts';
 import { AdvanceDeliveryService } from './modules/delivery/advance-delivery.service.ts';
+import { DeliveryProofService } from './modules/delivery/delivery-proof.service.ts';
 import { RecordAttemptService } from './modules/delivery/record-attempt.service.ts';
 import { ReturnService } from './modules/returns/return.service.ts';
 import { ReportExceptionService } from './modules/shipment/report-exception.service.ts';
+
+/**
+ * A 1×1 JPEG, for the simulated doorstep photo.
+ *
+ * Real bytes rather than an empty buffer, because `normalisePhoto` decodes the image to read its
+ * dimensions before storing it — a buffer that is not a decodable image is rejected as a malformed
+ * photo, and the simulation would fail on the evidence step instead of on the thing it exists to
+ * exercise.
+ */
+const SIMULATED_PHOTO_BASE64 =
+  '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a' +
+  'HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA' +
+  'AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
 
 export const SCENARIOS = [
   'delivered',
@@ -110,9 +124,60 @@ function simKey(scenario: Scenario): string {
   return `simulate-${scenario}-${randomUUID()}`;
 }
 
+/**
+ * The idempotency key for a proof submission.
+ *
+ * Its own function rather than `simKey(scenario)`, because a key names ONE request body and the
+ * proof submission is a different request from the delivery completion that follows it. Reusing the
+ * scenario's key across both would make the second call a `key_reuse` rejection rather than a
+ * delivery — a collision between two steps of the same simulated journey.
+ */
+function proofKey(jobId: string): string {
+  return `simulate-proof-${jobId}-${randomUUID()}`;
+}
+
 /** BD mobile number, unique per call — riders.phone is unique. */
 function simPhone(): string {
   return `+88017${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+}
+
+/**
+ * A name for the rider this run invents.
+ *
+ * The simulator registered every one of them as `Simulated Rider`, which is correct and useless: the
+ * control tower's tooltip is the one place a person reads a rider's name at a glance, and every dot on
+ * the board opened onto the same two words. Six markers on a map is a picture of a fleet; six identical
+ * names is a picture of a test.
+ *
+ * Drawn without replacement per process, so two riders on the same board never share a name either.
+ * The list is Bangladeshi because the network is, and because a demo that shows `Rider 0` next to
+ * `৳1,250.50` tells a reader which parts of it are real.
+ */
+const SIM_NAMES = [
+  'Nasir Hossain',
+  'Rezaul Karim',
+  'Shahidul Islam',
+  'Mizanur Rahman',
+  'Jahangir Alam',
+  'Bashir Ahmed',
+  'Rafiqul Hasan',
+  'Aminul Haque',
+  'Kamrul Hasan',
+  'Shafiqur Rahman',
+  'Nazmul Haque',
+  'Delwar Hossain',
+] as const;
+
+const usedNames = new Set<string>();
+
+function simName(): string {
+  const available = SIM_NAMES.filter((name) => !usedNames.has(name));
+  // Exhausted — an operator shift with more riders than names on this list is a demo fixture that has
+  // been run an absurd number of times, and repeating is better than failing a simulation.
+  const name =
+    available.length > 0 ? available[Math.floor(Math.random() * available.length)]! : 'Rider';
+  usedNames.add(name);
+  return name;
 }
 
 export async function runSimulation(
@@ -189,7 +254,7 @@ async function drive(
   // A fresh rider every run: unique phone, capacity for the parcel, and the
   // actor id every later step records (scans, attempts, returns, exceptions).
   const rider = await app.get(RegisterRiderService).execute({
-    displayName: 'Simulated Rider',
+    displayName: simName(),
     phone: simPhone(),
     capacity: 3,
   });
@@ -202,6 +267,7 @@ async function drive(
   const createDelivery = app.get(CreateDeliveryService);
   const advanceDelivery = app.get(AdvanceDeliveryService);
   const recordAttempt = app.get(RecordAttemptService);
+  const deliveryProof = app.get(DeliveryProofService);
   const returns = app.get(ReturnService);
   const reportException = app.get(ReportExceptionService);
 
@@ -350,6 +416,40 @@ async function drive(
     }
   };
 
+  /**
+   * Deliver, through the real proof-of-delivery path.
+   *
+   * This scenario used to call `advanceDelivery.complete` directly and it stopped working the day
+   * `complete` began refusing a delivery with no verified evidence — `PROOF_REQUIRED`, which is the
+   * rule working. The simulator had to change, not the rule: a simulation that skipped proof would
+   * have been asserting a delivery path that no rider can actually perform, which is the one thing
+   * a simulator must never do.
+   *
+   * So the full rider flow runs: issue a code, have the customer read it out, photograph the
+   * parcel at the doorstep, submit. Same three calls the mobile app makes.
+   */
+  async function deliver(jobId: string): Promise<void> {
+    const issued = await deliveryProof.issueCode({ jobId, actorId: rider.id });
+    await deliveryProof.submit({
+      jobId,
+      code: issued.code,
+      photoBase64: SIMULATED_PHOTO_BASE64,
+      photoContentType: 'image/jpeg',
+      // Somewhere in Dhaka. `assertPlausibleLocation` rejects a fixed 0,0 or a point outside the
+      // served network, so the fixture has to be a coordinate a real rider could plausibly stand
+      // at rather than a placeholder that reads as "no location captured".
+      latitude: 23.8103,
+      longitude: 90.4125,
+      idempotencyKey: proofKey(jobId),
+      actorId: rider.id,
+    });
+    await advanceDelivery.complete(jobId, {
+      collectedMinor: row.codAmountMinor,
+      idempotencyKey: simKey(scenario),
+      actorId: rider.id,
+    });
+  }
+
   // ---- scenario tails ------------------------------------------------------
   switch (scenario) {
     case 'delivered': {
@@ -361,12 +461,8 @@ async function drive(
       } else {
         jobId = await ensureOutForDelivery();
       }
-      await advanceDelivery.complete(jobId, {
-        collectedMinor: row.codAmountMinor,
-        idempotencyKey: simKey(scenario),
-        actorId: rider.id,
-      });
-      step('delivered, COD collected');
+      await deliver(jobId);
+      step('proof captured, delivered, COD collected');
       break;
     }
 
@@ -384,12 +480,8 @@ async function drive(
           'simulated: customer not home on the first visit',
         );
       }
-      await advanceDelivery.complete(jobId, {
-        collectedMinor: row.codAmountMinor,
-        idempotencyKey: simKey(scenario),
-        actorId: rider.id,
-      });
-      step('delivered on the retry, COD collected');
+      await deliver(jobId);
+      step('proof captured, delivered on the retry, COD collected');
       break;
     }
 

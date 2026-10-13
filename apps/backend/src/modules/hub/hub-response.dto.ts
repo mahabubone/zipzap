@@ -89,4 +89,68 @@ export class HubParcelsViewDto {
 
   @ApiProperty({ type: ParcelPresenceDto, isArray: true })
   parcels!: ParcelPresenceDto[];
+
+  @ApiProperty({
+    description:
+      'When the server built this view, UTC ISO 8601. The list is a snapshot of a belt that moves ' +
+      'while somebody reads it, so a screen that says "last updated" has to mean this rather than the ' +
+      'time the browser painted. The console renders it in Asia/Dhaka, like every other timestamp here.',
+    example: '2026-10-13T04:20:11.512Z',
+  })
+  timestamp!: string;
+}
+
+/** The hub a caller is assigned to, including the role they hold there. */
+export class MyHubDto {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  id!: string;
+
+  @ApiProperty({ example: 'DHK-01' })
+  code!: string;
+
+  @ApiProperty({ example: 'Dhaka Central Hub' })
+  name!: string;
+
+  @ApiProperty({ example: 'DISTRICT_HUB' })
+  kind!: string;
+
+  @ApiProperty({ example: 'dhaka-metro', nullable: true })
+  networkZone!: string | null;
+
+  @ApiProperty({ example: 90.4125, nullable: true })
+  lng!: number | null;
+
+  @ApiProperty({ example: 23.8103, nullable: true })
+  lat!: number | null;
+
+  @ApiProperty({
+    example: 'OPERATOR',
+    enum: ['MANAGER', 'OPERATOR'],
+    description: 'The role this person holds at the hub.',
+  })
+  staffRole!: string;
+}
+
+/** One staff assignment at a hub. */
+export class HubStaffDto {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  id!: string;
+
+  @ApiProperty({ example: 'b2c3d4e5-f6a7-8901-bcde-f12345678901' })
+  userId!: string;
+
+  @ApiProperty({ example: 'c3d4e5f6-a7b8-9012-cdef-123456789012' })
+  hubId!: string;
+
+  @ApiProperty({ example: 'OPERATOR', enum: ['MANAGER', 'OPERATOR'] })
+  role!: string;
+
+  @ApiProperty({ example: '2026-10-10T06:00:00.000Z' })
+  assignedAt!: Date;
+
+  @ApiProperty({ example: 'd4e5f6a7-b8c9-0123-defa-234567890123' })
+  assignedBy!: string;
+
+  @ApiProperty({ example: null, nullable: true })
+  revokedAt!: Date | null;
 }

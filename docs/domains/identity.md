@@ -32,12 +32,13 @@ and a support agent's session must never be usable as an integration credential.
 
 ## Roles
 
-Seven bundles, all defined in `rules/roles.ts`:
+Eight bundles, all defined in `rules/roles.ts`:
 
 | Role                 | Holds                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `PLATFORM_ADMIN`     | every scope; the only role permitted outside a merchant tenancy                          |
 | `OPERATIONS_MANAGER` | reads across merchants; moves parcels; sees that a COD exists, cannot settle it          |
+| `HUB_MANAGER`        | everything a `HUB_OPERATOR` holds, **plus `hub:manage`** — assigns and revokes hub staff |
 | `HUB_OPERATOR`       | scans and manifests; **no money scope at all**                                           |
 | `SUPPORT_AGENT`      | read-only; deliberately **no `cod:read`** — a read is the easiest permission to escalate |
 | `MERCHANT_OWNER`     | every scope within one merchant                                                          |
@@ -194,8 +195,8 @@ merchant:manage   hub:manage      rider:manage
 customer:read     audit:read      support:manage
 ```
 
-Roles bundle these: `PLATFORM_ADMIN`, `OPERATIONS_MANAGER`, `HUB_OPERATOR`, `SUPPORT_AGENT`,
-`MERCHANT_OWNER`, `MERCHANT_OPERATOR`, `RIDER`.
+Roles bundle these: `PLATFORM_ADMIN`, `OPERATIONS_MANAGER`, `HUB_MANAGER`, `HUB_OPERATOR`,
+`SUPPORT_AGENT`, `MERCHANT_OWNER`, `MERCHANT_OPERATOR`, `RIDER`.
 
 ## Scope rules
 

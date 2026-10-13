@@ -224,7 +224,7 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "Email and password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically.",
+          "description": "A handle (email or phone), a password, and optionally which business to act inside. Omit `merchantId` and the first membership is chosen deterministically.",
           "content": {
             "application/json": {
               "schema": {
@@ -328,7 +328,7 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "Email and password, and optionally which business to act inside. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one.",
+          "description": "A handle (email or phone) and a password. Nothing is set as a cookie, so this is the flow for a client with nowhere to keep one — which is exactly the rider app.",
           "content": {
             "application/json": {
               "schema": {
@@ -2494,6 +2494,115 @@
           }
         },
         "summary": "List your shipments, newest first",
+        "tags": [
+          "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
+        ]
+      }
+    },
+    "/v1/shipments/counts": {
+      "get": {
+        "operationId": "ShipmentCountsController_counts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The status breakdown of your own shipments, complete — every status in the machine is present, at zero when you have none. This is the console landing screen's data source; it exists because the paginated list cannot be counted and the control tower's live-counts is the whole network's, not yours.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentCountsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Count your shipments by status",
         "tags": [
           "shipments"
         ],
@@ -9513,7 +9622,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift.",
+            "description": "The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. `timestamp` is the instant the view was built, so a screen can say how old its numbers are.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9599,6 +9708,462 @@
         ],
         "x-required-scopes": [
           "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/v1/hubs/my-hub": {
+      "get": {
+        "operationId": "HubStaffController_myHub",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The hub the caller works at, including the role they hold there. A person between hubs gets a 404 — that is a normal state, not an authentication failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyHubDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The hub this person is assigned to",
+        "tags": [
+          "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/v1/hubs/{hubCode}/staff": {
+      "get": {
+        "operationId": "HubStaffController_list",
+        "parameters": [
+          {
+            "name": "hubCode",
+            "required": true,
+            "in": "path",
+            "description": "The hub whose staff are listed.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every person currently assigned to this hub, oldest assignment first. Only a manager at this hub (or a platform admin) may read it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HubStaffDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Staff assigned to one hub",
+        "tags": [
+          "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "HubStaffController_assign",
+        "parameters": [
+          {
+            "name": "hubCode",
+            "required": true,
+            "in": "path",
+            "description": "The hub to assign the person to.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The user ID and role for the new hub assignment.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignStaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The assignment as stored. A person already assigned elsewhere is refused by the database (one active hub per person). Only a manager at this hub (or platform admin) may assign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubStaffDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Assign a person to a hub",
+        "tags": [
+          "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:manage"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
+    },
+    "/v1/hubs/{hubCode}/staff/{userId}": {
+      "delete": {
+        "operationId": "HubStaffController_revoke",
+        "parameters": [
+          {
+            "name": "hubCode",
+            "required": true,
+            "in": "path",
+            "description": "The hub to revoke the assignment from.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "The person whose assignment is revoked.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The assignment is ended (revoked_at set, row kept for history). A person with no active assignment at this hub gets a 404, not a 403 — a 403 would confirm they once worked here."
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke a person assignment at a hub",
+        "tags": [
+          "hubs"
+        ],
+        "x-required-scopes": [
+          "hub:manage"
         ],
         "security": [
           {
@@ -9843,7 +10408,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness.",
+            "description": "Hubs and rider positions for the map, each rider carrying `staleSeconds` so a dot from twenty minutes ago can be rendered as stale rather than believed, and `lastSeenAt` so the age keeps counting while the board is left open — a duration computed server-side is correct for one instant and frozen for every instant after it. Parcels are never plotted, and riders with no ping yet are counted in `ridersWithoutPosition` instead of placed at (0,0) in the ocean. `generatedAt` lets the client label its own staleness.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10182,11 +10747,121 @@
           }
         ]
       }
+    },
+    "/v1/riders/{riderId}/earnings": {
+      "get": {
+        "operationId": "RiderEarningsController_earnings",
+        "parameters": [
+          {
+            "name": "riderId",
+            "required": true,
+            "in": "path",
+            "description": "The rider whose earnings are requested.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rider’s total earnings summed from completed deliveries, labelled with an `asOf` timestamp so the rider app can detect stale cached figures.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiderEarningsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A rider's server-truthful earnings projection",
+        "tags": [
+          "riders"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ]
+      }
     }
   },
   "info": {
     "title": "ZipZap API",
-    "description": "Logistics operating system for e-commerce fulfillment and last-mile delivery.\n\nBangladesh first. Models a real courier business end to end: order, pricing, pickup,\norigin hub, line-haul, destination hub, last-mile, COD, settlement.\n\n## Credentials\n\nEvery `/v1` endpoint except `auth/login` and the public `/track` routes needs a\ncredential. Two forms work on the same `Authorization` header:\n\n- `Authorization: Bearer <session-token>` — a session from `POST /v1/auth/login`.\n- `Authorization: ApiKey <key-id>.<secret>` — a machine principal.\n\nA browser signed in through a ZipZap console sends `Cookie: zipzap_session=<token>`\ninstead; see `docs/api/auth.md`.\n\n## What an operation requires\n\n`x-required-scopes` lists the scope(s) the operation enforces, taken from its own\n`ScopeGuard` rather than restated by hand. `x-rate-limit` names the bucket it draws from\nand whether that bucket closes or opens when Redis is unreachable.\n\n## Errors\n\nEvery failure is the §87 envelope described by `ErrorEnvelopeDto`: `type`, `title`,\n`status`, `code`, `detail`, `request_id`. Switch on `code`; `title` and `detail` are\nprose and may be reworded. Nothing else is ever returned as an error body.\n\n## Money\n\nInteger minor units (poisha) plus a currency. Per-row amounts are JSON numbers with\n`type: integer`; aggregates are decimal strings, because a sum can exceed what a JSON\nnumber represents exactly. Never a float — see `docs/ADR/0009-money-representation.md`.\n\n## Idempotency\n\nMutations listed in `docs/api/idempotency.md` require an `Idempotency-Key` header.\nReplaying the same key returns the original result rather than applying the mutation\ntwice.",
+    "description": "Logistics operating system for e-commerce fulfillment and last-mile delivery.\n\nModels a real courier business end to end: order, pricing, pickup,\norigin hub, line-haul, destination hub, last-mile, COD, settlement.\n\n## Credentials\n\nEvery `/v1` endpoint except `auth/login` and the public `/track` routes needs a\ncredential. Two forms work on the same `Authorization` header:\n\n- `Authorization: Bearer <session-token>` — a session from `POST /v1/auth/login`.\n- `Authorization: ApiKey <key-id>.<secret>` — a machine principal.\n\nA browser signed in through a ZipZap console sends `Cookie: zipzap_session=<token>`\ninstead; see `docs/api/auth.md`.\n\n## What an operation requires\n\n`x-required-scopes` lists the scope(s) the operation enforces, taken from its own\n`ScopeGuard` rather than restated by hand. `x-rate-limit` names the bucket it draws from\nand whether that bucket closes or opens when Redis is unreachable.\n\n## Errors\n\nEvery failure is the §87 envelope described by `ErrorEnvelopeDto`: `type`, `title`,\n`status`, `code`, `detail`, `request_id`. Switch on `code`; `title` and `detail` are\nprose and may be reworded. Nothing else is ever returned as an error body.\n\n## Money\n\nInteger minor units (poisha) plus a currency. Per-row amounts are JSON numbers with\n`type: integer`; aggregates are decimal strings, because a sum can exceed what a JSON\nnumber represents exactly. Never a float — see `docs/ADR/0009-money-representation.md`.\n\n## Idempotency\n\nMutations listed in `docs/api/idempotency.md` require an `Idempotency-Key` header.\nReplaying the same key returns the original result rather than applying the mutation\ntwice.",
     "version": "1.0",
     "contact": {}
   },
@@ -10428,6 +11103,18 @@
             "example": "9f8e7d6c-5b4a-3210-fedc-ba9876543210",
             "description": "The user behind a human principal, or the API key behind a machine one."
           },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Ayesha Begum",
+            "description": "A human-readable name for a human principal, so a console can render who is signed in without showing a UUID. Falls back to the login email when no display name is set. Always null for a machine principal — an API key has no person to name."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "example": "ayesha@ayesha.test",
+            "description": "The login email for a human principal. Present so a console can render an identity — a name, an email, and an avatar initial derived from them — without a second round-trip. Null for a machine principal."
+          },
           "merchantId": {
             "type": "string",
             "nullable": true,
@@ -10469,6 +11156,8 @@
         "required": [
           "kind",
           "subjectId",
+          "displayName",
+          "email",
           "merchantId",
           "merchantIds",
           "scopes",
@@ -10479,11 +11168,11 @@
       "LoginDto": {
         "type": "object",
         "properties": {
-          "email": {
+          "identifier": {
             "type": "string",
-            "format": "email",
+            "minLength": 3,
             "example": "owner@example.com",
-            "description": "The address the account is registered under."
+            "description": "The handle the account is registered under — an email address for a merchant, or a phone number for a rider. A rider is issued a SIM card, not a mailbox, and does not know or care which kind of identifier their depot gave them, so there is one field and the server works out which it is. Phone numbers are accepted in any format a person writes them: `01712345678`, `+8801712345678`, `+880 1712-345678` are one account, not three."
           },
           "password": {
             "type": "string",
@@ -10498,7 +11187,7 @@
           }
         },
         "required": [
-          "email",
+          "identifier",
           "password"
         ]
       },
@@ -10901,6 +11590,7 @@
                 "tracking:read",
                 "hub:read",
                 "hub:scan",
+                "hub:manage",
                 "rider:sync",
                 "pickup:create",
                 "pickup:read",
@@ -10954,6 +11644,7 @@
                 "tracking:read",
                 "hub:read",
                 "hub:scan",
+                "hub:manage",
                 "rider:sync",
                 "pickup:create",
                 "pickup:read",
@@ -11281,6 +11972,44 @@
         "required": [
           "data",
           "pagination"
+        ]
+      },
+      "ShipmentCountsDto": {
+        "type": "object",
+        "properties": {
+          "byStatus": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Your shipments per status. Every status in the machine is present, at zero when it has none, so a caller never has to know that an absent key means \"none\".",
+            "example": {
+              "CREATED": 2,
+              "IN_TRANSIT": 1,
+              "DELIVERED": 3
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Every shipment you own, in any status.",
+            "example": 6
+          },
+          "todayNew": {
+            "type": "number",
+            "description": "Shipments you created today, Asia/Dhaka calendar day. Counted in the same statement as the rest, so the two cannot disagree.",
+            "example": 2
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Snapshot instant, UTC ISO 8601.",
+            "example": "2026-10-13T04:20:00.000Z"
+          }
+        },
+        "required": [
+          "byStatus",
+          "total",
+          "todayNew",
+          "timestamp"
         ]
       },
       "TimelineEntryDto": {
@@ -14121,11 +14850,145 @@
             "items": {
               "$ref": "#/components/schemas/ParcelPresenceDto"
             }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "When the server built this view, UTC ISO 8601. The list is a snapshot of a belt that moves while somebody reads it, so a screen that says \"last updated\" has to mean this rather than the time the browser painted. The console renders it in Asia/Dhaka, like every other timestamp here.",
+            "example": "2026-10-13T04:20:11.512Z"
           }
         },
         "required": [
           "hub",
-          "parcels"
+          "parcels",
+          "timestamp"
+        ]
+      },
+      "MyHubDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "code": {
+            "type": "string",
+            "example": "DHK-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Dhaka Central Hub"
+          },
+          "kind": {
+            "type": "string",
+            "example": "DISTRICT_HUB"
+          },
+          "networkZone": {
+            "type": "string",
+            "nullable": true,
+            "example": "dhaka-metro"
+          },
+          "lng": {
+            "type": "number",
+            "nullable": true,
+            "example": 90.4125
+          },
+          "lat": {
+            "type": "number",
+            "nullable": true,
+            "example": 23.8103
+          },
+          "staffRole": {
+            "type": "string",
+            "example": "OPERATOR",
+            "enum": [
+              "MANAGER",
+              "OPERATOR"
+            ],
+            "description": "The role this person holds at the hub."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "networkZone",
+          "lng",
+          "lat",
+          "staffRole"
+        ]
+      },
+      "HubStaffDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+          },
+          "hubId": {
+            "type": "string",
+            "example": "c3d4e5f6-a7b8-9012-cdef-123456789012"
+          },
+          "role": {
+            "type": "string",
+            "example": "OPERATOR",
+            "enum": [
+              "MANAGER",
+              "OPERATOR"
+            ]
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-10T06:00:00.000Z"
+          },
+          "assignedBy": {
+            "type": "string",
+            "example": "d4e5f6a7-b8c9-0123-defa-234567890123"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "hubId",
+          "role",
+          "assignedAt",
+          "assignedBy",
+          "revokedAt"
+        ]
+      },
+      "AssignStaffDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "description": "The user id to assign. Must be an existing user."
+          },
+          "role": {
+            "enum": [
+              "MANAGER",
+              "OPERATOR"
+            ],
+            "type": "string",
+            "example": "OPERATOR",
+            "description": "The staff role at the hub. MANAGER may assign/revoke staff; OPERATOR scans and reconciles only."
+          }
+        },
+        "required": [
+          "userId",
+          "role"
         ]
       },
       "LiveShipmentCountsDto": {
@@ -14887,7 +15750,13 @@
           "staleSeconds": {
             "type": "number",
             "example": 45,
-            "description": "Seconds since the rider’s last ping. 0 is live."
+            "description": "Seconds since the rider’s last ping, at the instant `generatedAt` was taken. 0 is live. Use `lastSeenAt` for anything that has to keep counting while the client sits open."
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-13T04:18:07.221Z",
+            "description": "When the rider last reported a position, UTC ISO 8601. Null only for a rider with no ping yet, which the response also counts in `ridersWithoutPosition`. Sent alongside `staleSeconds` because a duration is true for one instant and frozen for every instant after."
           },
           "currentJobId": {
             "type": "string",
@@ -14902,6 +15771,7 @@
           "lng",
           "lat",
           "staleSeconds",
+          "lastSeenAt",
           "currentJobId"
         ]
       },
@@ -15245,6 +16115,38 @@
         "required": [
           "pickups",
           "deliveries"
+        ]
+      },
+      "RiderEarningsDto": {
+        "type": "object",
+        "properties": {
+          "totalEarningsMinor": {
+            "type": "integer",
+            "example": 250000,
+            "description": "Total earnings in integer minor units (poisha), summed from completed deliveries. Projection from delivery count × base fee; never stored, rebuilt on every read."
+          },
+          "currency": {
+            "type": "string",
+            "example": "BDT",
+            "description": "Currency of the earnings."
+          },
+          "completedDeliveries": {
+            "type": "number",
+            "example": 5,
+            "description": "Count of completed deliveries contributing to this total."
+          },
+          "asOf": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-10-12T18:53:25.342Z",
+            "description": "Server timestamp when this projection was computed. Use this to detect stale client-side cached figures."
+          }
+        },
+        "required": [
+          "totalEarningsMinor",
+          "currency",
+          "completedDeliveries",
+          "asOf"
         ]
       }
     }

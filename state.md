@@ -14,7 +14,7 @@ this file is the bug. Sourced from [`ROADMAP.md`](ROADMAP.md), [`docs/product/vi
 ## 1. Full picture — the thing being built
 
 **ZipZap** is a logistics operating system for e-commerce merchants, riders, hubs and delivery
-operations. Bangladesh first. It models a real courier business end to end.
+operations. It models a real courier business end to end.
 
 ```
 merchant creates order → pricing → pickup requested → rider assigned → rider picks up
@@ -193,14 +193,17 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ### Environment debt — worth fixing, nobody has
 
-- **23 commits unpushed.** `origin` exists now (`git@github.com:mahabububone/zipzap.git`) — the old
-  "no git remote" note was itself stale — but nothing since the enrichment branch has been pushed.
+- **The GitHub repo is `PRIVATE`.** `origin` is `git@github.com:mahabubone/zipzap.git`. Everything
+  described in this file is invisible to anyone who is not you, which defeats the point of the
+  exercise. `gh repo edit --visibility public` is the highest-ROI command available to this repo.
+- **[OLD note, superseded]** commits were unpushed at one point. `origin` is configured and the
+  branch tracks it. **Push before sharing a link.**
 - **`ROADMAP.md` line "apps/ holds `backend` only" is stale**, and `docs/product/surfaces.md`'s
-  surface list is now honest but mostly unbuilt: `control-tower`, `hub-console`,
-  `support-console`, `admin-console` and `developer-portal` have no package.
+  surface list is now honest but mostly unbuilt: `support-console`, `admin-console`,
+  `developer-portal` and `apps/desktop` have no package. `control-tower` and `hub-console` exist.
 - **Phase 2's section boxes are marked stale in ROADMAP itself** and still need an audit.
-- **113 unticked roadmap boxes**, concentrated in surfaces (7 of 10 unbuilt), security (6, none
-  started), observability dashboards/alerts, and load-test phases.
+- **113 unticked roadmap boxes**, concentrated in surfaces, security (6, none started),
+  observability dashboards/alerts, and load-test phases.
 
 ---
 
@@ -208,10 +211,52 @@ Built: landing · login · control tower · shipments list · shipment detail ·
 
 ```bash
 export PATH="$HOME/.local/share/fnm/node-versions/v24.16.0/installation/bin:$PATH"
-pnpm verify          # format:check && typecheck && test — must be green
+pnpm infra:up        # postgres :5433 · redis :6381 · nats :4224 (ports are in .env)
+pnpm db:migrate
+pnpm verify          # boundaries:check && format:check && typecheck && test — must be green
+pnpm test:integration   # 106 assertions against real Postgres/Redis/NATS
 ```
 
-Last run: **1188 backend tests across 51 files**, plus the api-client suite. Green.
+Last run: **2,396 unit tests across 115 files** — backend 1,913 · ui 338 · rider 93 ·
+api-client 36 · control-tower 8 · merchant-web 8 — plus **106 integration assertions**. Green.
+
+> An earlier version of this file claimed 1,188 across 51 files. It was stale, and it
+> understated the suite by 60%. Corrected 2026-10-12 — if you are comparing numbers against
+> older notes, this line is the one that moved.
+
+> **`pnpm test:integration` had never run.** CI invokes it, but no package defined the turbo task,
+> so turbo refused to dispatch it. Running it exposed three hand-wired DI graphs that had drifted
+> out of date and two production bugs — see [ADR-0017](docs/ADR/0017-integration-test-harness.md).
+
+## Shots — the visual memory, and how to regenerate it
+
+`shots/` holds **40 screenshots across 5 surfaces**, every one a real route against a real
+database. They are **generated, not hand-curated**: `pnpm shots` rebuilds the lot.
+
+```bash
+eval "$(pnpm db:seed | sed -n '/^export /p')"   # every login, sourceable — no transcription
+pnpm seed:shots                                   # parcels driven through real lifecycles
+pnpm shots                                        # web · hub · ops · site · mobile
+```
+
+`seed:shots` advances six parcels through six different end states (DELIVERED, DELIVERED-after-a-
+failed-attempt, RETURN_INITIATED, RETURNED, DAMAGED, LOST) using the same services the API uses,
+then runs a settlement from create through approve, initiate and confirm. It is what makes the
+screenshots show a product rather than an empty state — and a screenshot of an empty table proves
+nothing, because it looks identical whether the feature works or not.
+
+Two things about this that were fixed rather than worked around, because both recur:
+
+- **The seed could not produce an operations account.** `network:read` is an OPERATIONS_MANAGER
+  scope and MERCHANT_OWNER deliberately does not hold it, so the control tower was unreachable to
+  anyone seeding a dev environment — and a shots run using the merchant photographed a
+  PERMISSION_DENIED box. `seed.mjs` now mints `network+<tag>@ayesha.test`.
+- **A shots script that only works once is useless.** The notification script assumed a fresh
+  database and failed its own assertion on the second run of the day with `switch 1 never became
+false` — which reads like a regression. It now restores the known state before asserting.
+
+All five app servers must be running for `pnpm shots`. The Vite dev servers pick non-default ports
+when 5173 is taken; pass the actual port as `WEB_URL` / `CONSOLE_URL` / `TRACKING_URL` / `APP_URL`.
 
 Two scripts assert what the terminal cannot:
 

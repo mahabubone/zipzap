@@ -33,7 +33,11 @@ function check(label, ok, detail = '') {
   }
 }
 function eq(label, actual, expected) {
-  check(label, JSON.stringify(actual) === JSON.stringify(expected), `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`);
+  check(
+    label,
+    JSON.stringify(actual) === JSON.stringify(expected),
+    `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`,
+  );
 }
 
 /** AsyncStorage's exact two-method shape. Nothing more, so the port cannot rot. */
@@ -87,7 +91,11 @@ const sameInstant = new OfflineQueue(memoryStorage(), 100);
 const t = new Date('2026-10-09T09:00:00.000Z');
 await sameInstant.append(scan(B), t);
 await sameInstant.append(scan(A), t);
-eq('a createdAt tie breaks on deviceSequence', (await sameInstant.outbound()).map((c) => c.payload.shipmentId), [B, A]);
+eq(
+  'a createdAt tie breaks on deviceSequence',
+  (await sameInstant.outbound()).map((c) => c.payload.shipmentId),
+  [B, A],
+);
 
 // A restart must not reissue a sequence — that is the whole dedupe story.
 const storage = memoryStorage();
@@ -114,8 +122,16 @@ try {
 } catch (e) {
   refused = e;
 }
-check('the eleventh is refused, not silently dropped', refused instanceof QueueFullError, String(refused));
-eq('and the refusal names the numbers the rider needs', refused.message, 'Offline queue is full (10/10). Find a signal to sync.');
+check(
+  'the eleventh is refused, not silently dropped',
+  refused instanceof QueueFullError,
+  String(refused),
+);
+eq(
+  'and the refusal names the numbers the rider needs',
+  refused.message,
+  'Offline queue is full (10/10). Find a signal to sync.',
+);
 eq('the refused command left no trace to later lose', (await capped.pending()).length, 10);
 
 // ---------------------------------------------------------------- reconciliation
@@ -130,21 +146,45 @@ await recon.reconcile([
   { kind: 'applied', deviceSequence: c1.deviceSequence },
   { kind: 'rejected', deviceSequence: c2.deviceSequence, reason: 'shipment is CANCELLED' },
 ]);
-eq('settled commands leave the pending list', (await recon.pending()).map((c) => c.deviceSequence), [c3.deviceSequence]);
-eq('the rejection reason is kept, because it is the rider`s only clue', (await recon.settled()).map((s) => s.kind), ['applied', 'rejected']);
-eq('with the reason intact', (await recon.settled()).map((s) => s.reason), [undefined, 'shipment is CANCELLED']);
+eq(
+  'settled commands leave the pending list',
+  (await recon.pending()).map((c) => c.deviceSequence),
+  [c3.deviceSequence],
+);
+eq(
+  'the rejection reason is kept, because it is the rider`s only clue',
+  (await recon.settled()).map((s) => s.kind),
+  ['applied', 'rejected'],
+);
+eq(
+  'with the reason intact',
+  (await recon.settled()).map((s) => s.reason),
+  [undefined, 'shipment is CANCELLED'],
+);
 
 // A batch the server refused outright: nothing was ruled on, so nothing may be dropped.
 await recon.reconcile([], true);
-eq('a cap-refused batch keeps every command for the retry', (await recon.pending()).map((c) => c.deviceSequence), [c3.deviceSequence]);
+eq(
+  'a cap-refused batch keeps every command for the retry',
+  (await recon.pending()).map((c) => c.deviceSequence),
+  [c3.deviceSequence],
+);
 
 // A `duplicate` for a sequence this queue never minted cannot delete a command it still owes.
 await recon.reconcile([{ kind: 'duplicate', deviceSequence: 999, serverSaid: 'already applied' }]);
-eq('an unrecognised duplicate does not delete a pending command', (await recon.pending()).map((c) => c.deviceSequence), [c3.deviceSequence]);
+eq(
+  'an unrecognised duplicate does not delete a pending command',
+  (await recon.pending()).map((c) => c.deviceSequence),
+  [c3.deviceSequence],
+);
 
 // A corrupt blob must not brick the app.
 const corrupt = new OfflineQueue(memoryStorage({ 'zipzap.rider.offline.v1': '{{{' }), 100);
-eq('a corrupt store reads as an empty queue rather than throwing', (await corrupt.pending()).length, 0);
+eq(
+  'a corrupt store reads as an empty queue rather than throwing',
+  (await corrupt.pending()).length,
+  0,
+);
 
 // ---------------------------------------------------------------- against the real server
 if (!KEY_ID || !SECRET || !RIDER_ID) {
@@ -191,7 +231,11 @@ if (!KEY_ID || !SECRET || !RIDER_ID) {
   // Re-queue the same work, as a retry of the same day would.
   for (let i = 0; i < 12; i++) await live.append(scan(parcelId), new Date(Date.now() + i * 1000));
   const retry = await send();
-  check('a re-queued day comes back as duplicates, not fresh work', retry.body.results.every((r) => r.kind === 'duplicate'), JSON.stringify(retry.body.results.slice(0, 2)));
+  check(
+    'a re-queued day comes back as duplicates, not fresh work',
+    retry.body.results.every((r) => r.kind === 'duplicate'),
+    JSON.stringify(retry.body.results.slice(0, 2)),
+  );
   await live.reconcile(retry.body.results);
   eq('and still empties', (await live.pending()).length, 0);
 
@@ -203,16 +247,26 @@ if (!KEY_ID || !SECRET || !RIDER_ID) {
     // reporting a *different* command's outcome — a protocol violation by the device, not a bug. A
     // real phone gets this for free because `nextSequence` is persisted and monotonic.
     const stale = new OfflineQueue(
-      memoryStorage({ 'zipzap.rider.offline.v1': JSON.stringify({ nextSequence: 5000, pending: [], settled: [] }) }),
+      memoryStorage({
+        'zipzap.rider.offline.v1': JSON.stringify({ nextSequence: 5000, pending: [], settled: [] }),
+      }),
       100,
     );
     await stale.append(scan(staleParcel, 'OUT_FOR_DELIVERY'));
     const ruled = await post(await stale.outbound());
     eq('the stale scan is refused by the server', ruled.body.results[0].kind, 'rejected');
-    check('with a reason the rider can read', /CANCELLED/.test(ruled.body.results[0].reason), ruled.body.results[0].reason);
+    check(
+      'with a reason the rider can read',
+      /CANCELLED/.test(ruled.body.results[0].reason),
+      ruled.body.results[0].reason,
+    );
     await stale.reconcile(ruled.body.results);
     eq('and the device drops it from pending', (await stale.pending()).length, 0);
-    eq('keeping it in the settled list, where the rider can read why', (await stale.settled()).length, 1);
+    eq(
+      'keeping it in the settled list, where the rider can read why',
+      (await stale.settled()).length,
+      1,
+    );
   }
 
   // The collision, pinned deliberately: the same (rider, sequence) with a DIFFERENT parcel is

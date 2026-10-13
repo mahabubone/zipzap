@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { money } from '../../dist/common/money.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
+import { buildHubScan, buildPricingService } from './harness.ts';
 
 import { CreateShipmentService } from '../../dist/modules/shipment/create-shipment.service.js';
 import { ShipmentRepository } from '../../dist/modules/shipment/shipment.repository.js';
@@ -29,9 +30,6 @@ import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { AppendTrackingEventService } from '../../dist/modules/tracking/append-tracking-event.service.js';
 import { TrackingEventEntity } from '../../dist/modules/tracking/tracking-event.entity.js';
 import { PublicTimelineEntity } from '../../dist/modules/tracking/public-timeline.entity.js';
-import { PricingService } from '../../dist/modules/pricing/pricing.service.js';
-import { PricingRepository } from '../../dist/modules/pricing/pricing.repository.js';
-import { PricingVersionEntity } from '../../dist/modules/pricing/pricing-version.entity.js';
 import { EnsureCodRecordService } from '../../dist/modules/cod/ensure-cod-record.service.js';
 import { CodRecordEntity } from '../../dist/modules/cod/cod-record.entity.js';
 import { NetworkService } from '../../dist/modules/network/network.service.js';
@@ -52,6 +50,7 @@ import { RecordAttemptService } from '../../dist/modules/delivery/record-attempt
 import { DeliveryRepository } from '../../dist/modules/delivery/delivery.repository.js';
 import { DeliveryJobEntity } from '../../dist/modules/delivery/delivery.entity.js';
 import { DeliveryAttemptEntity } from '../../dist/modules/delivery/delivery-attempt.entity.js';
+import { DeliveryProofEntity } from '../../dist/modules/delivery/delivery-proof.entity.js';
 import { ReturnService } from '../../dist/modules/returns/return.service.js';
 import { ReturnRequestRepository } from '../../dist/modules/returns/return-request.repository.js';
 import { ReturnRequestEntity } from '../../dist/modules/returns/return-request.entity.js';
@@ -68,6 +67,9 @@ let pickupDb: DataSource;
 let riderDb: DataSource;
 let deliveryDb: DataSource;
 let returnsDb: DataSource;
+let pricing: Awaited<ReturnType<typeof buildPricingService>>;
+let hubScanHarness: Awaited<ReturnType<typeof buildHubScan>>;
+let networkDb: DataSource;
 
 let createShipment: CreateShipmentService;
 let requestPickup: RequestPickupService;
@@ -101,10 +103,20 @@ before(async () => {
   deliveryDb = await connectModuleDataSource('delivery', [
     DeliveryJobEntity,
     DeliveryAttemptEntity,
+    // Registered alongside the other two because completing a delivery writes a proof row.
+    // Omitting it did not fail loudly at connect time — it failed on first use, with
+    // `No metadata for "DeliveryProofEntity" was found`, in whichever test happened to
+    // deliver a parcel first. A module connection that is missing an entity is a latent
+    // failure wherever that entity is touched.
+    DeliveryProofEntity,
   ]);
   returnsDb = await connectModuleDataSource('returns', [ReturnRequestEntity]);
-  const pricingDb = await connectModuleDataSource('pricing', [PricingVersionEntity]);
+  // Wired once in harness.ts so a PricingService constructor change is one edit here
+  // rather than a silent runtime `undefined` in four suites.
+  const pricing = await buildPricingService();
   const networkDb = await connectModuleDataSource('network', [ServiceAreaEntity]);
+  const hubScanHarness = await buildHubScan();
+  hubScan = hubScanHarness.service;
 
   const tracking = new AppendTrackingEventService();
   const shipmentRepo = new ShipmentRepository();
@@ -114,7 +126,7 @@ before(async () => {
     shipmentDb,
     shipmentRepo,
     tracking,
-    new PricingService(pricingDb, new PricingRepository()),
+    pricing.service,
     new EnsureCodRecordService(codDb),
     new NetworkService(networkDb),
   );
@@ -129,7 +141,7 @@ before(async () => {
     advance,
   );
   scanParcel = new ScanParcelService(pickupDb, pickupsRepo, tracking, advance);
-  hubScan = new HubScanService(await connectModuleDataSource('hub', []), advance, tracking);
+
   const deliveryRepo = new DeliveryRepository();
   createDelivery = new CreateDeliveryService(deliveryDb, deliveryRepo);
   advanceDelivery = new AdvanceDeliveryService(
@@ -165,6 +177,15 @@ after(async () => {
   await riderDb?.destroy();
   await deliveryDb?.destroy();
   await returnsDb?.destroy();
+  // The pricing and network connections were opened in `before` and never closed. They
+  // are module-scoped DataSources, so a leaked one holds a pool open until the process
+  // exits — harmless for one file, but these suites run in the same runner as 15 others.
+  await pricing?.db.destroy();
+  await pricing?.merchantDb.destroy();
+  await networkDb?.destroy();
+  await hubScanHarness?.hubDb.destroy();
+  await hubScanHarness?.shipmentDb.destroy();
+  await hubScanHarness?.trackingDb.destroy();
 });
 
 describeIfDb('the failure story — refused, retried, refused, returned', () => {

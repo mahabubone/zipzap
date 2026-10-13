@@ -30,9 +30,7 @@ const { sendAttempt } = await import('../dist/modules/merchant/webhook-sender.se
 let failures = 0;
 function check(label, ok, detail = '') {
   if (!ok) failures++;
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`,
-  );
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,7 +125,11 @@ check(
   /^t=\d+,v1=[0-9a-f]{64}$/.test(String(got.signature)),
   `got ${got.signature}`,
 );
-check('a delivery id rides along for deduplication', typeof got.delivery === 'string', String(got.delivery));
+check(
+  'a delivery id rides along for deduplication',
+  typeof got.delivery === 'string',
+  String(got.delivery),
+);
 check('the event name rides along', got.event === 'shipment.delivered', String(got.event));
 check('the attempt number rides along', got.attempt === '1', String(got.attempt));
 
@@ -140,7 +142,10 @@ check(
   'the body on the wire is the payload, byte for byte',
   got.rawBody === JSON.stringify(PAYLOAD),
 );
-check('the payload carries integer minor units, never a decimal', typeof parsed.collectedMinor === 'number' && Number.isInteger(parsed.collectedMinor));
+check(
+  'the payload carries integer minor units, never a decimal',
+  typeof parsed.collectedMinor === 'number' && Number.isInteger(parsed.collectedMinor),
+);
 
 // ─── 3. the warnings the docs give are the failures that actually happen ───
 // The docs warn that re-serialising breaks verification. This proves WHY, because the reason matters:
@@ -148,12 +153,21 @@ check('the payload carries integer minor units, never a decimal', typeof parsed.
 // that actually break are typed ones — a Go struct, a Java class, a PHP assoc array — whose field
 // order comes from the type declaration, not the wire. Whitespace and float formatting break it too.
 const reserialised = [
-  ['reordered by a typed model (Go struct / PHP array)', JSON.stringify({ ...parsed, id: 'dlv_stranger0001' }, Object.keys(parsed).reverse())],
+  [
+    'reordered by a typed model (Go struct / PHP array)',
+    JSON.stringify({ ...parsed, id: 'dlv_stranger0001' }, Object.keys(parsed).reverse()),
+  ],
   ['pretty-printed', JSON.stringify(parsed, null, 2)],
-  ['float-formatted (125050 -> 125050.0)', got.rawBody.replace('"collectedMinor":125050', '"collectedMinor":125050.0')],
+  [
+    'float-formatted (125050 -> 125050.0)',
+    got.rawBody.replace('"collectedMinor":125050', '"collectedMinor":125050.0'),
+  ],
 ];
 for (const [how, body] of reserialised) {
-  check(`re-serialising the body — ${how} — does NOT verify`, !verifyFromDocs(SECRET, got.signature, body));
+  check(
+    `re-serialising the body — ${how} — does NOT verify`,
+    !verifyFromDocs(SECRET, got.signature, body),
+  );
 }
 check(
   'the reason is not JavaScript: parse + stringify round-trips byte-identically here',
@@ -208,15 +222,10 @@ check(
 check(
   'the signature is deterministic: the same bytes sign to the same hex',
   createHmac('sha256', SECRET)
-    .update(
-      `${/^t=(\d+)/.exec(String(got.signature))[1]}.${got.rawBody}`,
-      'utf8',
-    )
+    .update(`${/^t=(\d+)/.exec(String(got.signature))[1]}.${got.rawBody}`, 'utf8')
     .digest('hex') === /v1=([0-9a-f]+)/.exec(String(got.signature))[1],
 );
 
 server.close();
-console.log(
-  `\nstage 6b signature: ${failures === 0 ? 'all assertions ok' : `${failures} FAILED`}`,
-);
+console.log(`\nstage 6b signature: ${failures === 0 ? 'all assertions ok' : `${failures} FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

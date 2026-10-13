@@ -18,7 +18,10 @@
  * unknown field is what makes "the spec describes the request" a fact rather than a hope.
  *
  * Run: node apps/backend/scripts/verify-openapi-roundtrip.mjs
- * Env:  PROVE_BASE (default http://localhost:3000), API_KEY_ID, API_SECRET
+ * Env:  PROVE_BASE (default http://localhost:3000), SEED_API_KEY_ID, SEED_API_SECRET
+ *
+ * Credentials come from `pnpm db:seed`, printed once: `eval "$(pnpm db:seed | sed -n '/^export /p')"`.
+ * This is the openapi roundtrip half of that contract.
  */
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -30,19 +33,40 @@ import { promisify } from 'node:util';
 const run = promisify(execFile);
 
 const BASE = process.env.PROVE_BASE ?? 'http://localhost:3000';
-const KEY_ID = process.env.API_KEY_ID;
-const API_SECRET = process.env.API_SECRET;
+/**
+ * The seed's API key, and why it has two names.
+ *
+ * `pnpm db:seed` prints `SEED_API_KEY_ID` / `SEED_API_SECRET`, and `SEED_*` is the prefix every other
+ * script in this repository uses for "a credential the seed minted". These two read `API_KEY_ID` /
+ * `API_SECRET` instead, which is what they called them before the seed's output gained a prefix — so
+ * sourcing the seed's variables, which is the only way to obtain them at all, left these two proofs
+ * failing on a message that pointed at `pnpm db:seed` and named variables `pnpm db:seed` does not
+ * print.
+ *
+ * Both names work: `SEED_*` first, because that is where the value comes from, then the bare name for
+ * anyone pointing this at a different environment.
+ */
+const KEY_ID = process.env.SEED_API_KEY_ID ?? process.env.API_KEY_ID;
+const API_SECRET = process.env.SEED_API_SECRET ?? process.env.API_SECRET;
 
 let failures = 0;
 function check(label, ok, detail = '') {
   if (!ok) failures++;
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`,
-  );
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`);
 }
 
 if (!KEY_ID || !API_SECRET) {
-  console.error('Set API_KEY_ID and API_SECRET (see `pnpm db:seed` output — printed once).');
+  console.error(
+    [
+      'No API key to sign with.',
+      '',
+      '  These two proofs authenticate as a machine client, and the seed prints the key once:',
+      '',
+      '    eval "$(pnpm db:seed | sed -n \'/^export /p\')"',
+      '',
+      '  then re-run. API_KEY_ID and API_SECRET still work if you are pointing this elsewhere.',
+    ].join('\\n'),
+  );
   process.exit(1);
 }
 
@@ -54,8 +78,14 @@ check('the spec declares paths', Object.keys(spec.paths ?? {}).length > 0);
 
 const createSchemaName = spec.paths?.['/v1/shipments']?.post?.requestBody?.content?.[
   'application/json'
-]?.schema?.$ref?.split('/').pop();
-check('POST /v1/shipments publishes a request schema', Boolean(createSchemaName), 'no $ref on the request body');
+]?.schema?.$ref
+  ?.split('/')
+  .pop();
+check(
+  'POST /v1/shipments publishes a request schema',
+  Boolean(createSchemaName),
+  'no $ref on the request body',
+);
 check(
   'the request schema is a real component, not an inline stub',
   Boolean(spec.components?.schemas?.[createSchemaName]),
@@ -70,9 +100,16 @@ check(
 );
 check(
   'the required set covers sender, recipient and parcel basics',
-  ['senderName', 'senderPhone', 'senderAddress', 'recipientName', 'recipientPhone', 'recipientAddress', 'parcelWeightGrams', 'zone'].every(
-    (f) => required.includes(f),
-  ),
+  [
+    'senderName',
+    'senderPhone',
+    'senderAddress',
+    'recipientName',
+    'recipientPhone',
+    'recipientAddress',
+    'parcelWeightGrams',
+    'zone',
+  ].every((f) => required.includes(f)),
   `required: ${required.join(', ')}`,
 );
 check(
@@ -94,8 +131,9 @@ try {
   // Resolved by hand, not through the exports map: openapi-typescript@7 declares `"./*.js": "./*.mjs"`,
   // which points at a file that does not exist on disk. Importing the package's declared bin
   // specifier fails with MODULE_NOT_FOUND; only the literal path in the package directory works.
-  const generatorCli = fileURLToPath(import.meta.resolve('openapi-typescript/package.json'))
-    .replace(/package\.json$/, 'bin/cli.js');
+  const generatorCli = fileURLToPath(
+    import.meta.resolve('openapi-typescript/package.json'),
+  ).replace(/package\.json$/, 'bin/cli.js');
   await run(process.execPath, [generatorCli, specPath, '--output', typesPath], { cwd: dir });
   const generated = await import('node:fs').then((fs) => fs.readFileSync(typesPath, 'utf8'));
   check(
@@ -103,15 +141,52 @@ try {
     /export interface paths\b/.test(generated) && generated.includes('/v1/shipments'),
     'no paths block emitted',
   );
-  // The gap worth recording: controllers return interfaces, not decorated DTOs, so the spec carries
-  // no RESPONSE schemas. A generated client can therefore type the request but not the response —
-  // which is why packages/api-client hand-declares six response shapes. Asserted from the spec
-  // itself; asserting it by referencing the absent type would just be a compile error.
+  // The record this proof used to keep, updated because the thing it recorded stopped being true.
+  //
+  // It said the contract typed REQUESTS but not RESPONSES — controllers returned TypeScript
+  // interfaces, so the spec carried no response schemas and `packages/api-client` hand-declared its
+  // response shapes off live responses. Response DTOs closed that gap, the client's aliases were
+  // repointed at the generated schemas, and this assertion kept asserting the old world until the
+  // proof failed on a *good* change: a schema appeared where it said none could.
+  //
+  // A proof that pins a gap is only useful while the gap exists, and the way to keep it useful is to
+  // pin the current boundary rather than delete the check. So: every operation but three, named.
+  const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete']);
+  const untypedResponses = [];
+  for (const [path, operations] of Object.entries(spec.paths)) {
+    for (const [method, operation] of Object.entries(operations)) {
+      if (!HTTP_METHODS.has(method)) continue;
+      const typed = Object.values(operation.responses ?? {}).some(
+        (response) => response?.content?.['application/json']?.schema !== undefined,
+      );
+      if (!typed) untypedResponses.push(`${method.toUpperCase()} ${path}`);
+    }
+  }
+  untypedResponses.sort();
+
+  // The three that cannot be, each for its own reason — and all three are *deliberate* rather than
+  // merely unfinished, which is why they are named here instead of left as a count:
+  //
+  //  - `statement.csv` is text/csv. A JSON schema would describe the wrong format entirely.
+  //  - `bulk/{jobId}/result` and `track/{trackingCode}/events` stream. Their payloads vary with the
+  //    job's state, and a client that declared one shape for all of them would be lying about two.
+  const EXPECTED_UNTYPED = [
+    'GET /track/{trackingCode}/events',
+    'GET /v1/shipments/bulk/{jobId}/result',
+    'GET /v1/settlements/{id}/statement.csv',
+  ];
   check(
-    'the published contract types REQUESTS but not RESPONSES — a known, deliberate gap',
-    spec.paths['/v1/shipments'].post.responses['201']?.content?.['application/json']?.schema ===
+    'the contract types every JSON response except the three that are text or streamed',
+    // Both sides sorted, because the comparison is about which operations and not about the order two
+    // lists happen to be written in.
+    JSON.stringify(untypedResponses) === JSON.stringify([...EXPECTED_UNTYPED].sort()),
+    `untyped: ${JSON.stringify(untypedResponses)}`,
+  );
+  check(
+    'and the create response is one of them — this is what the old check asserted the opposite of',
+    spec.paths['/v1/shipments'].post.responses['201']?.content?.['application/json']?.schema !==
       undefined,
-    'a response schema appeared; the hand-declared shapes in api-client may now be redundant',
+    'no response schema on POST /v1/shipments 201',
   );
 
   // ─── 3. a client that knows ONLY the generated types ──────────────────────
@@ -150,9 +225,24 @@ export function buildBody(weightGrams: number) {
   const tscPath = fileURLToPath(import.meta.resolve('typescript/bin/tsc'));
   let typeErrors = '';
   try {
-    await run(process.execPath, [tscPath, '--noEmit', '--strict', '--target', 'ES2022', '--module', 'nodenext', '--moduleResolution', 'nodenext', clientPath], {
-      cwd: dir,
-    });
+    await run(
+      process.execPath,
+      [
+        tscPath,
+        '--noEmit',
+        '--strict',
+        '--target',
+        'ES2022',
+        '--module',
+        'nodenext',
+        '--moduleResolution',
+        'nodenext',
+        clientPath,
+      ],
+      {
+        cwd: dir,
+      },
+    );
   } catch (e) {
     typeErrors = `${e.stdout ?? ''}${e.stderr ?? ''}`;
   }
@@ -196,10 +286,18 @@ export function buildBody(weightGrams: number) {
     body: JSON.stringify(body),
   });
   const created = await createdRes.json();
-  check('a fresh client can create a shipment with the published contract', createdRes.status === 201, `HTTP ${createdRes.status} ${JSON.stringify(created).slice(0, 200)}`);
+  check(
+    'a fresh client can create a shipment with the published contract',
+    createdRes.status === 201,
+    `HTTP ${createdRes.status} ${JSON.stringify(created).slice(0, 200)}`,
+  );
 
   const id = created?.data?.id ?? created?.id;
-  check('the response carries an id', typeof id === 'string' && id.length > 0, JSON.stringify(created).slice(0, 200));
+  check(
+    'the response carries an id',
+    typeof id === 'string' && id.length > 0,
+    JSON.stringify(created).slice(0, 200),
+  );
 
   const readRes = await fetch(`${BASE}/v1/shipments/${id}`, { headers: { Authorization: auth } });
   const read = await readRes.json();

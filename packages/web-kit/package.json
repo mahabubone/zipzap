@@ -1,0 +1,37 @@
+{
+  "name": "@zipzap/web-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The web surfaces' shared formatting and fetch hook \u2014 one answer to 'how is a status worded, and how is money written'",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@zipzap/api-client": "workspace:*",
+    "@zipzap/lexicon": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react": "19.3.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  }
+}

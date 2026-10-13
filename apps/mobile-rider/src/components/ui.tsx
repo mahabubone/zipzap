@@ -244,16 +244,25 @@ export function Field({
   icon,
   error,
   hint,
+  autoComplete,
+  textContentType,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'numeric' | 'email-address';
+  keyboardType?: 'default' | 'numeric' | 'number-pad' | 'phone-pad' | 'email-address';
   icon?: keyof typeof Ionicons.glyphMap;
   error?: string;
   hint?: string;
+  /**
+   * Platform autofill hints. Not decoration: a rider signing in on a phone with a saved SIM gets
+   * the number filled in, which is the difference between a four-second sign-in at the depot and
+   * typing eleven digits one-handed while holding a parcel.
+   */
+  autoComplete?: 'tel' | 'email' | 'password' | 'off';
+  textContentType?: 'telephoneNumber' | 'emailAddress' | 'password' | 'none';
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -272,6 +281,8 @@ export function Field({
           placeholderTextColor={colors.textFaint}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
           autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
           style={styles.fieldInput}
         />

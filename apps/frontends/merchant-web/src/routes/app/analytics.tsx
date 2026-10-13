@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { PageHeader, ErrorState, Skeleton } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
-import { formatWhen } from '../../lib/format.ts';
+import { useAsync } from '@zipzap/web-kit';
+import { formatWhen } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/app/analytics')({
   component: AnalyticsScreen,
@@ -339,7 +339,7 @@ function LegendItem({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <svg width="24" height="8" style={{ opacity }}>
+      <svg width="24" height="8" style={{ opacity }} aria-hidden="true">
         <line x1="0" y1="4" x2="24" y2="4" stroke={color} strokeWidth="2" strokeDasharray={dash} />
       </svg>
       <span className="text-slate-700">{label}</span>

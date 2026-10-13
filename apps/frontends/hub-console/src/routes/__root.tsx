@@ -1,4 +1,5 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import { HeadContent, Link, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import { Button, NotFound, RouteError } from '@zipzap/ui';
 import '@zipzap/ui/styles.css';
 
 export const Route = createRootRoute({
@@ -12,6 +13,25 @@ export const Route = createRootRoute({
       { title: 'ZipZap Hub Console' },
     ],
   }),
+  /**
+   * A depot operator on a phone, standing at a belt, hitting a mistyped path. The router default is
+   * an unstyled page; this one names the hub console and offers the screen they came for, which is
+   * the one thing that matters when the parcel in your hand is waiting on it.
+   */
+  notFoundComponent: () => (
+    <NotFound
+      subject="that screen"
+      description="The hub console has one work list. If a link pointed elsewhere, it is out of date."
+      action={
+        <Button asChild>
+          <Link to="/my-hub">Back to my hub</Link>
+        </Button>
+      }
+    />
+  ),
+  errorComponent: ({ error, reset }) => (
+    <RouteError error={error} reset={reset} title="This screen could not load" />
+  ),
   component: () => (
     <html lang="en">
       <head>

@@ -6,6 +6,8 @@ import { colors, radius, space, typography } from '../theme.ts';
 import type { RiderClient } from '../rider-client.ts';
 import { toJobRows } from '../handoff/job-rows.ts';
 import type { JobRow, RiderJobs, ShipmentHandoff } from '../handoff/job-rows.ts';
+import { formatAge } from '@zipzap/lexicon';
+import { jobTone, statusLabel } from '../status.ts';
 
 /**
  * Re-exported so screens that already import from this module keep importing from here, and so
@@ -125,14 +127,17 @@ function greeting(): string {
 }
 
 function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
-  const tone = statusTone(job.status);
+  const tone = jobTone(job.status);
   // A coloured rail down the leading edge, so the list is scannable by colour alone: a rider can
   // find the one failed delivery without reading a word.
+  // Every tone the mapping can produce, so a state added tomorrow cannot render a rail with no
+  // colour — which would look like "this job has no state" rather than "this job has a new one".
   const rail = {
     success: colors.success,
     danger: colors.danger,
     warning: colors.warning,
     brand: colors.brand,
+    info: colors.info,
     neutral: colors.borderStrong,
   }[tone];
 
@@ -140,7 +145,7 @@ function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${job.kind === 'pickup' ? 'Pickup' : 'Delivery'}, ${job.title}, ${job.status}`}
+      accessibilityLabel={`${job.kind === 'pickup' ? 'Pickup' : 'Delivery'}, ${job.title}, ${statusLabel(job.status)}`}
       style={({ pressed }) => [pressed && styles.cardPressed]}
     >
       <View style={styles.cardOuter}>
@@ -160,14 +165,14 @@ function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
               />
               <Text style={styles.kindLabel}>{job.kind === 'pickup' ? 'PICKUP' : 'DELIVERY'}</Text>
             </View>
-            <Text style={styles.jobTime}>{timeAgo(job.createdAt)}</Text>
+            <Text style={styles.jobTime}>{formatAge(job.createdAt)}</Text>
           </View>
 
           <Text style={styles.jobTitle}>{job.title}</Text>
           <Text style={styles.jobDetail}>{job.detail}</Text>
 
           <View style={styles.jobFooter}>
-            <Badge label={job.status.replace(/_/g, ' ')} tone={tone} dot />
+            <Badge label={statusLabel(job.status)} tone={tone} dot />
             <View style={styles.jobCta}>
               <Text style={styles.jobCtaLabel}>Open</Text>
               <Icon name="chevron-forward" size="sm" color={colors.brand} />
@@ -177,35 +182,6 @@ function JobCard({ job, onPress }: { job: JobRow; onPress: () => void }) {
       </View>
     </Pressable>
   );
-}
-
-/** Status tone: terminal states are green, failures red, the rest neutral. */
-function statusTone(status: string): 'success' | 'danger' | 'warning' | 'neutral' {
-  switch (status) {
-    case 'DELIVERED':
-    case 'COMPLETED':
-    case 'COLLECTED':
-      return 'success';
-    case 'FAILED':
-      return 'danger';
-    case 'ATTEMPTED':
-    case 'EXCEPTION':
-      return 'warning';
-    default:
-      return 'neutral';
-  }
-}
-
-function timeAgo(iso: string): string {
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return '';
-  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 const styles = StyleSheet.create({

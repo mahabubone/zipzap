@@ -12,9 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ManifestsRouteImport } from './routes/manifests'
+import { Route as MyHubRouteImport } from './routes/my-hub'
 import { Route as HubsHubCodeRouteImport } from './routes/hubs.$hubCode'
 import { Route as ManifestsIndexRouteImport } from './routes/manifests.index'
 import { Route as ManifestsIdRouteImport } from './routes/manifests.$id'
+import { Route as HubsHubCodeIndexRouteImport } from './routes/hubs.$hubCode/index'
+import { Route as HubsHubCodeDeliveriesRouteImport } from './routes/hubs.$hubCode/deliveries'
+import { Route as HubsHubCodePickupsRouteImport } from './routes/hubs.$hubCode/pickups'
+import { Route as HubsHubCodeRidersRouteImport } from './routes/hubs.$hubCode/riders'
+import { Route as HubsHubCodeWorkRouteImport } from './routes/hubs.$hubCode/work'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,6 +35,11 @@ const LoginRoute = LoginRouteImport.update({
 const ManifestsRoute = ManifestsRouteImport.update({
   id: '/manifests',
   path: '/manifests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyHubRoute = MyHubRouteImport.update({
+  id: '/my-hub',
+  path: '/my-hub',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HubsHubCodeRoute = HubsHubCodeRouteImport.update({
@@ -46,30 +57,72 @@ const ManifestsIdRoute = ManifestsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ManifestsRoute,
 } as any)
+const HubsHubCodeIndexRoute = HubsHubCodeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HubsHubCodeRoute,
+} as any)
+const HubsHubCodeDeliveriesRoute = HubsHubCodeDeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
+  getParentRoute: () => HubsHubCodeRoute,
+} as any)
+const HubsHubCodePickupsRoute = HubsHubCodePickupsRouteImport.update({
+  id: '/pickups',
+  path: '/pickups',
+  getParentRoute: () => HubsHubCodeRoute,
+} as any)
+const HubsHubCodeRidersRoute = HubsHubCodeRidersRouteImport.update({
+  id: '/riders',
+  path: '/riders',
+  getParentRoute: () => HubsHubCodeRoute,
+} as any)
+const HubsHubCodeWorkRoute = HubsHubCodeWorkRouteImport.update({
+  id: '/work',
+  path: '/work',
+  getParentRoute: () => HubsHubCodeRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/manifests': typeof ManifestsRouteWithChildren
-  '/hubs/$hubCode': typeof HubsHubCodeRoute
+  '/my-hub': typeof MyHubRoute
+  '/hubs/$hubCode': typeof HubsHubCodeRouteWithChildren
   '/manifests/$id': typeof ManifestsIdRoute
   '/manifests/': typeof ManifestsIndexRoute
+  '/hubs/$hubCode/deliveries': typeof HubsHubCodeDeliveriesRoute
+  '/hubs/$hubCode/pickups': typeof HubsHubCodePickupsRoute
+  '/hubs/$hubCode/riders': typeof HubsHubCodeRidersRoute
+  '/hubs/$hubCode/work': typeof HubsHubCodeWorkRoute
+  '/hubs/$hubCode/': typeof HubsHubCodeIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/hubs/$hubCode': typeof HubsHubCodeRoute
+  '/my-hub': typeof MyHubRoute
   '/manifests/$id': typeof ManifestsIdRoute
   '/manifests': typeof ManifestsIndexRoute
+  '/hubs/$hubCode/deliveries': typeof HubsHubCodeDeliveriesRoute
+  '/hubs/$hubCode/pickups': typeof HubsHubCodePickupsRoute
+  '/hubs/$hubCode/riders': typeof HubsHubCodeRidersRoute
+  '/hubs/$hubCode/work': typeof HubsHubCodeWorkRoute
+  '/hubs/$hubCode': typeof HubsHubCodeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/manifests': typeof ManifestsRouteWithChildren
-  '/hubs/$hubCode': typeof HubsHubCodeRoute
+  '/my-hub': typeof MyHubRoute
+  '/hubs/$hubCode': typeof HubsHubCodeRouteWithChildren
   '/manifests/$id': typeof ManifestsIdRoute
   '/manifests/': typeof ManifestsIndexRoute
+  '/hubs/$hubCode/deliveries': typeof HubsHubCodeDeliveriesRoute
+  '/hubs/$hubCode/pickups': typeof HubsHubCodePickupsRoute
+  '/hubs/$hubCode/riders': typeof HubsHubCodeRidersRoute
+  '/hubs/$hubCode/work': typeof HubsHubCodeWorkRoute
+  '/hubs/$hubCode/': typeof HubsHubCodeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -77,26 +130,49 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/manifests'
+    | '/my-hub'
     | '/hubs/$hubCode'
     | '/manifests/$id'
     | '/manifests/'
+    | '/hubs/$hubCode/deliveries'
+    | '/hubs/$hubCode/pickups'
+    | '/hubs/$hubCode/riders'
+    | '/hubs/$hubCode/work'
+    | '/hubs/$hubCode/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/hubs/$hubCode' | '/manifests/$id' | '/manifests'
+  to:
+    | '/'
+    | '/login'
+    | '/my-hub'
+    | '/manifests/$id'
+    | '/manifests'
+    | '/hubs/$hubCode/deliveries'
+    | '/hubs/$hubCode/pickups'
+    | '/hubs/$hubCode/riders'
+    | '/hubs/$hubCode/work'
+    | '/hubs/$hubCode'
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/manifests'
+    | '/my-hub'
     | '/hubs/$hubCode'
     | '/manifests/$id'
     | '/manifests/'
+    | '/hubs/$hubCode/deliveries'
+    | '/hubs/$hubCode/pickups'
+    | '/hubs/$hubCode/riders'
+    | '/hubs/$hubCode/work'
+    | '/hubs/$hubCode/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   ManifestsRoute: typeof ManifestsRouteWithChildren
-  HubsHubCodeRoute: typeof HubsHubCodeRoute
+  MyHubRoute: typeof MyHubRoute
+  HubsHubCodeRoute: typeof HubsHubCodeRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -122,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManifestsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-hub': {
+      id: '/my-hub'
+      path: '/my-hub'
+      fullPath: '/my-hub'
+      preLoaderRoute: typeof MyHubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hubs/$hubCode': {
       id: '/hubs/$hubCode'
       path: '/hubs/$hubCode'
@@ -143,6 +226,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManifestsIdRouteImport
       parentRoute: typeof ManifestsRoute
     }
+    '/hubs/$hubCode/': {
+      id: '/hubs/$hubCode/'
+      path: '/'
+      fullPath: '/hubs/$hubCode/'
+      preLoaderRoute: typeof HubsHubCodeIndexRouteImport
+      parentRoute: typeof HubsHubCodeRoute
+    }
+    '/hubs/$hubCode/deliveries': {
+      id: '/hubs/$hubCode/deliveries'
+      path: '/deliveries'
+      fullPath: '/hubs/$hubCode/deliveries'
+      preLoaderRoute: typeof HubsHubCodeDeliveriesRouteImport
+      parentRoute: typeof HubsHubCodeRoute
+    }
+    '/hubs/$hubCode/pickups': {
+      id: '/hubs/$hubCode/pickups'
+      path: '/pickups'
+      fullPath: '/hubs/$hubCode/pickups'
+      preLoaderRoute: typeof HubsHubCodePickupsRouteImport
+      parentRoute: typeof HubsHubCodeRoute
+    }
+    '/hubs/$hubCode/riders': {
+      id: '/hubs/$hubCode/riders'
+      path: '/riders'
+      fullPath: '/hubs/$hubCode/riders'
+      preLoaderRoute: typeof HubsHubCodeRidersRouteImport
+      parentRoute: typeof HubsHubCodeRoute
+    }
+    '/hubs/$hubCode/work': {
+      id: '/hubs/$hubCode/work'
+      path: '/work'
+      fullPath: '/hubs/$hubCode/work'
+      preLoaderRoute: typeof HubsHubCodeWorkRouteImport
+      parentRoute: typeof HubsHubCodeRoute
+    }
   }
 }
 
@@ -160,11 +278,32 @@ const ManifestsRouteWithChildren = ManifestsRoute._addFileChildren(
   ManifestsRouteChildren,
 )
 
+interface HubsHubCodeRouteChildren {
+  HubsHubCodeDeliveriesRoute: typeof HubsHubCodeDeliveriesRoute
+  HubsHubCodePickupsRoute: typeof HubsHubCodePickupsRoute
+  HubsHubCodeRidersRoute: typeof HubsHubCodeRidersRoute
+  HubsHubCodeWorkRoute: typeof HubsHubCodeWorkRoute
+  HubsHubCodeIndexRoute: typeof HubsHubCodeIndexRoute
+}
+
+const HubsHubCodeRouteChildren: HubsHubCodeRouteChildren = {
+  HubsHubCodeDeliveriesRoute: HubsHubCodeDeliveriesRoute,
+  HubsHubCodePickupsRoute: HubsHubCodePickupsRoute,
+  HubsHubCodeRidersRoute: HubsHubCodeRidersRoute,
+  HubsHubCodeWorkRoute: HubsHubCodeWorkRoute,
+  HubsHubCodeIndexRoute: HubsHubCodeIndexRoute,
+}
+
+const HubsHubCodeRouteWithChildren = HubsHubCodeRoute._addFileChildren(
+  HubsHubCodeRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   ManifestsRoute: ManifestsRouteWithChildren,
-  HubsHubCodeRoute: HubsHubCodeRoute,
+  MyHubRoute: MyHubRoute,
+  HubsHubCodeRoute: HubsHubCodeRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -32,6 +32,7 @@ import { ReturnRequestEntity } from '../../dist/modules/returns/return-request.e
 import { ShipmentAdvanceService } from '../../dist/modules/shipment/advance-shipment.service.js';
 import { ShipmentEntity } from '../../dist/modules/shipment/shipment.entity.js';
 import { connectModuleDataSource } from '../../dist/database/module-connection.js';
+import { NoBlockers } from './harness.ts';
 import { LedgerEntryEntity } from '../../dist/modules/finance/ledger-entry.entity.js';
 import { SettlementEntity } from '../../dist/modules/finance/settlement.entity.js';
 
@@ -115,7 +116,7 @@ before(async () => {
   financeConsumer = new FinanceConsumer(financeDb);
   financeRepo = new FinanceRepository();
   postEntry = new PostLedgerEntryService(financeDb, financeRepo);
-  createSettlement = new CreateSettlementService(financeDb, financeRepo);
+  createSettlement = new CreateSettlementService(financeDb, financeRepo, new NoBlockers());
   approveSettlement = new ApproveSettlementService(financeDb, financeRepo);
   payments = new MockPaymentProvider();
   initiatePayment = new InitiateSettlementPaymentService(financeDb, financeRepo, payments);

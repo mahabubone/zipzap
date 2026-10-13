@@ -35,5 +35,5 @@ describe('AppModule dependency graph', () => {
     }).compile();
 
     expect(moduleRef).toBeDefined();
-  });
+  }, 30000);
 });

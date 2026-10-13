@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Button, FormField, Input, Spinner } from '@zipzap/ui';
+import { BrandMark, Button, FormField, Input, Spinner } from '@zipzap/ui';
 import { anonClient } from '../lib/api.ts';
 
 export const Route = createFileRoute('/login')({
@@ -35,7 +35,12 @@ function Login() {
   return (
     <main className="flex min-h-screen flex-col justify-center px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">Control tower</h1>
+        {/* The mark, because its three sibling apps have one. This app was the odd one out — bare text
+            on the sign-in of the screen an operations manager sees when something is on fire. */}
+        <div className="flex items-center gap-3">
+          <BrandMark className="size-9" />
+          <h1 className="text-2xl font-semibold tracking-tight">Control tower</h1>
+        </div>
         <p className="mt-2 text-sm text-slate-600">Operations staff. Your network, live.</p>
         <form className="mt-8 flex flex-col gap-5" onSubmit={submit}>
           <FormField label="Email" htmlFor="email">

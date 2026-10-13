@@ -2,14 +2,23 @@
  * Asserts the public pages actually render as designed — a marketing page that
  * silently loses its CSS still returns 200 and still contains the copy.
  *
- * Run: node apps/web/scripts/verify-marketing.mjs
+ * `MERCHANT_WEB_URL`, not `WEB_URL`. Three browser proofs read this script's address and mean three
+ * different apps by it: this one wants the merchant console, `verify-tracking.mjs` wants the tracking
+ * app, and both also read the other. One variable name for three apps means the combined
+ * `pnpm prove:browser` command can only work by accident — point it at the tracking app and this proof
+ * asserts a marketing page exists on the public tracking origin, and fails.
+ *
+ * `WEB_URL` is still read, as a fallback, so pointing one variable at a stack that serves everything
+ * still works.
+ *
+ * Run: MERCHANT_WEB_URL=http://localhost:5173 node apps/frontends/merchant-web/scripts/verify-marketing.mjs
  */
 // playwright-core from a global install, not a project dependency.
 const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core').then(
   (m) => m.default ?? m,
 );
 
-const WEB = process.env.WEB_URL ?? 'http://localhost:5173';
+const WEB = process.env.MERCHANT_WEB_URL ?? process.env.WEB_URL ?? 'http://localhost:5173';
 
 let failures = 0;
 function check(label, actual, expected) {

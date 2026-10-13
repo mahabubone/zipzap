@@ -16,24 +16,48 @@
  * rather than the behaviour.
  *
  * Run: node apps/backend/scripts/verify-webhook-portal.mjs
- * Env:  PROVE_BASE (default http://localhost:3000), API_KEY_ID, API_SECRET
+ * Env:  PROVE_BASE (default http://localhost:3000), SEED_API_KEY_ID, SEED_API_SECRET
+ *
+ * Credentials come from `pnpm db:seed`, printed once: `eval "$(pnpm db:seed | sed -n '/^export /p')"`.
+ * This is the webhook portal half of that contract.
  */
 import http from 'node:http';
 
 const BASE = process.env.PROVE_BASE ?? 'http://localhost:3000';
-const KEY_ID = process.env.API_KEY_ID;
-const API_SECRET = process.env.API_SECRET;
+/**
+ * The seed's API key, and why it has two names.
+ *
+ * `pnpm db:seed` prints `SEED_API_KEY_ID` / `SEED_API_SECRET`, and `SEED_*` is the prefix every other
+ * script in this repository uses for "a credential the seed minted". These two read `API_KEY_ID` /
+ * `API_SECRET` instead, which is what they called them before the seed's output gained a prefix — so
+ * sourcing the seed's variables, which is the only way to obtain them at all, left these two proofs
+ * failing on a message that pointed at `pnpm db:seed` and named variables `pnpm db:seed` does not
+ * print.
+ *
+ * Both names work: `SEED_*` first, because that is where the value comes from, then the bare name for
+ * anyone pointing this at a different environment.
+ */
+const KEY_ID = process.env.SEED_API_KEY_ID ?? process.env.API_KEY_ID;
+const API_SECRET = process.env.SEED_API_SECRET ?? process.env.API_SECRET;
 
 let failures = 0;
 function check(label, ok, detail = '') {
   if (!ok) failures++;
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`,
-  );
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${ok || !detail ? '' : `\n        ${detail}`}`);
 }
 
 if (!KEY_ID || !API_SECRET) {
-  console.error('Set API_KEY_ID and API_SECRET (see `pnpm db:seed` output — printed once).');
+  console.error(
+    [
+      'No API key to sign with.',
+      '',
+      '  These two proofs authenticate as a machine client, and the seed prints the key once:',
+      '',
+      '    eval "$(pnpm db:seed | sed -n \'/^export /p\')"',
+      '',
+      '  then re-run. API_KEY_ID and API_SECRET still work if you are pointing this elsewhere.',
+    ].join('\\n'),
+  );
   process.exit(1);
 }
 
@@ -82,11 +106,18 @@ const created = await call('POST', '/v1/webhooks', {
   url: hookUrl,
   events: ['shipment.created'],
 });
-check('a merchant can register an endpoint', created.status === 201, `HTTP ${created.status} ${JSON.stringify(created.body).slice(0, 200)}`);
+check(
+  'a merchant can register an endpoint',
+  created.status === 201,
+  `HTTP ${created.status} ${JSON.stringify(created.body).slice(0, 200)}`,
+);
 const endpointId = created.body?.data?.id ?? created.body?.endpoint?.id;
 const secret = created.body?.data?.secret ?? created.body?.secret;
 check('the response carries an endpoint id', typeof endpointId === 'string');
-check('the signing secret is returned exactly once, at creation', typeof secret === 'string' && secret.length > 0);
+check(
+  'the signing secret is returned exactly once, at creation',
+  typeof secret === 'string' && secret.length > 0,
+);
 
 const listed = await call('GET', '/v1/webhooks');
 const endpoints = listed.body?.data ?? listed.body ?? [];
@@ -111,7 +142,11 @@ const shipment = await call('POST', '/v1/shipments', {
   remoteArea: false,
   fragile: false,
 });
-check('a fixture shipment exists to emit events for', shipment.status === 201, `HTTP ${shipment.status}`);
+check(
+  'a fixture shipment exists to emit events for',
+  shipment.status === 201,
+  `HTTP ${shipment.status}`,
+);
 const shipmentId = shipment.body?.data?.id ?? shipment.body?.id;
 
 // ─── 3. the delivery log, read the way a merchant reads it ──────────────────
@@ -125,7 +160,11 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 1000));
 }
 const mine = rows.filter((r) => r.endpointId === endpointId);
-check('the failed attempt appears in the delivery log', mine.length > 0, `no rows for this endpoint out of ${rows.length}`);
+check(
+  'the failed attempt appears in the delivery log',
+  mine.length > 0,
+  `no rows for this endpoint out of ${rows.length}`,
+);
 check(
   'the log records the status code the merchant`s server returned',
   mine.some((r) => r.statusCode === 400),
@@ -156,13 +195,15 @@ const before = hits.length;
 if (!terminal) {
   console.log('SKIP  replay — no terminal delivery row to replay');
   hook.close();
-  console.log(
-    `\nstage 6b webhook portal: ${failures} FAILED`,
-  );
+  console.log(`\nstage 6b webhook portal: ${failures} FAILED`);
   process.exit(1);
 }
 const replay = await call('POST', `/v1/webhooks/deliveries/${terminal.id}/replay`, {});
-check('replay is accepted', replay.status === 201 || replay.status === 200, `HTTP ${replay.status} ${JSON.stringify(replay.body).slice(0, 200)}`);
+check(
+  'replay is accepted',
+  replay.status === 201 || replay.status === 200,
+  `HTTP ${replay.status} ${JSON.stringify(replay.body).slice(0, 200)}`,
+);
 
 const replayDeadline = Date.now() + 45_000;
 let delivered = false;
@@ -176,7 +217,11 @@ while (Date.now() < replayDeadline) {
   await new Promise((r) => setTimeout(r, 1000));
 }
 check('after the endpoint is fixed, a replayed delivery succeeds', delivered);
-check('the replay was a NEW request, not a resend of the old one', hits.length > before, `${before} -> ${hits.length}`);
+check(
+  'the replay was a NEW request, not a resend of the old one',
+  hits.length > before,
+  `${before} -> ${hits.length}`,
+);
 check(
   'the replay carries a fresh delivery id, so a receiver deduping on it is not double-counted',
   hits.length > before && hits[hits.length - 1].delivery !== hits[0].delivery,
@@ -192,7 +237,8 @@ const finalLog = await call('GET', '/v1/webhooks/deliveries?limit=50');
 const finalRows = (finalLog.body?.data ?? []).filter((r) => r.endpointId === endpointId);
 check(
   'the log now shows both the failure and the successful replay',
-  finalRows.some((r) => r.statusCode === 400) && finalRows.some((r) => r.statusCode && r.statusCode < 300),
+  finalRows.some((r) => r.statusCode === 400) &&
+    finalRows.some((r) => r.statusCode && r.statusCode < 300),
   `codes: ${[...new Set(finalRows.map((r) => r.statusCode))].join(', ')}`,
 );
 

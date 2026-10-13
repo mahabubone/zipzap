@@ -24,7 +24,7 @@ Nothing about the monolith prevents it. Three properties do the work:
 Not a rewrite. A checklist:
 
 - the module's events are already on NATS with stable schemas
-- no module queries its tables directly (verified by the CI grep)
+- no module queries its tables directly (verified by `pnpm boundaries:check`)
 - its consumers reference nothing but event payloads and identifiers
 - its schema is separable — no cross-schema foreign keys (none exist by rule)
 - it has an independent read and write load, or an independent team

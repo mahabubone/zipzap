@@ -2,6 +2,10 @@
  * The merchant timeline presenter, asserted without a test framework — same convention as
  * verify-bulk-preview.mjs and verify-actions.mjs.
  *
+ * The amounts below carry a space after the symbol since the formatter moved to `@zipzap/lexicon`.
+ * A timeline line is prose about money, so it is the surface where the space is most likely to be
+ * missed — and it is exactly the kind of string nobody notices is wrong until a screenshot shows it.
+ *
  * The load-bearing assertion is the FIRST one: the label map is a hand-written copy of the
  * backend's tracking vocabulary, and a type that arrives without a merchant-facing label is
  * exactly the drift that ships as a screen reading "ARRIVED_AT_DESTINATION_HUB".
@@ -58,7 +62,7 @@ const cod = timelineLines(
 check(
   'clean COD shows expected and collected',
   cod.detail,
-  'expected ৳1,250.50 · collected ৳1,250.50',
+  'expected ৳ 1,250.50 · collected ৳ 1,250.50',
 );
 check('clean COD does not claim a shortfall', cod.detail.includes('short'), false);
 
@@ -78,11 +82,11 @@ const over = timelineLines(
 check(
   'over-collection is stated, not hidden',
   over.detail,
-  'expected ৳1,250.00 · collected ৳1,300.00 · ৳50.00 over-collected',
+  'expected ৳ 1,250.00 · collected ৳ 1,300.00 · ৳ 50.00 over-collected',
 );
 check('over-collection does not claim a shortfall', over.detail.includes('short'), false);
 // The live row from the seeded DB is exactly this shape: 125000 / 130000 / -5000.
-check('the over-collected amount is exact', over.detail.includes('৳50.00'), true);
+check('the over-collected amount is exact', over.detail.includes('৳ 50.00'), true);
 
 const short = timelineLines(
   [
@@ -96,11 +100,11 @@ const short = timelineLines(
 check(
   'short COD shows the gap',
   short.detail,
-  'expected ৳1,250.50 · collected ৳1,000.00 · ৳250.50 short',
+  'expected ৳ 1,250.50 · collected ৳ 1,000.00 · ৳ 250.50 short',
 );
 
 // Money is rendered from integer minor units. A float here is rule 4 broken.
-check('minor units are exact to the poisha', short.detail.includes('৳250.50'), true);
+check('minor units are exact to the poisha', short.detail.includes('৳ 250.50'), true);
 
 // --- hub scans name the hub, so "where is my parcel" is answerable -------------------
 const scan = timelineLines(

@@ -25,6 +25,12 @@ export default defineConfig({
   plugins: [tanstackStart(), react(), tailwindcss()],
   ssr: { noExternal: ['@zipzap/ui', '@zipzap/api-client'] },
   server: {
+    // Pinned, and `strictPort` so a collision is loud. These three apps are started in parallel by
+    // `turbo run dev`, and Vite's default is to *take the next free port* — so without this the
+    // documented 5173 / 5175 / 5176 held only when they happened to start in one particular order,
+    // and every script that defaults to a URL was quietly photographing whichever app it got.
+    port: 5175,
+    strictPort: true,
     proxy: {
       '/api': {
         target: apiOrigin,

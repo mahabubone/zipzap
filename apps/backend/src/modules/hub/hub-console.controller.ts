@@ -47,7 +47,8 @@ export class HubConsoleController {
     description:
       'The hub, and the parcels waiting at it — most recently scanned first, each carrying the ' +
       'gesture it needs next, which is null once nothing further is required. An unknown hub ' +
-      'code is a 404, not an empty list that reads as a quiet shift.',
+      'code is a 404, not an empty list that reads as a quiet shift. `timestamp` is the instant ' +
+      'the view was built, so a screen can say how old its numbers are.',
   })
   @ApiErrors()
   async parcels(
@@ -55,6 +56,11 @@ export class HubConsoleController {
     @Query() query: HubParcelsQuery,
   ): Promise<HubParcelsViewDto> {
     const limit = query.limit === undefined ? undefined : Number(query.limit);
-    return this.console_.parcelsAt(hubCode, Number.isFinite(limit) ? limit : undefined);
+    const view = await this.console_.parcelsAt(hubCode, Number.isFinite(limit) ? limit : undefined);
+
+    // Stamped here rather than inside the service because it is a property of the *response*: the
+    // moment this list stopped describing the belt. Stamping it before the queries ran would make it
+    // a lie by exactly the length of the slowest query.
+    return { ...view, timestamp: new Date().toISOString() };
   }
 }
