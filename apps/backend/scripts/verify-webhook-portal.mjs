@@ -16,13 +16,29 @@
  * rather than the behaviour.
  *
  * Run: node apps/backend/scripts/verify-webhook-portal.mjs
- * Env:  PROVE_BASE (default http://localhost:3000), API_KEY_ID, API_SECRET
+ * Env:  PROVE_BASE (default http://localhost:3000), SEED_API_KEY_ID, SEED_API_SECRET
+ *
+ * Credentials come from `pnpm db:seed`, printed once: `eval "$(pnpm db:seed | sed -n '/^export /p')"`.
+ * This is the webhook portal half of that contract.
  */
 import http from 'node:http';
 
 const BASE = process.env.PROVE_BASE ?? 'http://localhost:3000';
-const KEY_ID = process.env.API_KEY_ID;
-const API_SECRET = process.env.API_SECRET;
+/**
+ * The seed's API key, and why it has two names.
+ *
+ * `pnpm db:seed` prints `SEED_API_KEY_ID` / `SEED_API_SECRET`, and `SEED_*` is the prefix every other
+ * script in this repository uses for "a credential the seed minted". These two read `API_KEY_ID` /
+ * `API_SECRET` instead, which is what they called them before the seed's output gained a prefix — so
+ * sourcing the seed's variables, which is the only way to obtain them at all, left these two proofs
+ * failing on a message that pointed at `pnpm db:seed` and named variables `pnpm db:seed` does not
+ * print.
+ *
+ * Both names work: `SEED_*` first, because that is where the value comes from, then the bare name for
+ * anyone pointing this at a different environment.
+ */
+const KEY_ID = process.env.SEED_API_KEY_ID ?? process.env.API_KEY_ID;
+const API_SECRET = process.env.SEED_API_SECRET ?? process.env.API_SECRET;
 
 let failures = 0;
 function check(label, ok, detail = '') {
@@ -31,7 +47,17 @@ function check(label, ok, detail = '') {
 }
 
 if (!KEY_ID || !API_SECRET) {
-  console.error('Set API_KEY_ID and API_SECRET (see `pnpm db:seed` output — printed once).');
+  console.error(
+    [
+      'No API key to sign with.',
+      '',
+      '  These two proofs authenticate as a machine client, and the seed prints the key once:',
+      '',
+      '    eval "$(pnpm db:seed | sed -n \'/^export /p\')"',
+      '',
+      '  then re-run. API_KEY_ID and API_SECRET still work if you are pointing this elsewhere.',
+    ].join('\\n'),
+  );
   process.exit(1);
 }
 

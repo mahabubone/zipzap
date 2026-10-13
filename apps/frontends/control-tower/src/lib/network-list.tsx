@@ -1,4 +1,5 @@
 import { Badge, Button } from '@zipzap/ui';
+import { statusLabel } from '@zipzap/web-kit';
 import type { MapHub, MapRider } from '@zipzap/api-client';
 import { isInBounds } from './map-projection.ts';
 
@@ -66,7 +67,17 @@ export function NetworkList({
           >
             <span className="font-medium">{r.displayName}</span>
             <span className="flex items-center gap-2 text-sm text-slate-500">
-              {r.status}
+              {/*
+                  Words, not enums.
+
+                  This row read `ON_PICKUP` — the raw wire value — next to a rider's name, in the one
+                  view that exists for moments when the console has gone wrong. Its sibling, the map
+                  tooltip, was fixed for exactly this and carries the comment explaining why; the fix
+                  had reached one surface and not the other, which is the drift `statusLabel` in
+                  `@zipzap/lexicon` exists to stop. A fallback view that answers a question in machine
+                  terms is not a fallback, it is a second outage.
+                */}
+              {statusLabel(r.status)}
               <Badge tone={r.staleSeconds > 900 ? 'warning' : 'success'}>
                 {r.staleSeconds > 900 ? 'stale' : 'live'}
               </Badge>

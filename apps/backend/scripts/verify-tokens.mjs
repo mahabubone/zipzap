@@ -25,7 +25,17 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../dist/app.module.js';
 import { TrackingConsumer } from '../dist/modules/tracking/tracking.consumer.js';
 
-const BASE = process.env.PROVE_BASE ?? 'http://localhost:3008';
+/**
+ * The running API.
+ *
+ * Defaulted to 3000, like `verify-webhook-portal.mjs` and `verify-openapi-roundtrip.mjs`, which run
+ * beside it in `pnpm prove:stack`. It used to be 3008, and 3008 appears nowhere else in this
+ * repository — not in the compose files, not in `docs/development/environment.md`, not in any other
+ * proof. So this script pointed at a port nothing listens on and failed with a bare `ECONNREFUSED`
+ * in the middle of a command whose other five proofs had already passed, which reads as "the stack is
+ * down" rather than "this script guessed a port".
+ */
+const BASE = process.env.PROVE_BASE ?? 'http://localhost:3000';
 const DB = 'postgresql://zipzap:zipzap@localhost:5433/zipzap';
 
 let failures = 0;

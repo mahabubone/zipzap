@@ -29,6 +29,17 @@ export interface TileOutcome {
 /** Fraction of tiles that must fail before the map gives up. One bad tile is not an outage. */
 export const FALLBACK_THRESHOLD = 0.5;
 
+/**
+ * How many failures make a verdict, in the Leaflet implementation.
+ *
+ * A count rather than the fraction above, and the reason is Leaflet's request pattern: it asks for tiles
+ * as the operator pans, so any given frame legitimately holds one, and "50% of one" is a coin toss. Two
+ * failures is the smallest number that is not a blip — and the component relies on it being reachable:
+ * when the map gave up at the *first* failure it also stopped asking for tiles, so the second never
+ * arrived and the fallback could not happen at all. See `network-map.tsx`.
+ */
+export const MIN_FAILURES = 2;
+
 export function tileUrl(template: string, z: number, x: number, y: number): string {
   return template.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
 }

@@ -4,9 +4,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './map.css';
 import type { MapHub, MapRider } from '@zipzap/api-client';
-import { Badge, Button } from '@zipzap/ui';
+import { Badge } from '@zipzap/ui';
 import { formatAge, humanStatus } from '@zipzap/web-kit';
 import { BOUNDS, isInBounds } from './map-projection.ts';
+import { MIN_FAILURES } from './tiles.ts';
 
 /**
  * The network map, on Leaflet.
@@ -92,7 +93,6 @@ export interface NetworkMapProps {
 
 export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
   const [failed, setFailed] = useState<number | null>(null);
-  const [attempt, setAttempt] = useState(0);
   const [settled, setSettled] = useState(0);
 
   // Nothing here checks whether it is running on a server. It is never rendered on one: `map-frame.tsx`
@@ -109,14 +109,35 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
    * and the thirteenth failed, the network is up and one tile is missing, which is not a reason to
    * take the map away from an operator in the middle of a shift.
    *
-   * So: a failure before anything has loaded, and a burst of failures after, both fall through to
-   * the list. The map is the better view; it is only given up when it is not one.
+   * So the rule is: **if nothing has ever loaded, the map is not a map and we give it up; if
+   * something has, the operator keeps what they have.** One failure either way is a blip and does
+   * nothing.
+   *
+   * ## Why there is no overlay here any more
+   *
+   * There used to be one — the map dimmed to 40% under a notice reading "The basemap did not load (N
+   * tiles failed)" with a retry button — and it was unreachable, twice over.
+   *
+   * It rendered instead of the tile layer, so the moment it appeared there were no more tiles to fail.
+   * The counter stopped at 1, the threshold was 2, and the fallback to the list could never be reached
+   * in a browser: the operator got a grey rectangle under a notice, permanently, with a retry button
+   * that could not help because the reason was already known. Its branch also required
+   * `settled === 0`, which is the same condition under which the component gives up entirely — so the
+   * case it was written for, a burst of failures *after* tiles had loaded, could never reach it.
+   *
+   * Two components, one job, and the one with the ticket button was the broken one. The notice is gone
+   * and the counters decide, which is what the comment above this block has claimed since the Leaflet
+   * rewrite.
    */
   const giveUp = (failures: number) => {
     setFailed(failures);
     if (settled === 0) {
+      // One sentence, and it is the only one an operator reads, because this reason replaces the map
+      // rather than sitting on top of it. So it carries what broke, how badly, and why that means a
+      // list: the count because an operator reporting a problem says "it said 17 tiles failed", and a
+      // bare "the basemap did not load" sends them to the network team instead of to the VPN settings.
       onFallback(
-        'The basemap did not load, so positions have no map to sit on. Showing the list instead.',
+        `The basemap did not load (${failures} ${failures === 1 ? 'tile' : 'tiles'} failed), so positions have no map to sit on.`,
       );
     }
   };
@@ -126,7 +147,8 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
   // decide with the settled count from before the failure that prompted the decision.
   useEffect(() => {
     if (failed === null) return;
-    if (settled === 0 && failed >= 2) giveUp(failed);
+    if (failed < MIN_FAILURES) return;
+    if (settled === 0) giveUp(failed);
   }, [failed, settled, giveUp]);
 
   // Out-of-bounds is dropped rather than nudged to an edge — see isInBounds. Counted, because a
@@ -144,60 +166,42 @@ export function NetworkMap({ hubs, riders, onFallback }: NetworkMapProps) {
 
   return (
     <div>
-      {failed !== null && settled === 0 ? (
-        // The map is still on screen underneath — it is the numbers an operator wants, and the
-        // basemap is the part that broke. Only the geography is missing, not the data.
-        <div className="relative">
-          <div style={{ height: 460, opacity: 0.4 }} aria-hidden>
-            <MapContainer
-              center={CENTER}
-              zoom={7}
-              style={{ height: '100%', width: '100%' }}
-              scrollWheelZoom
-            >
-              <MapContents hubs={placed.hubs} riders={placed.riders} />
-            </MapContainer>
-          </div>
-          <div className="absolute inset-0 flex items-start justify-center pt-24">
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
-              <p className="text-sm font-medium text-amber-900">
-                The basemap did not load ({failed} tiles failed)
-              </p>
-              <p className="mt-1 text-xs text-amber-800">
-                Positions are still correct — only the map underneath them is missing.
-              </p>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="mt-2"
-                onClick={() => setAttempt((a) => a + 1)}
-              >
-                Retry the basemap
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <MapContainer
-          center={CENTER}
-          zoom={7}
-          style={{ height: 460, width: '100%' }}
-          scrollWheelZoom
-          className="rounded-lg"
-          key={attempt}
-        >
-          <TileLayer
-            url={TILE_TEMPLATE}
-            attribution={TILE_ATTRIBUTION}
-            eventHandlers={{
-              tileload: () => setSettled((n) => n + 1),
-              tileerror: () => setFailed((n) => (n ?? 0) + 1),
-            }}
-          />
-          <MapContents hubs={placed.hubs} riders={placed.riders} />
-          <FitBounds hubs={placed.hubs} riders={placed.riders} />
-        </MapContainer>
-      )}
+      {/*
+        One structure, always.
+
+        The conditional this replaced took the whole `MapContainer` — tile layer included — out of the
+        tree on the first failure, so the counters could never move again and the notice it swapped in
+        was itself unreachable. See the block above.
+      */}
+      <MapContainer
+        center={CENTER}
+        zoom={7}
+        style={{ height: 460, width: '100%' }}
+        scrollWheelZoom
+        className="rounded-lg"
+      >
+        <TileLayer
+          url={TILE_TEMPLATE}
+          attribution={TILE_ATTRIBUTION}
+          eventHandlers={{
+            tileload: () => setSettled((n) => n + 1),
+            tileerror: () => setFailed((n) => (n ?? 0) + 1),
+          }}
+        />
+        <MapContents hubs={placed.hubs} riders={placed.riders} />
+        <FitBounds hubs={placed.hubs} riders={placed.riders} />
+      </MapContainer>
+
+      {/* Failures after something loaded are stated and survivable: the map is missing tiles, not
+          geography, and taking it away from an operator mid-shift would be a worse outcome than the
+          one that caused it. The list's own `Retry the map` is the recovery path, and it is reachable
+          because this component unmounts along with the whole frame. */}
+      {failed !== null && settled > 0 ? (
+        <p className="mt-3 text-sm text-amber-800">
+          {failed} {failed === 1 ? 'tile' : 'tiles'} did not load. Positions are still correct —
+          only parts of the map underneath them are missing.
+        </p>
+      ) : null}
 
       {/* Staleness and dropped markers, stated. A grey dot with no explanation is just a wrong dot. */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">

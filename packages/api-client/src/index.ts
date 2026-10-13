@@ -630,34 +630,32 @@ export class ZipZapClient {
   }
 
   /**
-   * POST /v1/auth/login — email + scrypt password → 12h bearer session.
+   * POST /v1/auth/login — email + scrypt password → a session.
    *
-   * `merchantId` picks which business to open the session against for a person
-   * who belongs to several. It is a REQUEST for a scope: the server refuses a
-   * business the user does not hold rather than falling back to a default.
+   * **There is no token in the return value, and that is the point.** The server puts it in an
+   * `HttpOnly` `Set-Cookie`, where script cannot read it, so an XSS gets no credential out of a
+   * response body (ADR-0016). A client that needs the token itself uses `loginToken` below.
+   *
+   * `merchantId` picks which business to open the session against for a person who belongs to
+   * several. It is a REQUEST for a scope: the server refuses a business the user does not hold rather
+   * than falling back to a default.
+   *
+   * The return type is the generated schema rather than a hand-written copy of it. It used to be a
+   * hand-written literal that included `token` and `tokenType` — fields this response has never
+   * carried — so `session.token` compiled, typed `string`, and was `undefined` at runtime. That is
+   * the exact failure the header above this class promises cannot happen, and a proof script hit it:
+   * it sent `Authorization: Bearer undefined` and failed with a 401 that said nothing about why.
    */
   async login(
     identifier: string,
     password: string,
     merchantId?: string,
-  ): Promise<{
-    token: string;
-    expiresAt: string;
-    tokenType: string;
-    merchantId: string;
-    merchantIds: ReadonlyArray<string>;
-  }> {
+  ): Promise<components['schemas']['AuthSessionResponseDto']> {
     const { data } = await this.request('/v1/auth/login', {
       method: 'POST',
       body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
-    return data as {
-      token: string;
-      expiresAt: string;
-      tokenType: string;
-      merchantId: string;
-      merchantIds: ReadonlyArray<string>;
-    };
+    return data as components['schemas']['AuthSessionResponseDto'];
   }
 
   /**
@@ -668,31 +666,21 @@ export class ZipZapClient {
    * read bodies — so an XSS would get the credential the cookie was there to protect. This endpoint
    * is the other half of the same session: same service call, same audit, same cost, token in the
    * body because a client with no browser has nowhere else to put it.
+   *
+   * A cookie is per-origin and a token is not, so this is the only way a proof script, a worker or a
+   * load test can authenticate at all — and the reason it is here rather than being optional on
+   * `login`.
    */
   async loginToken(
     identifier: string,
     password: string,
     merchantId?: string,
-  ): Promise<{
-    token: string;
-    tokenType: 'Bearer';
-    expiresInSeconds: number;
-    expiresAt: string;
-    merchantId: string;
-    merchantIds: ReadonlyArray<string>;
-  }> {
+  ): Promise<components['schemas']['AuthTokenResponseDto']> {
     const { data } = await this.request('/v1/auth/token', {
       method: 'POST',
       body: { identifier, password, ...(merchantId ? { merchantId } : {}) },
     });
-    return data as {
-      token: string;
-      tokenType: 'Bearer';
-      expiresInSeconds: number;
-      expiresAt: string;
-      merchantId: string;
-      merchantIds: ReadonlyArray<string>;
-    };
+    return data as components['schemas']['AuthTokenResponseDto'];
   }
 
   /** GET /v1/me — what the server thinks this principal is. */

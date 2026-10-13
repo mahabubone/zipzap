@@ -15,6 +15,24 @@ const API = process.env.API_ORIGIN ?? 'http://localhost:3000';
 const EMAIL = process.env.SEED_CONSOLE_EMAIL;
 const PASSWORD = process.env.SEED_CONSOLE_PASSWORD;
 
+/**
+ * The control tower's operator, and it is a *different person*.
+ *
+ * The section below that reads `/v1/dashboard/live-counts` is about what the operations console
+ * renders, and that endpoint needs `network:read` — which a merchant does not hold, deliberately: a
+ * shop's owner has no business knowing the whole network's numbers.
+ *
+ * So this script signs in twice, with the two credentials the seed mints for exactly this split, and
+ * uses each where it belongs. It used to use the merchant for both and died on a `403 Missing scope
+ * network:read` — which is the server being correctly strict, reported by a script as though the server
+ * were broken.
+ *
+ * And the refusal itself is worth asserting: a client that silently showed empty counts for a
+ * permission it lacked would be a much worse bug than this one.
+ */
+const OPS_EMAIL = process.env.SEED_OPS_EMAIL;
+const OPS_PASSWORD = process.env.SEED_OPS_PASSWORD;
+
 let failures = 0;
 function check(label, actual, expected) {
   const ok = JSON.stringify(actual) === JSON.stringify(expected);
@@ -24,9 +42,24 @@ function check(label, actual, expected) {
   );
 }
 
-// The anon client is what the login screen and the public tracker use.
-const session = await new ZipZapClient({ baseUrl: API }).login(EMAIL, PASSWORD);
+// `loginToken`, not `login`.
+//
+// `/v1/auth/login` exists for a browser: the token arrives in an `HttpOnly` cookie that script cannot
+// read, and the response body deliberately carries no token at all (ADR-0016). This script is not a
+// browser and has nowhere to keep a cookie, so it uses the other half of the same session — which is
+// what `/v1/auth/token` is for.
+//
+// It used to call `login` and read `session.token`. The client's return type claimed a `token: string`
+// that the server never sends, so it sent `Authorization: Bearer undefined` and the proof died on a
+// 401 that said nothing about authentication. The type is now the generated schema, which has no
+// `token` field, so this cannot compile again.
+const session = await new ZipZapClient({ baseUrl: API }).loginToken(EMAIL, PASSWORD);
 const client = new ZipZapClient({ baseUrl: API, bearerToken: session.token });
+check(
+  'the token endpoint hands back a token, unlike the cookie one',
+  typeof session.token,
+  'string',
+);
 
 // --- what ConsoleLayout reads on every page ---------------------------------
 const me = await client.getMe();
@@ -34,7 +67,21 @@ check('getMe resolves to a principal', typeof me.subjectId, 'string');
 check('scopes came back as an array', Array.isArray(me.scopes), true);
 
 // --- what the control tower renders -----------------------------------------
-const counts = await client.liveCounts();
+// Refused first, on purpose, and asserted as a refusal: `network:read` is not a merchant scope, and
+// the client should surface that as an error rather than return a page of zeroes that an operator would
+// read as "nothing is moving".
+let refused = false;
+try {
+  await client.liveCounts();
+} catch (error) {
+  refused = error?.envelope?.code === 'PERMISSION_DENIED';
+}
+check('a merchant cannot read the whole network', refused, true);
+
+const ops = new ZipZapClient({ baseUrl: API });
+const opsSession = await ops.loginToken(OPS_EMAIL, OPS_PASSWORD);
+const opsClient = new ZipZapClient({ baseUrl: API, bearerToken: opsSession.token });
+const counts = await opsClient.liveCounts();
 check('liveCounts typed shape reached the client', typeof counts.shipments.todayNew, 'number');
 check('hub group survives decoding', typeof counts.hub.networkHubs, 'number');
 check('COD byStatus decoded', typeof counts.cod.byStatus.COD_EXPECTED, 'number');

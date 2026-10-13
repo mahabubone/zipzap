@@ -16,11 +16,87 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-cor
 // This app's own dev server. The merchant console is a different origin entirely.
 const WEB = process.env.TRACKING_WEB_URL ?? process.env.WEB_URL ?? 'http://localhost:5174';
 const MERCHANT_WEB = process.env.MERCHANT_WEB_URL ?? 'http://localhost:5173';
-const CODE = process.env.TRACKING_CODE;
-if (!CODE) {
-  console.error('set TRACKING_CODE');
+/**
+ * The parcel this proof photographs.
+ *
+ * It used to be `TRACKING_CODE`, and it had to be: the script had no way to reach the database, so the
+ * operator had to query one out and paste it in. `pnpm prove:browser` runs four proofs and three of
+ * them need nothing, so this one silently aborted the whole command with two words — `set
+ * TRACKING_CODE` — which is the least useful message a command can end on.
+ *
+ * So it finds a subject itself, the way the other proofs find their own. `TRACKING_CODE` still wins, for
+ * someone who wants to photograph one particular journey.
+ *
+ * **Delivered, most recent first, and why those two words.** A public tracking page is at its most
+ * informative at the end of a journey: every scan, the COD collection and the proof-of-delivery are all
+ * on it. A parcel in transit shows four rows and a timeline that lies by omission. And "most recent"
+ * rather than "any", because the assertion that the final state reads *Delivered* is only meaningful on
+ * a parcel that has one.
+ */
+async function resolveCode() {
+  if (process.env.TRACKING_CODE) return { code: process.env.TRACKING_CODE, from: 'TRACKING_CODE' };
+
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    return {
+      error: [
+        'No parcel to photograph: neither TRACKING_CODE nor DATABASE_URL is set.',
+        '',
+        '  Either give a code —',
+        '',
+        '    TRACKING_CODE=ZP-XXXX pnpm prove:browser',
+        '',
+        '  or point at a database that has one, which is what DATABASE_URL is for and what',
+        '  `pnpm prove:browser` already needs for the hub console proof.',
+      ].join('\n'),
+    };
+  }
+
+  // The same `pg` the hub console proof uses: a root-level script cannot import it by name, because the
+  // root package deliberately has no dependencies.
+  const pg = (await import(process.env.PG ?? '../../../backend/node_modules/pg/esm/index.mjs'))
+    .default;
+  const client = new pg.Client({ connectionString: url });
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT tracking_code FROM shipment.shipments
+        WHERE status = 'DELIVERED' ORDER BY created_at DESC LIMIT 1`,
+    );
+    if (result.rows.length === 0) {
+      return {
+        error: [
+          'No delivered parcel to photograph.',
+          '',
+          '  This proof follows a journey to its end, and the database holds none — so there is nothing',
+          '  for it to check. `pnpm seed:shots` writes a full set; without it this is not a failure of',
+          '  the public page, it is an empty subject.',
+        ].join('\n'),
+      };
+    }
+    return { code: result.rows[0].tracking_code, from: 'the most recent delivered shipment' };
+  } catch (error) {
+    return {
+      error: [
+        'Could not read the database to find a parcel to photograph.',
+        '',
+        `  ${error.message}`,
+        '',
+        '  Set TRACKING_CODE to photograph a parcel without the database.',
+      ].join('\n'),
+    };
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+const subject = await resolveCode();
+if (subject.error) {
+  console.error(subject.error);
   process.exit(2);
 }
+const CODE = subject.code;
+console.log(`photographing ${CODE} — ${subject.from}`);
 
 let failures = 0;
 function check(label, actual, expected) {

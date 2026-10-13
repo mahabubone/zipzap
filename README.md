@@ -379,9 +379,10 @@ Full reasoning, with the alternatives that were rejected, lives in
 
 ```bash
 pnpm verify               # boundaries → format → proofs → typecheck → 2,539 unit tests
-pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
+pnpm test:integration     # 88 tests on real Postgres, Redis and NATS
 pnpm prove:stack          # six proofs against a running API: client, tokens, webhooks, proofs
-pnpm prove:browser        # three browser proofs against a running stack: map, login split, tracking
+pnpm prove:browser        # five browser proofs against a running stack: map, its fallback, marketing,
+                         #   the hub console, public tracking
 ```
 
 |                                               |                                             |
@@ -389,9 +390,9 @@ pnpm prove:browser        # three browser proofs against a running stack: map, l
 | Domain modules, each owning a Postgres schema | **17**                                      |
 | HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
 | Unit tests                                    | **2,539**                                   |
-| Integration tests on live infrastructure      | **86** across 17 files                      |
-| Standalone proofs, reachable from a command   | **20** across four commands                 |
-| Reviewed, reversible migrations               | **51**                                      |
+| Integration tests on live infrastructure      | **88** across 19 files                      |
+| Standalone proofs, reachable from a command   | **23**, all of them                         |
+| Reviewed, reversible migrations               | **52**                                      |
 | Architecture decision records                 | **17**, each with the alternatives rejected |
 | Workspaces in the graph                       | **13**                                      |
 | Documentation files                           | **77** markdown                             |
@@ -424,12 +425,22 @@ invisible to a human reading a small diff. With no CI, `.githooks/pre-commit` ru
 every commit, so the gate is where the work happens rather than somewhere nobody looks.
 
 `pnpm prove` exists because eleven `verify-*.mjs` proofs were reachable from no command at all — not
-from `package.json`, not from anything. Twenty are now reachable across four commands
-(`prove`, `prove:stack`, `prove:browser`), one of them checking the dock's vocabulary against the
-server's scan kinds across the module boundary, so a sixth gesture cannot reach a loading dock as a
-button labelled `Scan`. The two that are still unwired — and what has drifted in each — are named in
-[`docs/development/workflow.md`](docs/development/workflow.md), because a script that silently does not
-run is worse than one that is known to be stale.
+from `package.json`, not from anything. Every one of the twenty-three now is: twenty-one from the three
+root commands (`prove`, `prove:stack`, `prove:browser`) and two from the rider app's own scripts, one
+of them checking the dock's vocabulary against the server's scan kinds across the module boundary, so a
+sixth gesture cannot reach a loading dock as a button labelled `Scan`. A twenty-fourth was deleted
+rather than wired — it imported a module the lexicon work had already replaced, so it had not been
+loadable, and every assertion in it is now made in the place that owns the decision.
+
+The last two were the hard ones, and both had a **stated reason for being unwired that turned out to be
+wrong** — which is the whole argument for wiring a proof rather than documenting it as stale. The hub
+console's had been rewritten twice underneath its own selectors and had been leaking a merchant and four
+parcels onto the demo database on every run. The map fallback's was aimed at a hand-drawn SVG map that
+Leaflet replaced, so it had not run green against the current UI at all — and running it found that the
+fallback it existed to prove was **unreachable in a browser**: the map dropped its tile layer on the
+first failure, so the counter stopped at 1 against a threshold of 2, and an operator with a dead tile
+server got a grey rectangle and a retry button that could not help. Both stories are in
+[`docs/development/workflow.md`](docs/development/workflow.md).
 
 ---
 
@@ -491,6 +502,12 @@ aggregate with the tenancy predicate on.
 </tr>
 <tr>
 <td colspan="2" align="center"><sub>Leaflet on OpenStreetMap. Markers are drawn by the app from coordinates the API returned; the basemap is decoration, and when it stops answering the screen swaps itself to a list rather than leaving an operator with a grey rectangle. A rider who stops checking in goes <b>grey</b>, not red, because an ops console that paints everything red stops being read — and the footer counts what it could not place instead of dropping it silently.</sub></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><img src="shots/2026-10-13_ops_map_fallback.png" alt="The same console with every map tile refused: a list of riders with coordinates, live or stale, and the count of tiles that failed" width="900"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><sub>Photographed with every tile request refused at the network layer, which is what a dead CDN looks like from a browser. The list that replaces the map says <b>how many</b> tiles failed — because that is what an operator reporting the problem will say, and a bare "the basemap did not load" sends them to the network team instead of to the VPN settings — keeps every rider the map could not place rather than dropping them silently, and answers with <code>On pickup</code> rather than <code>ON_PICKUP</code>. One dead tile instead of fifteen is a blip: the map stays exactly where it was, with the hole in it stated underneath.</sub></td>
 </tr>
 </table>
 
