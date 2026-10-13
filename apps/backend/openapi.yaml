@@ -6302,6 +6302,7 @@ paths:
             type: string
       requestBody:
         required: true
+        description: The user ID and role for the new hub assignment.
         content:
           application/json:
             schema:
@@ -6788,6 +6789,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelopeDto'
       summary: A rider's pickup and delivery jobs, newest first
+      tags:
+        - riders
+      security:
+        - ApiKey: []
+        - SessionCookie: []
+  /v1/riders/{riderId}/earnings:
+    get:
+      operationId: RiderEarningsController_earnings
+      parameters:
+        - name: riderId
+          required: true
+          in: path
+          description: The rider whose earnings are requested.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            The rider’s total earnings summed from completed deliveries, labelled with an `asOf`
+            timestamp so the rider app can detect stale cached figures.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiderEarningsDto'
+        '400':
+          description: Validation failed. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '401':
+          description: No valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '403':
+          description: Authenticated, but missing the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '404':
+          description: The record does not exist, or belongs to another tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '429':
+          description: Rate limited. Honour `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '500':
+          description: Unexpected failure. The `request_id` identifies it in our logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+        '503':
+          description: A required dependency is unreachable. Nothing was written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelopeDto'
+      summary: A rider's server-truthful earnings projection
       tags:
         - riders
       security:
@@ -10822,3 +10890,32 @@ components:
       required:
         - pickups
         - deliveries
+    RiderEarningsDto:
+      type: object
+      properties:
+        totalEarningsMinor:
+          type: integer
+          example: 250000
+          description: >-
+            Total earnings in integer minor units (poisha), summed from completed deliveries.
+            Projection from delivery count × base fee; never stored, rebuilt on every read.
+        currency:
+          type: string
+          example: BDT
+          description: Currency of the earnings.
+        completedDeliveries:
+          type: number
+          example: 5
+          description: Count of completed deliveries contributing to this total.
+        asOf:
+          format: date-time
+          type: string
+          example: '2026-10-12T18:53:25.342Z'
+          description: >-
+            Server timestamp when this projection was computed. Use this to detect stale client-side
+            cached figures.
+      required:
+        - totalEarningsMinor
+        - currency
+        - completedDeliveries
+        - asOf

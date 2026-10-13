@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useParams } from '@tanstack/react-router';
 import { Spinner, ErrorState, StatCard } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
+import { useAsync } from '@zipzap/web-kit';
 
 function OverviewPage() {
   const { hubCode } = useParams({ from: '/hubs/$hubCode' });
@@ -59,9 +59,7 @@ function OverviewPage() {
           </div>
           <div>
             <p className="text-slate-600">Last Updated</p>
-            <p className="font-semibold text-xs">
-              {new Date().toLocaleTimeString()}
-            </p>
+            <p className="font-semibold text-xs">{new Date().toLocaleTimeString()}</p>
           </div>
         </div>
       </div>

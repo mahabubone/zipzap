@@ -48,13 +48,17 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
-  test('defaults to submit behaviour so a bare button in a form still works', async () => {
-    // `<button>` submits even with no `type` attribute. The default is what makes
-    // `<form><Button>Save</Button></form>` behave; an explicit `button` would silently break
-    // every form in the app. Asserted behaviourally, not on the attribute — `Button` does not
-    // write one, it inherits the HTML default, and a test demanding `type="submit"` would be
-    // pinning a detail the component deliberately leaves to the platform.
+  test('defaults to type="button", so a bare button in a form does not submit it', async () => {
+    // It used to inherit the HTML default of `submit`, and two sibling tests pinned that as a
+    // feature: "a bare `<Button>Save</Button>` in a form must still work".
+    //
+    // That is true of every form in this product, and every one of them states `type="submit"` on
+    // the button that submits — so the default bought nothing. What it cost was real: an
+    // `ErrorState`'s Retry or an `EmptyState`'s action inside a create-shipment form submitted it,
+    // and the merchant lost the draft they had just typed. The fix belongs in the component that
+    // caused it, so it happened here rather than in three molecules.
     const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+    const user = userEvent.setup();
     render(
       <form onSubmit={onSubmit}>
         <Button>Save</Button>
@@ -62,9 +66,9 @@ describe('Button', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Save' });
-    expect(button).not.toHaveAttribute('type');
-    await userEvent.setup().click(button);
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(button).toHaveAttribute('type', 'button');
+    await user.click(button);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   test('an explicit type overrides the default in both directions', async () => {

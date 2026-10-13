@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute, isRedirect, redirect } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
@@ -26,16 +26,30 @@ const loadPrincipal = createServerFn({ method: 'GET' })
   });
 
 export const Route = createFileRoute('/')({
+  /**
+   * `/` is a router, not a screen: it has no UI of its own, it answers "you are signed in, go
+   * somewhere" or "you are not, go and sign in".
+   *
+   * The redirect to `/my-hub` is thrown OUTSIDE the try, which is the whole shape of this function.
+   * Inside it, the catch would swallow the redirect it was meant to pass on and replace it with a
+   * `/login` — and `redirect()` is a `Response`, not an `Error`, so the `e instanceof Error` test
+   * meant to recognise it could not fire. The result was a signed-in operator bouncing between `/`
+   * and `/login` forever, which reads as a broken session rather than a swallowed redirect: the login
+   * succeeds, the cookie is set, and the app still will not open.
+   *
+   * `isRedirect` is the router's own check, and it is used for the other half below for the same
+   * reason — a test written against the wrong shape of the thrown value fails open.
+   */
   beforeLoad: async () => {
     try {
       await loadPrincipal();
-      // User is authenticated, redirect to /my-hub
-      throw redirect({ to: '/my-hub' });
     } catch (e) {
-      // If it's a redirect, rethrow it
-      if (e instanceof Error && 'isRedirect' in e) throw e;
-      // Otherwise cookie is missing/expired, redirect to login
+      if (isRedirect(e)) throw e;
+      // The cookie is missing, expired or revoked. See the note in merchant-web's `/app` guard for
+      // why it is not cleared here: it is `HttpOnly`, so no code on this page can reach it.
       throw redirect({ to: '/login' });
     }
+    // Outside the try, for the reason in the comment above.
+    throw redirect({ to: '/my-hub' });
   },
 });

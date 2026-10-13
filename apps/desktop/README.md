@@ -35,6 +35,7 @@ pnpm start -- --kiosk
 ```
 
 This disables:
+
 - Browser back/forward buttons
 - Right-click context menu
 - DevTools
@@ -46,6 +47,7 @@ This disables:
 The main process (`src/main.ts`) creates a single `BrowserWindow` and loads the hub-console at runtime. No build-time bundling of the web app; Electron simply points at the running console server.
 
 For production deployment:
+
 1. Build the hub-console to static files
 2. Serve it from a local HTTP server or the same machine
 3. Point `ELECTRON_START_URL` at it

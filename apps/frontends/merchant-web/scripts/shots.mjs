@@ -15,6 +15,9 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-cor
   (m) => m.default ?? m,
 );
 import fs from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const WEB = process.env.WEB_URL ?? 'http://localhost:5173';
 const TRACKING = process.env.TRACKING_URL ?? 'http://localhost:5174';
@@ -148,7 +151,6 @@ await page.waitForURL('**/app', { timeout: 15000 });
 const ROUTES = [
   ['app_shipments', '/app/shipments'],
   ['app_shipment_new', '/app/shipments/new'],
-  ['app_bulk', '/app/shipments/bulk'],
   ['app_cod', '/app/cod'],
   ['app_settlements', '/app/settlements'],
   ['app_money', '/app/money'],
@@ -166,6 +168,58 @@ for (const [name, path] of ROUTES) {
   }
   await shoot(page, name);
 }
+
+/**
+ * Bulk import, photographed as a PREVIEW rather than as an empty file picker.
+ *
+ * The screen's whole claim is "nothing is created until you accept", and a screenshot of an empty
+ * file input is a screenshot of nothing: it looks identical whether the preview works, refuses a bad
+ * file, or never existed. So this uploads a real CSV — the app's own template columns, with one row
+ * that will import and one that will not, because the interesting part of a preview is where the rows
+ * disagree — and shoots the table the server sends back.
+ *
+ * The file goes to the OS temp directory because `setInputFiles` takes a path, and it is removed in a
+ * `finally` so a run that fails halfway does not leave a stray CSV lying about.
+ *
+ * If the upload produces no preview, the run says so and shoots the screen as it is. A line in the
+ * log is honest; a file named `app_bulk` showing an error box is not.
+ */
+await page.goto(`${CONSOLE}/app/shipments/bulk`);
+await settle(page);
+/**
+ * The file is named the way a merchant would name it.
+ *
+ * The preview header prints the uploaded file's own name, so a `zipzap-shots-bulk-<epoch>.csv` lands
+ * in the middle of the screenshot and the shot stops looking like a person doing their job. The name
+ * is still unique enough to be written into a temp directory without colliding with a real one.
+ */
+const csvPath = join(tmpdir(), `orders-week-42-${process.pid}.csv`);
+writeFileSync(
+  csvPath,
+  [
+    'invoice,recipient_name,recipient_phone,recipient_address,cod_amount,parcel_weight,item_description',
+    'INV-9001,Shahana Akter,+8801810000901,"Agrabad C/A, Chattogram",125050,1200,Two shirts',
+    'INV-9002,Nasim Uddin,+8801810000902,"Zindabazar, Sylhet",98000,800,Running shoes',
+    // A row the backend will refuse — no recipient phone. It belongs in the shot: a preview that has
+    // only ever shown green is a preview nobody has learned to read.
+    'INV-9003,Mahbub Alam,,"Bogura bazar",54000,600,Gift box',
+    '',
+  ].join('\n'),
+);
+try {
+  await page.setInputFiles('input[type="file"]', csvPath);
+  // The job goes to PREVIEW and the accept button only appears once the rows are known, so waiting
+  // for the button is waiting for the answer rather than for a number of milliseconds.
+  await page.waitForSelector('button:has-text("Import")', { timeout: 30000 }).catch(() => {});
+  await settle(page);
+  const previewed = (await page.locator('body').innerText()).includes('Will import');
+  console.log(
+    previewed ? '      bulk preview rendered' : '      no preview — shooting the screen as it is',
+  );
+} finally {
+  rmSync(csvPath, { force: true });
+}
+await shoot(page, 'app_bulk');
 
 /**
  * The control tower is shot as an operations manager, not as the merchant.

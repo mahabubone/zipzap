@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, isRedirect, redirect, useNavigate } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
@@ -33,21 +33,29 @@ const loadMyHub = createServerFn({ method: 'GET' })
   });
 
 export const Route = createFileRoute('/my-hub')({
+  /**
+   * Two outcomes, and the distinction between them is the point of the screen.
+   *
+   * Assigned a hub → go there. Assigned nothing → stay, and say so, because "not assigned" is a
+   * state a hub manager can fix in thirty seconds and a login loop cannot be fixed at all.
+   *
+   * The redirect is thrown after the try for the same reason as in `index.tsx`: `redirect()` returns
+   * a `Response`, so a catch that tests `e instanceof Error` cannot tell one from a failure, and
+   * throws away the very navigation it was supposed to let through. `isRedirect` is the router's own
+   * check and is used here for the case where the server function itself redirects.
+   */
   beforeLoad: async () => {
+    let hub: Awaited<ReturnType<typeof loadMyHub>>;
     try {
-      const hub = await loadMyHub();
-      if (hub) {
-        // Redirect to the assigned hub
-        throw redirect({ to: '/hubs/$hubCode', params: { hubCode: hub.code } });
-      }
-      // Not assigned, show the "not assigned" screen
-      return { hub: null };
+      hub = await loadMyHub();
     } catch (e) {
-      // If it's a redirect, rethrow it
-      if (e instanceof Error && 'isRedirect' in e) throw e;
-      // Otherwise it's an auth or network error
+      if (isRedirect(e)) throw e;
+      // The session is gone or unreadable — not "this person works nowhere". `loadMyHub` already
+      // turns a 404 into `null`, because a 404 here means between hubs, which is a real answer.
       throw redirect({ to: '/login' });
     }
+    if (hub) throw redirect({ to: '/hubs/$hubCode', params: { hubCode: hub.code } });
+    return { hub: null };
   },
   component: MyHubScreen,
 });

@@ -29,19 +29,20 @@ async function open(user: ReturnType<typeof userEvent.setup>) {
 describe('Dropdown', () => {
   test('the trigger reports collapsed before it is opened', () => {
     openDropdown();
-    // `aria-expanded` lives on the wrapper the trigger sits in, so it is asserted on the
-    // wrapper's parent rather than on the button itself.
-    const trigger = screen.getByRole('button', { name: 'Open' });
-    expect(trigger.parentElement).toHaveAttribute('aria-expanded', 'false');
+    // On the trigger element itself, not on a wrapper: `aria-expanded` on a roleless `<div>` is
+    // never exposed, so a screen reader was told nothing when this menu opened.
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('the trigger reports expanded once opened', async () => {
     const { user } = openDropdown();
     await open(user);
-    expect(screen.getByRole('button', { name: 'Open' }).parentElement).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('the trigger says it opens a menu', () => {
+    openDropdown();
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveAttribute('aria-haspopup', 'menu');
   });
 
   test('children are not rendered until the dropdown is opened', async () => {

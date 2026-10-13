@@ -21,7 +21,7 @@
  */
 
 import type { TimelineEntry } from '@zipzap/api-client';
-import { formatMinor, humanStatus } from './format.ts';
+import { formatMinor, humanStatus } from '@zipzap/web-kit';
 
 export interface TimelineLine {
   /** The event's own id — never the index. Two corrections can share an instant. */

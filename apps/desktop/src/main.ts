@@ -21,7 +21,6 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
     },
     // Kiosk mode: full screen, no chrome
@@ -60,7 +59,8 @@ function createWindow() {
   }
 
   const startUrl =
-    process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../../../frontends/hub-console/dist/index.html')}`;
+    process.env.ELECTRON_START_URL ||
+    `file://${path.join(__dirname, '../../../frontends/hub-console/dist/index.html')}`;
   mainWindow.loadURL(startUrl);
 
   // Show window once ready

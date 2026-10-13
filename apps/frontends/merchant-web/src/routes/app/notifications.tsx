@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ErrorState, PageHeader, Skeleton } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
+import { useAsync } from '@zipzap/web-kit';
 import {
   applyToggle,
   revertToggle,

@@ -50,13 +50,11 @@ describe('EmptyState', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  test('the action inherits Button submit semantics inside a form', async () => {
-    // `EmptyState` renders a default `Button`, and `Button` deliberately writes no `type`
-    // attribute, inheriting the HTML default of `submit`. So an action inside a `<form>` does
-    // submit it. Pinned as-is rather than "fixed" here: `Button`'s default is a documented
-    // decision (a bare `<Button>Save</Button>` in a form must submit), and changing it belongs
-    // in `Button`, not in a molecule. Callers who need a non-submitting action inside a form
-    // pass their own `action` button rather than this one.
+  test('the action does not submit an enclosing form', async () => {
+    // Inverted along with `Button`. This used to assert that an `EmptyState` action *did* submit a
+    // surrounding form, on the grounds that `Button` inherits the HTML default of `submit`. Both
+    // halves were a footgun rather than a feature: an empty state is a statement about data, and
+    // its action is a navigation — neither is a reason to post a form.
     const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
     const user = userEvent.setup();
     render(
@@ -69,7 +67,7 @@ describe('EmptyState', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Create shipment' }));
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   test('renders a supplied icon node', () => {

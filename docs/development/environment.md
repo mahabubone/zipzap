@@ -116,9 +116,15 @@ because it is a debugger rather than an interface. The containers run `NODE_ENV=
 
 ```bash
 pnpm --filter @zipzap/merchant-web dev           # http://localhost:5173
-pnpm --filter @zipzap/control-tower dev          # http://localhost:5174
-pnpm --filter @zipzap/hub-console dev            # http://localhost:5175
+pnpm --filter @zipzap/customer-tracking dev      # http://localhost:5174  (pinned in its vite.config)
+pnpm --filter @zipzap/control-tower dev          # http://localhost:5175
+pnpm --filter @zipzap/hub-console dev            # http://localhost:5176
 ```
+
+Only the tracking app pins its port. The other three take Vite's default cascade — 5173, then the
+next free port — which is why starting them in the order above is what produces these four numbers,
+and why starting them out of order moves the later ones along. `.env` publishes the container stack's
+ports; the host stack reads its defaults.
 
 Each app's dev server proxies `/api/*` to `API_ORIGIN` (default `http://localhost:3000`), so the
 browser sees one origin. That is what makes `zipzap_session` a first-party cookie — a cross-origin

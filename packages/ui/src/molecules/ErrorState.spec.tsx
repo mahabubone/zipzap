@@ -66,11 +66,11 @@ describe('ErrorState', () => {
     expect(screen.getByText(message)).toBeInTheDocument();
   });
 
-  test('the retry button inherits Button submit semantics inside a form', async () => {
-    // `ErrorState` renders a default `Button`, which writes no `type` and so inherits the HTML
-    // default of `submit`. Pinned as-is, not "fixed" here: `Button`'s default is deliberate, and
-    // a Retry inside a form has to be handled by the caller or by `Button`, not by a test that
-    // quietly redefines what a default means.
+  test('the retry button does not submit an enclosing form', async () => {
+    // This test used to pin the opposite, on the grounds that the fix belonged in `Button`. It was
+    // fixed in `Button`: every form in this product states `type="submit"` on the button that
+    // submits it, so the HTML default was buying nothing and costing an accidental form post —
+    // a Retry inside a create-shipment form wiped the draft the user had just typed.
     const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
     const user = userEvent.setup();
     render(
@@ -80,7 +80,7 @@ describe('ErrorState', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   test('title, message and retry can all appear together', async () => {

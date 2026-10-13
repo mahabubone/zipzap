@@ -320,11 +320,11 @@ services:
       args:
         APP: '@zipzap/customer-tracking'
         APP_DIR: apps/frontends/customer-tracking
-        # customer-tracking predates the same-origin proxy and still reads VITE_API_URL. Pointing
-        # it at `/api` puts this surface on the same contract as the consoles — one origin, no
-        # CORS, no WEB_ORIGIN entry to keep in sync — instead of leaving one app in the stack
-        # quietly depending on a cross-origin allowance.
-        VITE_API_URL: '/api'
+        # No API build argument, and that is the point. This app used to read `VITE_API_URL` and was
+        # pointed at `/api` by hand so it would not be the one surface in this file talking to the
+        # backend cross-origin — no proxy, no `Origin` rewrite, no `sec-fetch-*` stripping, so the
+        # CSRF arrangement ADR-0016 depends on did not apply to the app a recipient's browser uses.
+        # Its client resolves `/api` relative to the origin now, like every other surface here.
     image: zipzap/web:customer-tracking
     environment:
       API_ORIGIN: http://api:3000

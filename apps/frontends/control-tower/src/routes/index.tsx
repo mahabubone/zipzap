@@ -4,7 +4,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
 import { Button, ErrorState, Spinner } from '@zipzap/ui';
-import { useAsync } from '../lib/useAsync.ts';
+import { useAsync } from '@zipzap/web-kit';
 import { NetworkList, NetworkMap } from '../lib/network-map.tsx';
 
 /**

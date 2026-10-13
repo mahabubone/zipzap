@@ -14,6 +14,7 @@
     "@tanstack/react-start": "^1.168.60",
     "@zipzap/api-client": "workspace:*",
     "@zipzap/ui": "workspace:*",
+    "@zipzap/web-kit": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

@@ -11,6 +11,7 @@
     "docs:dev": "pnpm --filter @zipzap/site dev",
     "docs:build": "turbo run build --filter=@zipzap/site",
     "boundaries:check": "node scripts/check-boundaries.mjs",
+    "hooks:install": "git config core.hooksPath .githooks && printf 'hooks: %s\\n' \"$(git config core.hooksPath)\"",
     "build": "turbo run build",
     "db:migrate": "pnpm --filter @zipzap/backend db:migrate",
     "db:revert": "pnpm --filter @zipzap/backend db:revert",

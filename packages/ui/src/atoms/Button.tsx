@@ -21,9 +21,27 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly size?: Size;
 }
 
-export function Button({ variant = 'primary', size = 'md', className, ...rest }: ButtonProps) {
+/**
+ * `type` defaults to `"button"`.
+ *
+ * The HTML default is `submit`, so a `Button` rendered inside a `<form>` submitted that form whether
+ * or not anybody meant it to: an `ErrorState`'s Retry, an `EmptyState`'s action, a filter's Clear.
+ * The form went away with its values, and the screen looked like it had worked.
+ *
+ * Every form in this product states `type="submit"` on the button that submits it, so making the
+ * default the safe one costs nothing and removes a class of accident. `pnpm typecheck` cannot catch
+ * this one — it is a behaviour, not a type.
+ */
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  className,
+  type = 'button',
+  ...rest
+}: ButtonProps) {
   return (
     <button
+      type={type}
       className={cx(
         'inline-flex items-center justify-center rounded-md font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed',
         variants[variant],

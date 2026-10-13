@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { PageHeader, ErrorState, Skeleton } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
-import { formatWhen } from '../../lib/format.ts';
+import { useAsync } from '@zipzap/web-kit';
+import { formatWhen } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/app/analytics')({
   component: AnalyticsScreen,

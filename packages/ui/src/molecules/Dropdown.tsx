@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { cx } from '../lib/cx.ts';
 
 export interface DropdownProps {
@@ -33,22 +42,64 @@ export function Dropdown({ trigger, children, align = 'end', className }: Dropdo
 
   const close = () => setOpen(false);
 
+  const toggle = () => setOpen((v) => !v);
+
+  /**
+   * The open state, put on the trigger itself.
+   *
+   * It used to sit on a wrapper `<div>` with no role, which meant `aria-expanded` was never exposed
+   * to a screen reader at all — the menu opened with nothing anywhere saying so. It cannot be moved
+   * onto a *button* wrapper either: nesting a button inside the trigger a consumer passed makes
+   * interactive content inside interactive content, which is the bug this component's own test
+   * suite was written to prevent.
+   *
+   * So the trigger element is cloned and annotated. Its own `onClick` is preserved and called first,
+   * because a consumer that passed a handler passed it for a reason.
+   *
+   * A trigger that is not an element — a bare string, say — falls back to a `<span role="button">`,
+   * which at least reports its state and answers Enter, Space and ArrowDown.
+   */
+  const triggerNode = isValidElement(trigger) ? (
+    cloneElement(trigger as ReactElement<Record<string, unknown>>, {
+      'aria-haspopup': 'menu',
+      'aria-expanded': open,
+      onClick: (event: unknown) => {
+        const own = (trigger as ReactElement<{ onClick?: (e: unknown) => void }>).props.onClick;
+        own?.(event);
+        toggle();
+      },
+      onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+        if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggle();
+        }
+      },
+    })
+  ) : (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      className="inline-flex cursor-pointer"
+      onClick={toggle}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggle();
+        }
+      }}
+    >
+      {trigger}
+    </span>
+  );
+
   return (
     <div ref={rootRef} className={cx('relative inline-block', className)}>
-      <div
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' || e.key === 'Enter') {
-            e.preventDefault();
-            setOpen((v) => !v);
-          }
-        }}
-      >
-        {trigger}
-      </div>
+      {triggerNode}
       {open ? (
         <div
+          role="menu"
           className={cx(
             'absolute z-40 mt-1 min-w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg',
             align === 'end' ? 'right-0' : 'left-0',

@@ -38,7 +38,7 @@ Eight bundles, all defined in `rules/roles.ts`:
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `PLATFORM_ADMIN`     | every scope; the only role permitted outside a merchant tenancy                          |
 | `OPERATIONS_MANAGER` | reads across merchants; moves parcels; sees that a COD exists, cannot settle it          |
-| `HUB_MANAGER`        | everything a `HUB_OPERATOR` holds, **plus `hub:manage`** — assigns and revokes hub staff  |
+| `HUB_MANAGER`        | everything a `HUB_OPERATOR` holds, **plus `hub:manage`** — assigns and revokes hub staff |
 | `HUB_OPERATOR`       | scans and manifests; **no money scope at all**                                           |
 | `SUPPORT_AGENT`      | read-only; deliberately **no `cod:read`** — a read is the easiest permission to escalate |
 | `MERCHANT_OWNER`     | every scope within one merchant                                                          |

@@ -49,7 +49,8 @@ foreign keys — a `rider_id` in `delivery` is a bare identifier, not a constrai
    `class-validator`, no `bullmq`. Keeps business rules honest about their dependencies.
 3. **`scripts/check-boundaries.mjs`** for cross-schema SQL, cross-module `*.entity.ts` imports,
    framework imports in `rules/` files, provider wire formats outside adapters, and decimal
-   literals on money-shaped names. It runs in `pnpm verify` and in CI, so it is a gate rather
+   literals on money-shaped names. It runs in `pnpm verify` and in the pre-commit hook
+   (`.githooks/pre-commit`, installed with `pnpm hooks:install`), so it is a gate rather
    than a convention. Each rule has been proven to fire on a planted violation.
 
 ## Consequences

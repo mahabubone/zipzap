@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import {
+  ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
@@ -91,6 +92,10 @@ export class HubStaffController {
   @UseGuards(new ScopeGuard('hub:manage'))
   @ApiOperation({ summary: 'Assign a person to a hub' })
   @ApiParam({ name: 'hubCode', description: 'The hub to assign the person to.' })
+  @ApiBody({
+    type: AssignStaffDto,
+    description: 'The user ID and role for the new hub assignment.',
+  })
   @ApiCreatedResponse({
     type: HubStaffDto,
     description:

@@ -17,8 +17,8 @@
  *  - `role` in the pg config is ignored by node-postgres, and `options: '-c role=x'` fails
  *    because `role` is not a GUC.
  *
- * So qualified cross-schema access is caught by `scripts/check-boundaries.mjs` in CI, which is
- * a real gate rather than a convention.
+ * So qualified cross-schema access is caught by `scripts/check-boundaries.mjs`, which runs in
+ * `pnpm verify` and in the pre-commit hook — a real gate rather than a convention.
  *
  * `ponytail:` runtime privilege isolation needs a Postgres role per module and a separate
  * connection credential for each — four more DSNs and four more secrets to manage. That is the

@@ -127,11 +127,15 @@ async function seed() {
   );
   // The credential belongs to the PERSON (migration 0036), not to the merchant — which is what lets
   // one login hold several businesses. MERCHANT_OWNER: this is the merchant's own operator.
-  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
-    userId,
-    email,
-    hashSecret(password),
-  ]);
+  //
+  // `display_name` is set because the console renders it in the place a person's name belongs, and
+  // `getMe` falls back to the email when it is null. A sidebar reading `ops+k3f9a1@ayesha.test`
+  // twice — name line and handle line — is the shape of leaked fixture data, and every screenshot
+  // of every surface carries it.
+  await client.query(
+    `INSERT INTO identity.users (id, email, password_hash, display_name) VALUES ($1, $2, $3, $4)`,
+    [userId, email, hashSecret(password), 'Ayesha Rahman'],
+  );
   await client.query(
     `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
      VALUES ($1, $2, 'MERCHANT_OWNER')`,
@@ -156,11 +160,10 @@ async function seed() {
     .digest('base64url')
     .slice(0, 24)}`;
   await client.query('BEGIN');
-  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
-    hubUserId,
-    hubEmail,
-    hashSecret(hubPassword),
-  ]);
+  await client.query(
+    `INSERT INTO identity.users (id, email, password_hash, display_name) VALUES ($1, $2, $3, $4)`,
+    [hubUserId, hubEmail, hashSecret(hubPassword), 'Rafiqul Islam'],
+  );
   await client.query(
     `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
      VALUES ($1, $2, 'HUB_OPERATOR')`,
@@ -169,9 +172,7 @@ async function seed() {
   // Assign the operator to the first hub so the console lands directly on it instead of a picker.
   // Hubs are seeded by `seedProfile` above, so one exists here. The first hub by code is an
   // arbitrary but stable choice — the point is that the demo login has somewhere to land.
-  const { rows: firstHub } = await client.query(
-    `SELECT id FROM hub.hubs ORDER BY code LIMIT 1`,
-  );
+  const { rows: firstHub } = await client.query(`SELECT id FROM hub.hubs ORDER BY code LIMIT 1`);
   if (firstHub[0]) {
     await client.query(
       `INSERT INTO hub.staff (user_id, hub_id, role, assigned_by)
@@ -196,11 +197,10 @@ async function seed() {
     .digest('base64url')
     .slice(0, 24)}`;
   await client.query('BEGIN');
-  await client.query(`INSERT INTO identity.users (id, email, password_hash) VALUES ($1, $2, $3)`, [
-    opsUserId,
-    opsEmail,
-    hashSecret(opsPassword),
-  ]);
+  await client.query(
+    `INSERT INTO identity.users (id, email, password_hash, display_name) VALUES ($1, $2, $3, $4)`,
+    [opsUserId, opsEmail, hashSecret(opsPassword), 'Tanvir Hossain'],
+  );
   await client.query(
     `INSERT INTO identity.user_merchants (user_id, merchant_id, role)
      VALUES ($1, $2, 'OPERATIONS_MANAGER')`,
@@ -232,7 +232,8 @@ async function seed() {
     .slice(0, 24)}`;
   await client.query('BEGIN');
   await client.query(
-    `INSERT INTO identity.users (id, email, phone, password_hash) VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO identity.users (id, email, phone, password_hash, display_name)
+     VALUES ($1, $2, $3, $4, $5)`,
     [
       riderUserId,
       // An email is NOT NULL on identity.users, and it is not the handle — the phone is. This is a
@@ -241,6 +242,7 @@ async function seed() {
       `rider+${runTag}@riders.zipzap.local`,
       riderPhone,
       hashSecret(riderPassword),
+      'Shahriar Alam',
     ],
   );
   // A membership, because a session is anchored to a business — `merchant.sessions.merchant_id`

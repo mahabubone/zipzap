@@ -1,7 +1,7 @@
 import { Outlet, useParams, useNavigate, useLocation } from '@tanstack/react-router';
 import { Button } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
+import { useAsync } from '@zipzap/web-kit';
 
 export function HubLayout() {
   const { hubCode } = useParams({ from: '/hubs/$hubCode' });

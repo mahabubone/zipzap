@@ -15,6 +15,7 @@
     "@types/leaflet": "^1.9.22",
     "@zipzap/api-client": "workspace:*",
     "@zipzap/ui": "workspace:*",
+    "@zipzap/web-kit": "workspace:*",
     "leaflet": "^1.9.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",

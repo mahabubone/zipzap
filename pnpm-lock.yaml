@@ -119,6 +119,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      vite:
+        specifier: ^8.3.3
+        version: 8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)
 
   apps/frontends/control-tower:
     dependencies:
@@ -137,6 +140,9 @@ importers:
       '@zipzap/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@zipzap/web-kit':
+        specifier: workspace:*
+        version: link:../../../packages/web-kit
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
@@ -189,6 +195,9 @@ importers:
       '@zipzap/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@zipzap/web-kit':
+        specifier: workspace:*
+        version: link:../../../packages/web-kit
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -232,6 +241,9 @@ importers:
       '@zipzap/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@zipzap/web-kit':
+        specifier: workspace:*
+        version: link:../../../packages/web-kit
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -275,6 +287,9 @@ importers:
       '@zipzap/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@zipzap/web-kit':
+        specifier: workspace:*
+        version: link:../../../packages/web-kit
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -490,6 +505,25 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.10.1)(jsdom@30.1.2)(vite@8.3.3(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/web-kit:
+    dependencies:
+      '@zipzap/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -18481,6 +18515,21 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
+
+  vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1):
+    dependencies:
+      lightningcss: 1.33.0
+      picomatch: 4.0.7
+      postcss: 8.5.28
+      rolldown: 1.2.12
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 22.20.5
+      esbuild: 0.28.2
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      terser: 5.51.2
+      yaml: 2.9.1
 
   vite@8.3.3(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1):
     dependencies:

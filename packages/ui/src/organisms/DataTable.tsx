@@ -330,10 +330,39 @@ export function DataTable<Row>({
                     <tr
                       key={row.id}
                       onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                      // A clickable row is a control, so it answers the keyboard as well.
+                      //
+                      // It had `cursor-pointer` and an `onClick` and nothing else: the shipment list,
+                      // the bulk preview, the webhook log and the manifests all navigate on row
+                      // click, and every one of them was mouse-only — the detail page of a parcel
+                      // could not be reached from the keyboard at all.
+                      //
+                      // `role="button"` on a `<tr>` inside a `<table>` is invalid ARIA, so the
+                      // keyboard affordance is a real tab stop plus Enter/Space, and the role is
+                      // omitted deliberately. A cell-level link would be the purer answer; it would
+                      // also mean every table decides where its links point, which is a bigger change
+                      // than the defect deserves.
+                      tabIndex={onRowClick ? 0 : undefined}
+                      onKeyDown={
+                        onRowClick
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onRowClick(row.original);
+                              }
+                            }
+                          : undefined
+                      }
+                      aria-label={
+                        onRowClick
+                          ? `Open row ${String((row.original as { id?: unknown }).id ?? '')}`
+                          : undefined
+                      }
                       className={cx(
                         'border-b border-slate-50 last:border-0',
                         row.getIsSelected() && 'bg-brand-500/5',
-                        onRowClick && 'cursor-pointer hover:bg-slate-50',
+                        onRowClick &&
+                          'cursor-pointer hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600',
                       )}
                     >
                       {row.getVisibleCells().map((cell) => {

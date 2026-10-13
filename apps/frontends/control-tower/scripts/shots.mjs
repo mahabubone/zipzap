@@ -19,7 +19,16 @@ const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-cor
 );
 import fs from 'node:fs';
 
-const APP = process.env.APP_URL ?? 'http://localhost:5173';
+/**
+ * The control tower's own dev server. 5175, not 5173.
+ *
+ * It was 5173 — the merchant console's port — so `pnpm shots:ops` logged in here, was redirected to
+ * the merchant console it had just authenticated against, and photographed the merchant's shipments
+ * table three times under an `ops_` filename. Nothing failed: the login worked, the screenshot
+ * succeeded, and the file was wrong. A default that points at a sibling app is the one kind of typo
+ * nothing in this script can surface on its own.
+ */
+const APP = process.env.APP_URL ?? 'http://localhost:5175';
 const EMAIL = process.env.SEED_OPS_EMAIL;
 const PASSWORD = process.env.SEED_OPS_PASSWORD;
 const OUT = new URL('../../../../shots/', import.meta.url).pathname;
@@ -136,13 +145,35 @@ if (suppressed > 0) {
 // opens this screen is to read ONE dot — who it is, what they are doing, when they last checked
 // in — and none of that is visible until a marker is hovered. Capturing it closed would be
 // photographing the map without the part that does the work.
-const riderMarker = page.locator('.leaflet-marker-icon').first();
-if ((await riderMarker.count()) > 0) {
-  await riderMarker.hover();
-  await page.waitForTimeout(700);
+//
+// Which marker is hovered is decided by asking, not by guessing. `.first()` used to take whichever
+// marker the DOM had first, and Leaflet stacks overlapping markers by latitude rather than nudging
+// them apart — so the dot aimed at could be sitting under a hub box, and Playwright spent its whole
+// timeout retrying a hover that another element was intercepting. The run died after two good shots,
+// which is the only reason it was ever noticed: a reader would otherwise have found a missing file.
+//
+// So: try each rider in turn, and stop at the first whose tooltip actually opened. A tooltip that
+// did not appear means the hover missed, whatever the browser said about it.
+const riderMarkers = page.locator('.leaflet-marker-icon.zz-rider-icon');
+const riderCount = await riderMarkers.count();
+let opened = false;
+for (let i = 0; i < riderCount && !opened; i++) {
+  try {
+    await riderMarkers.nth(i).hover({ timeout: 2500 });
+    await page.waitForTimeout(500);
+    opened = (await page.locator('.leaflet-tooltip').count()) > 0;
+  } catch {
+    // Covered by another marker. Try the next rider.
+  }
+}
+if (opened) {
+  await page.waitForTimeout(400);
   await shoot(page, 'network_map_rider_detail');
+  console.log('      rider detail opened on a tooltip');
 } else {
-  console.log('skip  network_map_rider_detail (no markers drawn)');
+  console.log(
+    `skip  network_map_rider_detail (no rider tooltip opened out of ${riderCount} riders)`,
+  );
 }
 
 await browser.close();

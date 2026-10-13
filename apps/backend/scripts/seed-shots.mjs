@@ -126,11 +126,25 @@ if (!cookie) {
 }
 const auth = { Cookie: cookie, 'Content-Type': 'application/json' };
 
+/**
+ * One key per parcel per RUN, not per parcel.
+ *
+ * `shots-seed-1` … `shots-seed-6` were fixed, which made a second run of this script a no-op: every
+ * create replayed the first run's stored response, so the same six tracking codes came back, the
+ * simulations found them already in their final states and did nothing, and the fixture set never
+ * changed. A shots pipeline that can only ever produce one fixture set cannot re-shoot — which is the
+ * one job it exists for.
+ *
+ * The key is still doing its job inside a run: a retried create replays instead of making a second
+ * parcel, which is the whole point of ADR-0010 and the reason a half-finished run can be repeated.
+ */
+const RUN = String(Date.now());
+
 const created = [];
 for (const [i, p] of PARCELS.entries()) {
   const res = await fetch(`${BASE}/v1/shipments`, {
     method: 'POST',
-    headers: { ...auth, 'Idempotency-Key': `shots-seed-${i + 1}` },
+    headers: { ...auth, 'Idempotency-Key': `shots-seed-${RUN}-${i + 1}` },
     body: JSON.stringify({
       senderName: 'Ayesha Textiles',
       senderPhone: '+8801700000000',
@@ -178,6 +192,91 @@ console.log(`\n${created.length} shipments seeded. Public tracking:`);
 for (const { code, scenario } of created) {
   console.log(`  ${BASE}/track/${code}  (${scenario})`);
 }
+
+console.log('\n--- hub operator placement ---');
+
+/**
+ * Put the seeded hub operator at the hub that has scan work waiting.
+ *
+ * Phase B replaced the hub picker with an assignment: `GET /v1/hubs/my-hub`, and the console lands
+ * on whatever the seed put there — which was `ORDER BY code LIMIT 1`, i.e. Chattogram District by
+ * alphabet. Chattogram is where the demo flow's parcels ARRIVE, and an arrived parcel computes
+ * `nextScan = NULL` (`ARRIVED` is the last row of the scan-order CASE in `HubRepository.parcelsAt`).
+ * So the one screen this console exists for — a list of parcels, each offering exactly the one
+ * gesture it needs next — photographed fourteen rows with nothing to press, while Dhaka District sat
+ * four deep with `SORT` and `OUTBOUND` waiting. An empty work list does not prove the work list works.
+ *
+ * In SQL, and not over HTTP, because no principal this seed mints can do it over HTTP: `hub:manage`
+ * belongs to HUB_MANAGER and PLATFORM_ADMIN only, and the seed creates a HUB_OPERATOR, a
+ * MERCHANT_OWNER and an OPERATIONS_MANAGER. That refusal is correct — the point of the scope is that
+ * a line operator cannot enrol or revoke the person standing next to them — so it is not something a
+ * demo fixture should route around by minting a superuser. This is dev-only tooling writing the hub
+ * module's own two tables, exactly as `positionRiders` below writes the rider module's.
+ *
+ * The question it asks is "which hub has parcels waiting for a scan", and it answers it from
+ * `hub.parcel_presence` using the same scan order the work list renders: `ARRIVED` is the one
+ * `last_scan` with nothing after it, so every other value means a gesture is still owed.
+ */
+async function placeHubOperator() {
+  const pgMod = await import('pg').catch(() => null);
+  if (!pgMod) {
+    console.log('      pg unavailable — operator left where the seed put it');
+    return;
+  }
+  const { Client } = pgMod.default ?? pgMod;
+  const db = new Client({ connectionString: process.env.DATABASE_URL });
+  await db.connect();
+  try {
+    const { rows: busy } = await db.query(
+      `SELECT p.hub_id, p.hub_code, h.name, count(*)::int AS actionable
+         FROM hub.parcel_presence p
+         JOIN hub.hubs h ON h.id = p.hub_id
+        WHERE p.last_scan IN ('INBOUND', 'SORT', 'OUTBOUND', 'DEPARTED')
+        GROUP BY p.hub_id, p.hub_code, h.name
+        ORDER BY actionable DESC, p.hub_code
+        LIMIT 1`,
+    );
+    if (busy.length === 0) {
+      console.log('      no parcel is waiting for a scan anywhere — assignment left alone');
+      return;
+    }
+    const target = busy[0];
+
+    const { rows: current } = await db.query(
+      `SELECT s.hub_id, h.code
+         FROM hub.staff s
+         JOIN hub.hubs h ON h.id = s.hub_id
+        WHERE s.user_id = (SELECT id FROM identity.users WHERE email = $1)
+          AND s.revoked_at IS NULL`,
+      [process.env.SEED_HUB_EMAIL],
+    );
+
+    if (current[0]?.hub_id === target.hub_id) {
+      console.log(`      already at ${target.hub_code} — ${target.actionable} awaiting a scan`);
+      return;
+    }
+
+    const { rowCount } = await db.query(
+      `UPDATE hub.staff
+          SET hub_id = $1, assigned_at = now()
+        WHERE user_id = (SELECT id FROM identity.users WHERE email = $2)
+          AND revoked_at IS NULL`,
+      [target.hub_id, process.env.SEED_HUB_EMAIL],
+    );
+    console.log(
+      rowCount
+        ? `      ${current[0]?.code ?? 'unassigned'} → ${target.hub_code} (${target.name}) — ` +
+            `${target.actionable} awaiting a scan`
+        : `      no active assignment for ${process.env.SEED_HUB_EMAIL} — left alone`,
+    );
+  } catch (error) {
+    console.log(`      placement failed: ${error.message}`);
+  } finally {
+    await db.end();
+  }
+}
+
+await placeHubOperator();
 
 /**
  * Run a settlement to completion, so the money screens have something real in them.
@@ -265,6 +364,15 @@ async function positionRiders() {
 
       for (const [i, rider] of rows.entries()) {
         const hub = hubCoords[i % hubCoords.length];
+        // Two riders report late on purpose. The map colours a rider grey once they have not checked
+        // in for fifteen minutes, and a map where every dot is green proves nothing about that —
+        // the whole claim is that a stale rider is visible as stale. A literal `recordedAt` here
+        // meant the opposite: every rider was eighteen hours old by the second run, so the shot said
+        // "25 riders live" over a wall of grey.
+        //
+        // "Late" is relative to now rather than to a date, or the fixture goes stale by itself and
+        // the next re-shoot photographs the same wall.
+        const late = i % 6 === 5;
         const res = await fetch(`${BASE}/v1/riders/${rider.id}/position`, {
           method: 'POST',
           headers: { ...riderAuth, 'Content-Type': 'application/json' },
@@ -274,14 +382,14 @@ async function positionRiders() {
             latitude: hub.lat + (Math.random() - 0.5) * 0.08,
             longitude: hub.lng + (Math.random() - 0.5) * 0.08,
             accuracyMeters: 12,
-            recordedAt: '2026-10-12T10:00:00.000Z',
+            recordedAt: new Date(Date.now() - (late ? 38 * 60_000 : 45_000)).toISOString(),
           }),
         });
         if (!res.ok) {
           console.error(`      ${(await res.text()).slice(0, 300)}`);
         }
         console.log(
-          `${res.ok ? 'positioned' : 'position skipped'}  ${(rider.display_name ?? rider.id).padEnd(16)} → ${res.status}`,
+          `${res.ok ? 'positioned' : 'position skipped'}  ${(rider.display_name ?? rider.id).padEnd(16)} → ${res.status}${late ? '  (reported late, so it reads grey)' : ''}`,
         );
       }
     } finally {
@@ -306,17 +414,45 @@ const post = async (path, body, key) => {
 const merchantId = (await (await fetch(`${BASE}/v1/me`, { headers: { ...auth } })).json())
   .merchantId;
 
-const createdSettlement = await post(
-  '/v1/settlements',
-  { merchantId, note: 'Weekly payout' },
-  `shots-settlement-${Date.now()}`,
-);
+/**
+ * Ask for the freeze until the cash is actually there to freeze.
+ *
+ * The COD_COLLECTED row is written by the worker, consuming the event the delivery published — so it
+ * lands some hundreds of milliseconds after `runSimulation` returns. This script used to ask once,
+ * immediately, and has been refused with `404 No unsettled COD collections for this merchant` on
+ * every run since the projections became asynchronous: the settlement blocker doing its job, one
+ * step earlier than the script was listening for. Then the three finance screens photographed their
+ * empty states and the log called that "expected", which is how a real fixture gap hides for a week.
+ *
+ * The condition being waited on IS the freeze, because the freeze is the only thing that knows
+ * whether this merchant's cash has landed. Each attempt carries its own idempotency key — reusing
+ * one would replay the stored 404 forever, which is the failure this loop exists to end.
+ *
+ * It is expected to run out of attempts on a fixture set whose cash genuinely has not been
+ * collected. That is reported as a refusal with its own status, not swallowed.
+ */
+let createdSettlement = null;
+for (let attempt = 1; attempt <= 10 && !createdSettlement; attempt++) {
+  createdSettlement = await post(
+    '/v1/settlements',
+    { merchantId, note: 'Weekly payout' },
+    `shots-settlement-${RUN}-${attempt}`,
+  );
+  if (!createdSettlement.ok) {
+    if (attempt === 1 || attempt % 5 === 0) {
+      console.log(`      waiting for the ledger — attempt ${attempt}: ${createdSettlement.status}`);
+    }
+    await new Promise((r) => setTimeout(r, 750));
+  }
+}
 
 if (!createdSettlement.ok) {
   console.error(
     `settlement not created: ${createdSettlement.status} ${JSON.stringify(createdSettlement.body)}`,
   );
-  console.error('  (expected while cash is still uncollected — settlement will not freeze it)');
+  console.error(
+    '  (expected only while cash is still uncollected — settlement will not freeze it)',
+  );
 } else {
   const id = createdSettlement.body.id;
   console.log(`created   settlement ${id}`);
@@ -328,22 +464,18 @@ if (!createdSettlement.ok) {
   const approved = await post(
     `/v1/settlements/${id}/approve`,
     { approverId: me.subjectId },
-    `shots-approve-${Date.now()}`,
+    `shots-approve-${RUN}`,
   );
   console.log(approved.ok ? 'approved  settlement' : `approve skipped: ${approved.status}`);
 
   const initiated = await post(
     `/v1/settlements/${id}/initiate-payment`,
     {},
-    `shots-initiate-${Date.now()}`,
+    `shots-initiate-${RUN}`,
   );
   console.log(initiated.ok ? 'initiated payout' : `initiate skipped: ${initiated.status}`);
 
-  const confirmed = await post(
-    `/v1/settlements/${id}/confirm-payment`,
-    {},
-    `shots-confirm-${Date.now()}`,
-  );
+  const confirmed = await post(`/v1/settlements/${id}/confirm-payment`, {}, `shots-confirm-${RUN}`);
   console.log(confirmed.ok ? 'confirmed payout' : `confirm skipped: ${confirmed.status}`);
   console.log(`statement: ${BASE}/v1/settlements/${id}/statement.csv`);
 }

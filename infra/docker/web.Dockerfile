@@ -65,17 +65,18 @@ ARG APP=@zipzap/merchant-web
 # ...and its directory, which Docker cannot derive from the package name.
 ARG APP_DIR=apps/frontends/merchant-web
 
-# Read by the bundle at BUILD time, so a different value means a different image — which is the
-# only reason it is an ARG and not a runtime variable. The browser must never learn an API URL;
-# this is the build-time half of that rule, the host in infra/docker/web-host.mjs is the rest.
+# No `VITE_API_URL` argument any more, and that is the point of the change rather than a side effect
+# of it.
 #
-# `/api` rather than an absolute URL is the default for ALL apps, including customer-tracking,
-# whose `src/lib/api.ts` still reads VITE_API_URL. Pointing it at the proxy means every surface in
-# this compose file talks to the backend through its own origin: no CORS, no WEB_ORIGIN entry to
-# keep in sync, and one rule to reason about instead of two. Passing an absolute
-# `http://host:port` restores the old cross-origin behaviour if you want to see it fail.
-ARG VITE_API_URL=/api
-ENV VITE_API_URL=${VITE_API_URL}
+# It existed because `customer-tracking/src/lib/api.ts` read `import.meta.env.VITE_API_URL`, and that
+# app was the last surface talking to the API on a second origin: no proxy in front of it, no `Origin`
+# rewrite, no `sec-fetch-*` stripping — so the CSRF arrangement ADR-0016 depends on simply did not
+# apply to the one app a recipient's browser uses. The client now resolves `/api` relative to whatever
+# origin the caller used, and every surface in this compose file goes through `web-host.mjs`.
+#
+# One origin per surface means no CORS, no WEB_ORIGIN entry to keep in sync, and one rule to reason
+# about instead of two.
+#
 
 WORKDIR /srv
 

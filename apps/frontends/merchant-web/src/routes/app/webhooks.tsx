@@ -12,7 +12,7 @@ import {
   Table,
 } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
+import { useAsync } from '@zipzap/web-kit';
 
 export const Route = createFileRoute('/app/webhooks')({
   component: WebhooksScreen,

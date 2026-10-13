@@ -3,8 +3,8 @@ import { createFileRoute, useParams } from '@tanstack/react-router';
 import { ZipZapApiError, type HubScanKind, type ParcelPresence } from '@zipzap/api-client';
 import { Badge, Button, EmptyState, ErrorState, Spinner } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '../../lib/useAsync.ts';
-import { formatAgo, formatClock, scanAction, statusLabel } from '../../lib/scans.ts';
+import { useAsync } from '@zipzap/web-kit';
+import { formatAgo, formatClock, scanAction, statusLabel } from '@zipzap/web-kit';
 
 /**
  * The work list, and the only screen in this app that matters.
@@ -76,12 +76,7 @@ function WorkPage() {
         <div role="alert" className="mb-4 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3">
           <p className="text-sm font-semibold text-red-900">Scan refused</p>
           <p className="mt-1 text-slate-800">{refusal}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2 -ml-3"
-            onClick={() => setRefusal(null)}
-          >
+          <Button variant="ghost" size="sm" className="mt-2 -ml-3" onClick={() => setRefusal(null)}>
             Dismiss
           </Button>
         </div>

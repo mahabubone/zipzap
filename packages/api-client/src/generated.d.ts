@@ -1471,6 +1471,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/riders/{riderId}/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A rider's server-truthful earnings projection */
+        get: operations["RiderEarningsController_earnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3750,6 +3767,29 @@ export interface components {
             pickups: components["schemas"]["RiderPickupJobDto"][];
             /** @description Delivery jobs assigned to this rider, newest first, each carrying what to collect and who to call — read through `SHIPMENT_HANDOFF_LOOKUP` because the parcel lives in shipment’s schema and a module may not join across it */
             deliveries: components["schemas"]["RiderDeliveryJobDto"][];
+        };
+        RiderEarningsDto: {
+            /**
+             * @description Total earnings in integer minor units (poisha), summed from completed deliveries. Projection from delivery count × base fee; never stored, rebuilt on every read.
+             * @example 250000
+             */
+            totalEarningsMinor: number;
+            /**
+             * @description Currency of the earnings.
+             * @example BDT
+             */
+            currency: string;
+            /**
+             * @description Count of completed deliveries contributing to this total.
+             * @example 5
+             */
+            completedDeliveries: number;
+            /**
+             * Format: date-time
+             * @description Server timestamp when this projection was computed. Use this to detect stale client-side cached figures.
+             * @example 2026-10-12T18:53:25.342Z
+             */
+            asOf: string;
         };
     };
     responses: never;
@@ -11116,6 +11156,7 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description The user ID and role for the new hub assignment. */
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssignStaffDto"];
@@ -11646,6 +11687,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RiderJobsDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    RiderEarningsController_earnings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The rider whose earnings are requested. */
+                riderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rider’s total earnings summed from completed deliveries, labelled with an `asOf` timestamp so the rider app can detect stale cached figures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderEarningsDto"];
                 };
             };
             /** @description Validation failed. Nothing was written. */

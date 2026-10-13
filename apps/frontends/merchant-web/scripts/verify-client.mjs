@@ -3,11 +3,15 @@
  * decoded values the console screens render. This is the contract between the
  * client and the UI — if a controller changes shape, this fails.
  *
+ * `API_ORIGIN`, not `VITE_API_URL`: this script runs in Node, not in a browser, so it legitimately
+ * knows the API's address. The browser does not, and must not — see the note in
+ * `src/lib/api.ts`.
+ *
  * Run: SEED_CONSOLE_EMAIL=... SEED_CONSOLE_PASSWORD=... node apps/web/scripts/verify-client.mjs
  */
 import { ZipZapClient } from '@zipzap/api-client';
 
-const API = process.env.VITE_API_URL ?? 'http://localhost:3000';
+const API = process.env.API_ORIGIN ?? 'http://localhost:3000';
 const EMAIL = process.env.SEED_CONSOLE_EMAIL;
 const PASSWORD = process.env.SEED_CONSOLE_PASSWORD;
 

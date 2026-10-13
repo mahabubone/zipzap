@@ -346,8 +346,8 @@ describeIfDb('module boundaries — what is actually enforced', () => {
     // search_path cannot block a fully-qualified name. Closing this at the database needs a
     // Postgres role per module and a separate connection credential per module; TypeORM merges
     // `extra` into its own Pool so a pre-built pool with a connect hook is not an option.
-    // Until then `scripts/check-boundaries.mjs` is the gate, and it runs in CI and in
-    // `pnpm verify`.
+    // Until then `scripts/check-boundaries.mjs` is the gate, and it runs in `pnpm verify` and in
+    // the pre-commit hook.
     const attempt = await shipmentDb.query('SELECT count(*) FROM merchant.merchants').then(
       () => 'permitted',
       () => 'refused',
@@ -357,7 +357,7 @@ describeIfDb('module boundaries — what is actually enforced', () => {
   });
 
   test('the boundary checker does catch a qualified cross-module query', async () => {
-    // The CI gate is the enforcement for qualified access, so it is worth asserting it fires.
+    // The checker is the enforcement for qualified access, so it is worth asserting it fires.
     const { execFileSync } = await import('node:child_process');
     const checker = new URL('../../../../scripts/check-boundaries.mjs', import.meta.url).pathname;
 
