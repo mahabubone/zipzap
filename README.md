@@ -25,12 +25,12 @@ _Cash-on-delivery, where the courier holds the customer's money in trust and the
 
 <table>
 <tr>
-<td width="33%"><img src="shots/2026-10-13_web_app_shipment_delivered.png" alt="A delivered parcel with a twelve-step movement history, every step attributed to whoever performed it" width="100%"></td>
+<td width="33%"><img src="shots/2026-10-13_web_app_overview.png" alt="The merchant's overview: their parcels by state and the cash attached to them" width="100%"></td>
 <td width="33%"><img src="shots/2026-10-13_ops_network_map.png" alt="The control tower on a real basemap, hubs and live rider positions" width="100%"></td>
 <td width="33%"><img src="shots/2026-10-13_hub_work.png" alt="The hub work list: every waiting parcel offering exactly the one scan it needs next" width="100%"></td>
 </tr>
 <tr>
-<td align="center"><sub><b>Merchant</b> · the twelve-step journey of one parcel</sub></td>
+<td align="center"><sub><b>Merchant</b> · 12 parcels, ৳5,002 owed</sub></td>
 <td align="center"><sub><b>Operations</b> · the network, live</sub></td>
 <td align="center"><sub><b>Hub</b> · one parcel, one gesture</sub></td>
 </tr>
@@ -129,11 +129,18 @@ tenants.
 | 📡 Control tower    | `localhost:5175`      | The network on a real basemap, for an operations manager            |
 | 🏢 Hub console      | `localhost:5176`      | One hub, one work list, signed in as a person assigned to it        |
 | 📚 Docs site        | `localhost:4321`      | Product docs and the API reference, generated from the OpenAPI spec |
-| 🖥️ API · Swagger    | `localhost:3000/docs` | 93 operations, generated from the controller decorators             |
+| 🖥️ API · Swagger    | `localhost:3000/docs` | 94 operations, generated from the controller decorators             |
 
-Only the tracking app pins its port; the rest take Vite's default cascade, so start them in that
-order. [`docs/development/environment.md`](docs/development/environment.md) has the container path and
-the troubleshooting notes.
+Each app pins its own port with `strictPort`, so a collision stops the run instead of quietly moving
+a surface onto a number the documentation and every script do not know about.
+[`docs/development/environment.md`](docs/development/environment.md) has the container path and the
+troubleshooting notes.
+
+**One thing to do once per clone**, because there is no CI here:
+
+```bash
+pnpm hooks:install    # prettier on staged files + the module-boundary checker, before every commit
+```
 
 ---
 
@@ -211,7 +218,8 @@ flowchart TB
 ```
 
 Seventeen modules, each owning its own Postgres schema, each unreachable from any other by SQL. The
-rule is enforced by a checker that runs before every commit, not promised in a README.
+rule is enforced by a checker that runs before every commit — not promised in a README, and not
+because a pipeline says so.
 
 ---
 
@@ -270,7 +278,7 @@ showing through, not a defect.
 ## 📐 The money rules
 
 Cash-on-delivery is where a logistics system either earns trust or loses it. Four rules, each
-enforced in a place that cannot be forgotten.
+enforced in a place that cannot be skipped.
 
 ```mermaid
 flowchart LR
@@ -291,15 +299,17 @@ flowchart LR
     style O fill:#eff6ff,stroke:#3b82f6
 ```
 
-| Rule                    | Where it lives                                       | Why it cannot be skipped                                                                                                                        |
-| ----------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Integer minor units** | `common/money.ts` · `@MoneyMinor` DTOs · `MoneyText` | `boundaries:check` fails the commit on a float in a money field, and the browser formats the same integer the API stores — the two cannot drift |
-| **Append-only ledger**  | DB triggers reject UPDATE/DELETE                     | A correction is a compensating row. There is no API to edit history, and no account with the scope to ask for one                               |
-| **Derived balances**    | `finance` sums its own ledger                        | The balance column is not stored, so there is nothing to corrupt. The screen shows the lines that made it up                                    |
-| **Settlement blocker**  | `COD_LOOKUP`, read before the freeze                 | Cash in transit cannot be frozen, so a settlement cannot be created against money that has not landed                                           |
+| Rule                    | Where it lives                                             | Why it cannot be skipped                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Integer minor units** | `common/money.ts` · `@MoneyMinor` DTOs · `@zipzap/web-kit` | `boundaries:check` fails the commit on a decimal literal assigned to a money-shaped name, and the browser formats the same integer the API stores |
+| **Append-only ledger**  | DB triggers reject UPDATE/DELETE                           | A correction is a compensating row. There is no API to edit history, and no account with the scope to ask for one                                 |
+| **Derived balances**    | `finance` sums its own ledger                              | The balance column is not stored, so there is nothing to corrupt. The screen shows the lines that made it up                                      |
+| **Settlement blocker**  | `COD_LOOKUP`, read before the freeze                       | Cash in transit cannot be frozen, so a settlement cannot be created against money that has not landed                                             |
 
-`MoneyText` in `packages/ui` carries its own tests because it once divided a float and rounded
-wrongly — the class of bug a screenshot hides and an assertion does not.
+One formatter writes money in this product. Four copies drifted apart once — one of them dividing by
+100 into a float, which is the exact rule this table's first row forbids — and `formatMinor` now
+splits in integer space in `@zipzap/web-kit`, which is what the backend's `money.format()` does. A
+statement and a screen cannot disagree by a poisha.
 
 ---
 
@@ -312,7 +322,8 @@ monorepo tooling (pnpm workspaces + Turbo). Microservices are an extraction stra
 point.
 
 **Authentication**: JWT for API clients · HttpOnly session cookies for browsers, behind a same-origin
-proxy
+proxy on every surface — including public tracking, which had been the one app talking to the API on
+a second origin
 
 **Authorization**: Role-based access control with scoped permissions, and hub assignment as a second
 axis — a hub manager's power says _what_, their assignment says _where_
@@ -340,19 +351,20 @@ site) · Tailwind CSS
 A list of names says nothing a search engine cannot. The table below is the part that is hard to
 find elsewhere, because most of these decisions are invisible until they go wrong.
 
-| Layer             | Choice                                      | The reason, not the list                                                                                                                                                                        |
-| ----------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Runtime**       | Node 24 · pnpm 11 · Turbo 2.11              | Strict ESM and a workspace graph, so a package cannot import another's internals by accident                                                                                                    |
-| **Backend**       | NestJS 12                                   | Dependency injection with real module boundaries — `forModule('identity', […])` scopes a connection per module, which makes a cross-schema query _fail at runtime_ rather than degrade silently |
-| **ORM**           | TypeORM 1.1                                 | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration — the gate runs `db:migrate`, `db:revert`, `db:migrate` on every push                                 |
-| **Database**      | PostgreSQL 18 + PostGIS                     | Coverage, service areas and routing are spatial. A healthcheck runs `SELECT postgis_version()`, because "accepts connections" is not "works"                                                    |
-| **Async**         | NATS JetStream · BullMQ · Redis             | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                       |
-| **Language**      | TypeScript 6.0                              | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                  |
-| **Web**           | React 19 · TanStack Router/Start            | One codebase, SSR. The auth guard runs in `beforeLoad` _on the server_, so an unauthenticated visitor gets a 307 rather than a flash of console                                                 |
-| **Design system** | `packages/ui`                               | 71 components across atoms, molecules and organisms · 338 tests · Storybook. A screen that is not in the kit does not get built                                                                 |
-| **Mobile**        | Expo / React Native                         | Offline-first queue with per-command idempotency                                                                                                                                                |
-| **Docs**          | Astro 7                                     | The API reference is generated from the same spec the typed client is generated from, so it cannot drift                                                                                        |
-| **Observability** | OpenTelemetry · Prometheus · Grafana · pino | The publisher and worker expose metrics; the correlation is `request_id`                                                                                                                        |
+| Layer             | Choice                           | The reason, not the list                                                                                                                                                                        |
+| ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**       | Node 24 · pnpm 11 · Turbo 2.11   | Strict ESM and a workspace graph, so a package cannot import another's internals by accident                                                                                                    |
+| **Backend**       | NestJS 12                        | Dependency injection with real module boundaries — `forModule('identity', […])` scopes a connection per module, which makes a cross-schema query _fail at runtime_ rather than degrade silently |
+| **ORM**           | TypeORM 1.1                      | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration, and the rollback is part of the migration's story rather than an afterthought                        |
+| **Database**      | PostgreSQL 18 + PostGIS          | Coverage, service areas and routing are spatial. A healthcheck runs `SELECT postgis_version()`, because "accepts connections" is not "works"                                                    |
+| **Async**         | NATS JetStream · BullMQ · Redis  | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                       |
+| **Language**      | TypeScript 6.0                   | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                  |
+| **Web**           | React 19 · TanStack Router/Start | One codebase, SSR. The auth guard runs in `beforeLoad` _on the server_, so an unauthenticated visitor gets a 307 rather than a flash of console                                                 |
+| **Design system** | `packages/ui`                    | 36 components across atoms, molecules and organisms · 346 tests · Storybook. A screen that is not in the kit does not get built                                                                 |
+| **Web kit**       | `packages/web-kit`               | One place decides how a status is worded, how ৳1,250.50 is written and what a failed load says — because four copies drifted and the differences shipped                                        |
+| **Mobile**        | Expo / React Native              | Offline-first queue with per-command idempotency                                                                                                                                                |
+| **Docs**          | Astro 7                          | The API reference is generated from the same spec the typed client is generated from, so it cannot drift                                                                                        |
+| **Desktop**       | Electron                         | A kiosk shell for a depot machine, hardened against navigation and window opens — with `ELECTRON_START_URL` required, because guessing it produced a white window                               |
 
 Full reasoning, with the alternatives that were rejected, lives in
 [`docs/architecture/overview.md`](docs/architecture/overview.md) and
@@ -365,22 +377,24 @@ Full reasoning, with the alternatives that were rejected, lives in
 ## 🧪 What proves it works
 
 ```bash
-pnpm verify               # boundaries → format → typecheck → 2,433 unit tests
-pnpm test:integration     # 80 tests on real Postgres, Redis and NATS
-pnpm boundaries:check     # the architecture gate
+pnpm verify               # boundaries → format → proofs → typecheck → 2,468 unit tests
+pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
+pnpm prove:stack          # the browser and live-stack proofs: client, tokens, webhooks, proofs
 ```
 
 |                                               |                                             |
 | --------------------------------------------- | ------------------------------------------- |
 | Domain modules, each owning a Postgres schema | **17**                                      |
-| HTTP operations in the generated OpenAPI spec | **93** across 83 paths                      |
-| Unit tests                                    | **2,433**                                   |
-| Integration tests on live infrastructure      | **80** across 16 files                      |
+| HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
+| Unit tests                                    | **2,468**                                   |
+| Integration tests on live infrastructure      | **86** across 17 files                      |
+| Standalone proofs, reachable from one command | **11**                                      |
 | Reviewed, reversible migrations               | **51**                                      |
 | Architecture decision records                 | **17**, each with the alternatives rejected |
+| Workspaces in the graph                       | **12**                                      |
 | Documentation files                           | **77** markdown                             |
 | Screenshots, all regenerable by `pnpm shots`  | **42** across 6 apps                        |
-| Code                                          | ~84k lines of TypeScript, TSX and Astro     |
+| Code                                          | ~85k lines of TypeScript, TSX and Astro     |
 
 ### The gates, and what they actually prevent
 
@@ -388,23 +402,29 @@ pnpm boundaries:check     # the architecture gate
 flowchart LR
     C["📝 Every commit"] --> P{"pnpm verify"}
     P --> B["🧱 boundaries:check<br/><i>cross-schema query,<br/>framework import in rules/,<br/>provider wire format escaping,<br/>float in a money field</i>"]
+    P --> F["💅 format:check"]
+    P --> V["🧷 pnpm prove<br/><i>11 zero-dependency proofs</i>"]
     P --> T["🔍 typecheck"]
-    P --> U["🧪 2,433 unit tests"]
+    P --> U["🧪 2,468 unit tests"]
     P --> I["🔗 test:integration<br/><i>real PG / NATS / Redis</i>"]
-    P --> K["📜 api:check<br/><i>spec + client drift</i>"]
-    P --> D["🗄️ migrate up → down → up<br/><i>a migration that cannot<br/>roll back cannot deploy</i>"]
 
-    B --> V([✅ green])
-    T --> V; U --> V; I --> V; K --> V; D --> V
+    B --> G([✅ green])
+    F --> G; V --> G; T --> G; U --> G; I --> G
 
     style B fill:#fef2f2,stroke:#dc2626,stroke-width:2px
-    style K fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
-    style D fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style V fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    style I fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
 ```
 
 `boundaries:check` is 194 lines of zero-dependency JavaScript and the highest-leverage file in the
-repository: it fails the gate on the failure modes this architecture is most at risk of, all of which
-are invisible to a human reading a small diff.
+repository: it fails on the failure modes this architecture is most at risk of, all of which are
+invisible to a human reading a small diff. With no CI, `.githooks/pre-commit` runs it and prettier on
+every commit, so the gate is where the work happens rather than somewhere nobody looks.
+
+`pnpm prove` exists because eleven `verify-*.mjs` proofs were reachable from no command at all —
+not from `package.json`, not from anything. One of them now checks the dock's vocabulary against the
+server's scan kinds across the module boundary, so a sixth gesture cannot reach a loading dock as a
+button labelled `Scan`.
 
 ---
 
@@ -425,7 +445,7 @@ are invisible to a human reading a small diff.
 
 <table>
 <tr>
-<td width="50%"><img src="shots/2026-10-13_web_app_shipments.png" alt="Shipment list in six different lifecycle states" width="100%"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_shipments.png" alt="The shipment list in six different lifecycle states at once" width="100%"></td>
 <td width="50%"><img src="shots/2026-10-13_web_track_parcel.png" alt="The same parcel on its public tracking page" width="100%"></td>
 </tr>
 <tr>
@@ -435,11 +455,26 @@ are invisible to a human reading a small diff.
 
 <table>
 <tr>
-<td width="50%"><img src="shots/2026-10-13_web_app_shipment_new.png" alt="Create a shipment with live server pricing" width="100%"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_overview.png" alt="The merchant overview: parcels by state, their own balance, and anything waiting for review" width="100%"></td>
 <td width="50%"><img src="shots/2026-10-13_web_app_money.png" alt="A derived balance with the ledger lines that produced it" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2" align="center"><sub>Live server pricing with a coverage check before the write · a balance <b>derived</b> from an append-only ledger, never a stored column, with the lines that made it up shown on screen.</sub></td>
+<td colspan="2" align="center"><sub>An overview about <b>your</b> parcels and <b>your</b> money — every status count links to the filtered list it came from · a balance <b>derived</b> from an append-only ledger, never a stored column, with the lines that made it up on screen.</sub></td>
+</tr>
+</table>
+
+The overview is worth a note. It was titled "Control tower" and read `GET /v1/control-tower/live-counts`
+— the network's picture, `network:read` — so it answered **403** to the one person meant to see it, and
+the console's landing page was an error box. It now reads `GET /v1/shipments/counts`: the same
+aggregate with the tenancy predicate on.
+
+<table>
+<tr>
+<td width="50%"><img src="shots/2026-10-13_web_app_shipment_new.png" alt="Create a shipment with live server pricing" width="100%"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_bulk.png" alt="Bulk import previewed: two rows will import, one will not, and the reason is named" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><sub>Live server pricing with a coverage check before the write — and when either request fails the screen says so, rather than telling a merchant who has finished typing that their form is incomplete · bulk import: three rows in, and the screen names which two will create a parcel, the failed row first, with the server's reason. Nothing is written until <b>Create 2 parcels</b> is pressed.</sub></td>
 </tr>
 </table>
 
@@ -453,6 +488,12 @@ are invisible to a human reading a small diff.
 <td colspan="2" align="center"><sub>Leaflet on OpenStreetMap. Markers are drawn by the app from coordinates the API returned; the basemap is decoration, and when it stops answering the screen swaps itself to a list rather than leaving an operator with a grey rectangle. A rider who stops checking in goes <b>grey</b>, not red, because an ops console that paints everything red stops being read — and the footer counts what it could not place instead of dropping it silently.</sub></td>
 </tr>
 </table>
+
+The map is the one part of this product that cannot be server-rendered: Leaflet reads `window` at
+module scope, so the map is loaded on the client behind a stated placeholder, and the counts, the
+footer and the fallback list all render on the server. Before that split, the whole route silently
+fell back to client rendering on every direct visit — visible only by reading a response body nobody
+reads.
 
 ### The hub
 
@@ -483,7 +524,7 @@ is rendered in full, above the list, in the machine's own words.
 <td colspan="2" align="center"><img src="shots/2026-10-13_hub_manifests.png" alt="Route manifests with a status filter" width="620"></td>
 </tr>
 <tr>
-<td colspan="2" align="center"><sub>Signed in as an operator whose only write scope is <code>hub:scan</code> — they can move parcels between hubs and cannot create, cancel or settle anything. Manifests are the other half of a shift: seal, dispatch, receive, reconcile.</sub></td>
+<td colspan="2" align="center"><sub>Signed in as an operator whose only write scope is <code>hub:scan</code> — they can move parcels between hubs and cannot create, cancel or settle anything. Manifests are the other half of a shift: seal, dispatch, receive, reconcile. Three sidebar destinations — riders, deliveries, pickups — are marked <i>soon</i> and say <b>Not built yet</b> when opened, rather than describing a feature that does not exist.</sub></td>
 </tr>
 </table>
 
@@ -501,7 +542,7 @@ is rendered in full, above the list, in the machine's own words.
 
 <table>
 <tr>
-<td width="50%"><img src="shots/mobile/2026-10-13_rider_job-delivery.png" alt="A delivery job with the cash due" width="300"></td>
+<td width="50%"><img src="shots/mobile/2026-10-13_rider_job-delivery.png" alt="A delivery job with who to call and the cash to collect" width="300"></td>
 <td width="50%"><img src="shots/mobile/2026-10-13_rider_proof-code.png" alt="Proof of delivery — the code the customer reads out" width="300"></td>
 </tr>
 <tr>
@@ -562,10 +603,15 @@ Stated plainly, because a portfolio that only lists its strengths is telling you
 - **Support, admin and developer-portal consoles** are planned and absent — no packages exist.
 - **The rider's native bundle does not build.** `expo export --platform ios` fails inside
   `react-native-screens`; the web export used for these screenshots is the only bundle.
-- **The Electron kiosk shell typechecks but does not build.** `apps/desktop`'s `build` script calls a
-  `vite` it does not depend on, so `pnpm build` fails on that one workspace.
-- **Three of the six hub-console sidebar destinations are placeholders** — riders, deliveries and
-  pickups render a designed empty state, not data.
+- **The rider app ships its own component kit.** `apps/mobile-rider/src/components` is a second,
+  parallel design system: React Native cannot consume `@zipzap/ui`, but ten component names now
+  exist twice with different props.
+- **Three of the six hub-console destinations are designed and empty** — riders, deliveries and
+  pickups say "Not built yet" rather than pretending.
+- **The desktop shell is not packaged.** It builds, it is hardened, and there is no
+  `electron-builder` configuration or signed artefact.
+- **No CI.** The gates are `pnpm verify` and a pre-commit hook; nothing runs them when this is
+  pushed anywhere.
 - **No deployment beyond `docker compose`.** No Kubernetes, no Terraform, no blue-green.
 - **Roadmap boxes are still open**, concentrated in surfaces, security hardening, observability
   dashboards and load testing.
@@ -584,7 +630,7 @@ Stated plainly, because a portfolio that only lists its strengths is telling you
 [NestJS](https://nestjs.com) · [TypeORM](https://typeorm.io) · [PostgreSQL](https://www.postgresql.org) ·
 [PostGIS](https://postgis.net) · [NATS JetStream](https://nats.io) · [BullMQ](https://docs.bullmq.io) · [Redis](https://redis.io) ·
 [React](https://react.dev) · [TanStack](https://tanstack.com) · [Expo](https://expo.dev) ·
-[Astro](https://astro.build) · [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org) ·
+[Astro](https://astro.build) · [Leaflet](https://leafletjs.com) · [Electron](https://electronjs.org) · [OpenStreetMap](https://www.openstreetmap.org) ·
 [Vitest](https://vitest.dev) · [OpenTelemetry](https://opentelemetry.io)
 
 ---
@@ -637,52 +683,52 @@ section above argues, this one indexes.
 <td align="center"><sub>The console at 390px, drawer open</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="shots/2026-10-13_web_app_shipments.png" alt="The shipment list in six different lifecycle states at once"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_overview.png" alt="Overview: your parcels by state, your balance, anything waiting for review"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_shipments.png" alt="Six lifecycle states on one page, and a filter that narrows to one"></td>
+</tr>
+<tr>
+<td align="center"><sub>Overview — merchant-scoped, and reachable</sub></td>
+<td align="center"><sub>Six lifecycle states on one page</sub></td>
+</tr>
+<tr>
 <td width="50%"><img src="shots/2026-10-13_web_app_shipment_delivered.png" alt="Twelve-step history, every actor attributed"></td>
-</tr>
-<tr>
-<td align="center"><sub>Six lifecycle states on one page — and a filter that narrows it to one</sub></td>
-<td align="center"><sub>Twelve-step history, every actor attributed</sub></td>
-</tr>
-<tr>
 <td width="50%"><img src="shots/2026-10-13_web_app_shipment_detail.png" alt="A lost parcel — actions off, history intact"></td>
-<td width="50%"><img src="shots/2026-10-13_web_app_shipment_new.png" alt="Live server pricing and a coverage check"></td>
 </tr>
 <tr>
+<td align="center"><sub>Twelve-step history, every actor attributed</sub></td>
 <td align="center"><sub>A lost parcel — actions off, history intact</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="shots/2026-10-13_web_app_shipment_new.png" alt="Live server pricing and a coverage check"></td>
+<td width="50%"><img src="shots/2026-10-13_web_app_bulk.png" alt="Bulk import previewed before it commits"></td>
+</tr>
+<tr>
 <td align="center"><sub>Live server pricing and a coverage check</sub></td>
+<td align="center"><sub>Bulk import, previewed before it commits</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="shots/2026-10-13_web_app_bulk.png" alt="Bulk import previewed: two rows will import, one will not, and the reason is named"></td>
 <td width="50%"><img src="shots/2026-10-13_web_app_money.png" alt="A balance derived from the ledger, not stored"></td>
-</tr>
-<tr>
-<td align="center"><sub>Bulk import: three rows in, and the screen says which two will create a parcel — the failed row first, with the server's reason. Nothing is written until <b>Create 2 parcels</b> is pressed.</sub></td>
-<td align="center"><sub>A balance derived from the ledger, not stored</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="shots/2026-10-13_web_app_cod.png" alt="The reconciliation queue, empty and saying so"></td>
 <td width="50%"><img src="shots/2026-10-13_web_app_settlements.png" alt="Settlements, with a downloadable statement"></td>
 </tr>
 <tr>
-<td align="center"><sub>The reconciliation queue — empty because every collection matched what it was quoted, and it says exactly that instead of showing a spinner forever</sub></td>
+<td align="center"><sub>A balance derived from the ledger, not stored</sub></td>
 <td align="center"><sub>Settlements, with a downloadable statement</sub></td>
 </tr>
 <tr>
+<td width="50%"><img src="shots/2026-10-13_web_app_cod.png" alt="The reconciliation queue, empty and saying so"></td>
 <td width="50%"><img src="shots/2026-10-13_web_app_pricing.png" alt="Rate card, with worked examples"></td>
-<td width="50%"><img src="shots/2026-10-13_web_app_analytics.png" alt="Analytics over the same event stream"></td>
 </tr>
 <tr>
+<td align="center"><sub>The reconciliation queue — empty, and it says why</sub></td>
 <td align="center"><sub>Rate card, with worked examples</sub></td>
-<td align="center"><sub>Analytics over the same event stream</sub></td>
 </tr>
 <tr>
+<td width="50%"><img src="shots/2026-10-13_web_app_analytics.png" alt="Analytics over the same event stream"></td>
 <td width="50%"><img src="shots/2026-10-13_web_app_webhooks.png" alt="Webhooks with a per-attempt delivery log"></td>
-<td width="50%"><img src="shots/2026-10-13_web_app_control_tower.png" alt="Control tower, as an operations manager"></td>
 </tr>
 <tr>
+<td align="center"><sub>Analytics over the same event stream</sub></td>
 <td align="center"><sub>Webhooks with a per-attempt delivery log</sub></td>
-<td align="center"><sub>Control tower, as an operations manager</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="shots/2026-10-13_web_app_notifications.png" alt="Notification preferences, as shipped"></td>
@@ -710,7 +756,7 @@ section above argues, this one indexes.
 <td></td>
 </tr>
 <tr>
-<td align="center"><sub>An unknown code, answered plainly — this is a separate app on a separate origin, sharing nothing but the event stream</sub></td>
+<td align="center"><sub>An unknown code, answered plainly — a separate app on a separate origin, now talking to the API through its own</sub></td>
 <td></td>
 </tr>
 </table>

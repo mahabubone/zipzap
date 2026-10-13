@@ -428,11 +428,14 @@ const merchantId = (await (await fetch(`${BASE}/v1/me`, { headers: { ...auth } }
  * whether this merchant's cash has landed. Each attempt carries its own idempotency key — reusing
  * one would replay the stored 404 forever, which is the failure this loop exists to end.
  *
- * It is expected to run out of attempts on a fixture set whose cash genuinely has not been
- * collected. That is reported as a refusal with its own status, not swallowed.
+ * Forty attempts at 750ms is thirty seconds, and the ceiling is generous on purpose. The worker may
+ * be draining a backlog — the finance consumer is one consumer among several, and a database that has
+ * just been seeded has plenty to catch up on — so a ten-second window was not enough to be sure. A
+ * fixture script that gives up quietly and leaves the three money screens empty is worse than one
+ * that waits, because nothing reports which of the two happened.
  */
 let createdSettlement = null;
-for (let attempt = 1; attempt <= 10 && !createdSettlement; attempt++) {
+for (let attempt = 1; attempt <= 40 && !createdSettlement; attempt++) {
   createdSettlement = await post(
     '/v1/settlements',
     { merchantId, note: 'Weekly payout' },

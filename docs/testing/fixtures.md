@@ -92,7 +92,7 @@ scenario changes once.
 Each integration test runs against a **fresh database** — Testcontainers with a new container or
 a truncated schema set between tests.
 
-Tests that share state pass in order and fail in parallel, and you find out in CI rather than
+Tests that share state pass in order and fail in parallel, and you find out when the suite runs rather than
 locally.
 
 ## Seeding volumes

@@ -65,7 +65,7 @@ function Overview() {
           />
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Panel title="Where your parcels are" hint="Every status you have">
+            <Panel title="Where your parcels are" hint="Every state still in motion">
               <ul className="flex flex-col gap-1.5 text-sm">
                 {activeStates(counts.data.byStatus).map(([status, count]) => (
                   <li key={status} className="flex items-center justify-between gap-3">
@@ -80,7 +80,10 @@ function Overview() {
                   </li>
                 ))}
                 {activeStates(counts.data.byStatus).length === 0 ? (
-                  <li className="text-slate-500">No parcels yet.</li>
+                  <li className="text-slate-500">
+                    Nothing in motion. Every parcel you have is in a final state — the counts on the
+                    right say which.
+                  </li>
                 ) : null}
               </ul>
               <p className="mt-3 text-xs text-slate-400">

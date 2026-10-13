@@ -149,6 +149,7 @@ await page.waitForURL('**/app', { timeout: 15000 });
  * logistics OS that treats the cash as an afterthought is not the product being described.
  */
 const ROUTES = [
+  ['app_overview', '/app'],
   ['app_shipments', '/app/shipments'],
   ['app_shipment_new', '/app/shipments/new'],
   ['app_cod', '/app/cod'],
@@ -220,39 +221,6 @@ try {
   rmSync(csvPath, { force: true });
 }
 await shoot(page, 'app_bulk');
-
-/**
- * The control tower is shot as an operations manager, not as the merchant.
- *
- * `network:read` is an OPERATIONS_MANAGER scope and deliberately withheld from every merchant
- * role, and `notifications:manage` is the other way round. One principal cannot shoot both
- * screens — a run using the merchant for everything produced a control-tower shot of a
- * PERMISSION_DENIED error box, which is a fresh file showing a broken screen. A 403 in a shot is
- * worse than a stale shot, because it looks intentional.
- *
- * When SEED_OPS_EMAIL is absent the control tower is skipped rather than captured wrong.
- */
-const opsPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-if (process.env.SEED_OPS_EMAIL) {
-  await opsPage.goto(`${CONSOLE}/login`);
-  await settle(opsPage);
-  await opsPage.fill('#email', process.env.SEED_OPS_EMAIL);
-  await opsPage.fill('#password', process.env.SEED_OPS_PASSWORD ?? '');
-  await opsPage.click('button[type="submit"]');
-  await opsPage.waitForURL('**/app', { timeout: 15000 });
-  await opsPage.goto(`${CONSOLE}/app`);
-  await settle(opsPage);
-  // Fail loudly rather than capture the error box: a shot that says PERMISSION_DENIED is a false
-  // record of what the product looks like.
-  const body = await opsPage.locator('body').innerText();
-  if (body.includes('Something went wrong') || body.includes('PERMISSION_DENIED')) {
-    throw new Error('control tower rendered an error — check the ops account has network:read');
-  }
-  await shoot(opsPage, 'app_control_tower');
-} else {
-  console.log('skip  app_control_tower (no SEED_OPS_EMAIL)');
-}
-await opsPage.close();
 
 // Notification preferences: the three-togge screen that all three competitors ship, and
 // the one row where an unsent SMS is a bill and a complaint rather than a missing feature.

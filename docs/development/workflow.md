@@ -66,17 +66,35 @@ The questions worth asking, in order of how much they cost when missed:
 7. **Is the test actually asserting?** A test that cannot fail is worse than no test, because it
    looks like coverage.
 
-## CI
+## The gate
+
+There is no CI in this repository, so the sequence below runs on your machine, from a pre-commit
+hook, and on demand. Nothing runs it when this is pushed anywhere — that is a real gap and it is
+stated rather than implied.
 
 ```
-format → lint → typecheck → unit → integration → build → container → security scan → deploy
+boundaries → format → proofs → typecheck → unit
 ```
 
-Integration tests need Postgres, Redis, and NATS — Testcontainers, not mocks for the things you
-are testing behaviour of.
+| Command                 | What it proves                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm boundaries:check` | No cross-schema SQL, no framework in `rules/`, no provider wire format outside its adapter, no float on a money-shaped name    |
+| `pnpm format:check`     | One formatter, so a diff is about the change and not about the author's editor                                                 |
+| `pnpm prove`            | Eleven zero-dependency proofs, including one that reads the backend's scan kinds and asserts the dock's vocabulary covers each |
+| `pnpm typecheck`        | Every workspace, and the generated client against the spec                                                                     |
+| `pnpm test`             | Unit tests. Vitest, colocated `*.spec.ts`, no mocks of the code under test                                                     |
+| `pnpm test:integration` | The behaviour of the above against real Postgres, Redis and NATS — Testcontainers, not mocks, for the things being tested      |
 
-Every push is a green build or a broken main. Merging red to unblock a demo is how main becomes
-a place nobody trusts.
+`pnpm verify` runs the first five. `.githooks/pre-commit` (installed with `pnpm hooks:install`)
+runs the boundary checker in full and Prettier on the staged files only, because a hook that takes
+a minute is a hook that gets `--no-verify`'d. Integration tests are deliberately not in the hook.
+
+**Order matters if you are also photographing the app**: `dashboard.integration.test.ts` empties the
+shipment, rider, COD and delivery tables, so run it _before_ `pnpm seed:shots`, never after.
+
+When this repository is released publicly, the same sequence belongs in a workflow. Until then,
+`pnpm verify` passing is a claim you make about your own work rather than one the repository makes
+for you.
 
 ## Dependencies
 

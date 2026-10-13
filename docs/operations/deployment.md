@@ -5,7 +5,7 @@
 Two supported shapes. They run the same three processes and answer the same URLs.
 
 ```bash
-pnpm demo:up                   # everything in containers — what a reviewer or a CI smoke test uses
+pnpm demo:up                   # everything in containers — what a reviewer uses
 ```
 
 ```bash

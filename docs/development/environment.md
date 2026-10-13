@@ -108,7 +108,7 @@ pnpm dev                      # turbo: api + worker + publisher
 `pnpm infra:logs` follows all container logs. `pnpm infra:down` stops them.
 
 `/docs-json` and `/docs-yaml` are served in every environment: they are the machine-readable
-contract the generated client and CI are built from. The interactive `/docs` UI is development-only,
+contract the generated client is built from. The interactive `/docs` UI is development-only,
 because it is a debugger rather than an interface. The containers run `NODE_ENV=production`, so
 `/docs` is absent there by the same rule — `APP_NODE_ENV=development` in `.env` brings it back.
 

@@ -62,7 +62,7 @@ see [extraction.md](extraction.md).
 
 The cost is discipline. Nothing stops a module from reaching into another module's tables. That
 is why the boundary is _enforced_, not merely documented: one TypeORM connection per module
-scoped to its own schema, plus a CI grep. See
+scoped to its own schema, plus `pnpm boundaries:check`. See
 [module-boundaries.md](module-boundaries.md#enforcement).
 
 ## Why three entrypoints

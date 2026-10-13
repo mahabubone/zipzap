@@ -125,6 +125,21 @@ re-refuse forever and hide a real problem behind a spinner.
 oversight: the queue is the part that can silently lose a day, and a screen asserting "synced" over a
 queue without exact-once would be a lie with a spinner.
 
+## Earnings
+
+`GET /v1/riders/:riderId/earnings` — the rider app's home screen number.
+
+- **Derived, never stored.** `totalEarningsMinor` is summed from completed deliveries at read time
+  (delivery count × base fee), so it cannot drift from the deliveries that produced it and there is no
+  counter to increment twice. Same rule as `finance`'s balance.
+- **Integer minor units with a currency**, like every other amount in the system. `250000` is ৳2,500.00.
+- **It is a projection, so it carries a timestamp.** `computedAt` exists because a rider app that
+  caches this number offline needs to know how old the figure it is showing is — a stale "you have
+  earned" with no date on it is worse than no figure at all.
+- **Served by its own module.** `RiderEarningsModule` reads `delivery` through `DeliveryRepository`
+  rather than having `RiderModule` query another schema (rule 2): the rider schema owns who a rider is,
+  and it does not own what they were paid.
+
 ## KPI
 
 Rider utilisation — fraction of capacity in use — is measured with the assignment scoring, then

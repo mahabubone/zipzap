@@ -21,7 +21,13 @@ export default defineConfig({
     maxWorkers: 1,
     coverage: {
       provider: 'v8',
-      exclude: [...coverageConfigDefaults.exclude, '**/*.module.ts', 'src/worker.ts', 'src/main.ts', 'src/publisher.ts'],
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        '**/*.module.ts',
+        'src/worker.ts',
+        'src/main.ts',
+        'src/publisher.ts',
+      ],
     },
   },
 });

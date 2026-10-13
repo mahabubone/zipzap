@@ -80,7 +80,8 @@ process — import it.
 2. **A module owns its schema.** No module may read or write another module's tables — no
    JOINs, no foreign repositories, no raw SQL crossing a schema boundary. Cross-module =
    injected service (sync) or event (async).
-   Enforced by one `TypeOrmModule.forRoot({ schema })` per module + a CI grep.
+   Enforced by one `TypeOrmModule.forRoot({ schema })` per module + the boundary
+   checker, which runs in `pnpm verify` and in `.githooks/pre-commit`.
 3. **Pure rules import nothing from the framework.** Files matching `rules/` are plain
    TypeScript: no `@nestjs/*`, no `typeorm`, no `class-validator` decorators, no BullMQ,
    no Nest DI. Domain errors are plain `Error` subclasses. Enforced by the checker on the
@@ -131,8 +132,12 @@ process — import it.
 ## Before you commit
 
 ```bash
-pnpm verify        # format:check && typecheck && test
+pnpm verify        # boundaries:check && format:check && prove && typecheck && test
 ```
+
+There is no CI in this repository, so this command and `.githooks/pre-commit` are the whole gate.
+Install the hook once per clone with `pnpm hooks:install`; it runs the boundary checker in full and
+Prettier on the staged files only.
 
 There is no ESLint yet. `noUnusedLocals` and `noUnusedParameters` in `tsconfig.base.json`
 cover the class of bug ESLint would catch here, and Prettier covers formatting. Add ESLint when
