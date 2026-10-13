@@ -18,7 +18,7 @@ import http from 'node:http';
 import { AppModule } from './app.module.ts';
 import { config } from './config';
 import { registry, registerProcessMetrics } from './common/metrics';
-import { connectNats, drainQuietly } from './nats.ts';
+import { connectNats, drainQuietly, watchConnection } from './nats.ts';
 import { TrackingConsumer } from './modules/tracking/tracking.consumer.ts';
 import { FinanceConsumer } from './modules/finance/finance-consumer.service.ts';
 import { WebhookConsumer } from './modules/merchant/webhook.consumer.ts';
@@ -76,6 +76,15 @@ async function bootstrap(): Promise<void> {
   };
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
+
+  // A worker that cannot reach its broker is not a worker. It stays alive, its metrics keep
+  // answering 200, and it consumes nothing — so it exits instead, and says why on the way out.
+  // `shutdown()` is not used here: this is not a drain, and pretending it was would mark the
+  // connection as deliberately closing and suppress the log line that explains the restart.
+  watchConnection(nc, (reason) => {
+    logger.error(`${reason} — exiting so the process supervisor can restart this worker`);
+    void app.close().finally(() => process.exit(1));
+  });
 
   logger.log('worker started');
 

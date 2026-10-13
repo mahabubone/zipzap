@@ -428,33 +428,40 @@ const merchantId = (await (await fetch(`${BASE}/v1/me`, { headers: { ...auth } }
  * whether this merchant's cash has landed. Each attempt carries its own idempotency key — reusing
  * one would replay the stored 404 forever, which is the failure this loop exists to end.
  *
- * Forty attempts at 750ms is thirty seconds, and the ceiling is generous on purpose. The worker may
- * be draining a backlog — the finance consumer is one consumer among several, and a database that has
- * just been seeded has plenty to catch up on — so a ten-second window was not enough to be sure. A
- * fixture script that gives up quietly and leaves the three money screens empty is worse than one
- * that waits, because nothing reports which of the two happened.
+ * Ninety seconds, and it logs while it waits. The ceiling matters because of what precedes it: after
+ * `pnpm test:integration` the worker can be minutes behind, since that suite deletes and recreates
+ * thousands of rows and every event published in the meantime is sitting in the outbox. Thirty seconds
+ * was not enough on a cold worker, and the symptom was the three finance screens photographing their
+ * empty states while the log called it "expected" — the exact failure this loop was written to end,
+ * one notch slower.
+ *
+ * A wait that logs every tenth attempt is a wait you can watch; a silent one looks like a hang.
  */
+const FREEZE_ATTEMPTS = 120;
 let createdSettlement = null;
-for (let attempt = 1; attempt <= 40 && !createdSettlement; attempt++) {
+for (let attempt = 1; attempt <= FREEZE_ATTEMPTS && !createdSettlement; attempt++) {
   createdSettlement = await post(
     '/v1/settlements',
     { merchantId, note: 'Weekly payout' },
     `shots-settlement-${RUN}-${attempt}`,
   );
   if (!createdSettlement.ok) {
-    if (attempt === 1 || attempt % 5 === 0) {
-      console.log(`      waiting for the ledger — attempt ${attempt}: ${createdSettlement.status}`);
+    if (attempt === 1 || attempt % 10 === 0) {
+      console.log(
+        `      waiting for the ledger (${Math.round((attempt * 1000) / 1000)}s) — attempt ${attempt}/${FREEZE_ATTEMPTS}: ${createdSettlement.status}`,
+      );
     }
-    await new Promise((r) => setTimeout(r, 750));
+    await new Promise((r) => setTimeout(r, 1000));
   }
 }
 
 if (!createdSettlement.ok) {
   console.error(
-    `settlement not created: ${createdSettlement.status} ${JSON.stringify(createdSettlement.body)}`,
+    `settlement not created after ${FREEZE_ATTEMPTS}s: ${createdSettlement.status} ${JSON.stringify(createdSettlement.body)}`,
   );
   console.error(
-    '  (expected only while cash is still uncollected — settlement will not freeze it)',
+    '  The ledger never received a COD_COLLECTED entry. Either the worker is not running, or it is' +
+      ' more than two minutes behind — check its log before re-running this.',
   );
 } else {
   const id = createdSettlement.body.id;

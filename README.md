@@ -377,7 +377,7 @@ Full reasoning, with the alternatives that were rejected, lives in
 ## 🧪 What proves it works
 
 ```bash
-pnpm verify               # boundaries → format → proofs → typecheck → 2,502 unit tests
+pnpm verify               # boundaries → format → proofs → typecheck → 2,511 unit tests
 pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
 pnpm prove:stack          # six proofs against a running API: client, tokens, webhooks, proofs
 pnpm prove:browser        # three browser proofs against a running stack: map, login split, tracking
@@ -387,7 +387,7 @@ pnpm prove:browser        # three browser proofs against a running stack: map, l
 | --------------------------------------------- | ------------------------------------------- |
 | Domain modules, each owning a Postgres schema | **17**                                      |
 | HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
-| Unit tests                                    | **2,502**                                   |
+| Unit tests                                    | **2,511**                                   |
 | Integration tests on live infrastructure      | **86** across 17 files                      |
 | Standalone proofs, reachable from a command   | **20** across four commands                 |
 | Reviewed, reversible migrations               | **51**                                      |
@@ -406,7 +406,7 @@ flowchart LR
     P --> F["💅 format:check"]
     P --> V["🧷 pnpm prove<br/><i>11 zero-dependency proofs</i>"]
     P --> T["🔍 typecheck"]
-    P --> U["🧪 2,502 unit tests"]
+    P --> U["🧪 2,511 unit tests"]
     P --> I["🔗 test:integration<br/><i>real PG / NATS / Redis</i>"]
 
     B --> G([✅ green])
