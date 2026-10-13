@@ -108,6 +108,7 @@ type ListQuery =
 type Schemas = components['schemas'];
 
 export type HubSummary = Schemas['HubSummaryDto'];
+export type MyHub = Schemas['MyHubDto'];
 export type HubWorkList = Schemas['HubParcelsViewDto'];
 export type HubScanResult = Schemas['HubScanResultDto'];
 export type HubScanInput = Schemas['HubScanDto'];
@@ -423,6 +424,12 @@ export class ZipZapClient {
   /** GET /v1/hubs — every hub and how many parcels are waiting at it. */
   async hubs(): Promise<HubSummary[]> {
     const { data } = await this.request<HubSummary[]>('/v1/hubs', { method: 'GET' });
+    return data;
+  }
+
+  /** GET /v1/hubs/my-hub — the hub the caller is assigned to (404 if not assigned). */
+  async myHub(): Promise<HubSummary> {
+    const { data } = await this.request<HubSummary>('/v1/hubs/my-hub', { method: 'GET' });
     return data;
   }
 

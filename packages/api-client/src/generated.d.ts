@@ -1334,6 +1334,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hubs/my-hub": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The hub this person is assigned to */
+        get: operations["HubStaffController_myHub"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hubs/{hubCode}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff assigned to one hub */
+        get: operations["HubStaffController_list"];
+        put?: never;
+        /** Assign a person to a hub */
+        post: operations["HubStaffController_assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hubs/{hubCode}/staff/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a person assignment at a hub */
+        delete: operations["HubStaffController_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/control-tower/live-counts": {
         parameters: {
             query?: never;
@@ -1754,7 +1806,7 @@ export interface components {
              *       "tracking:read"
              *     ]
              */
-            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "members:manage" | "network:read")[];
+            scopes: ("shipments:read" | "shipments:write" | "tracking:read" | "hub:read" | "hub:scan" | "hub:manage" | "rider:sync" | "pickup:create" | "pickup:read" | "delivery:create" | "delivery:read" | "delivery:complete" | "returns:read" | "returns:write" | "cod:read" | "settlements:read" | "settlements:approve" | "webhooks:manage" | "notifications:manage" | "keys:manage" | "members:manage" | "network:read")[];
         };
         CreatedApiKeyDto: {
             /** @example key_123456789 */
@@ -3071,6 +3123,67 @@ export interface components {
         HubParcelsViewDto: {
             hub: components["schemas"]["HubSummaryDto"];
             parcels: components["schemas"]["ParcelPresenceDto"][];
+        };
+        MyHubDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example DHK-01 */
+            code: string;
+            /** @example Dhaka Central Hub */
+            name: string;
+            /** @example DISTRICT_HUB */
+            kind: string;
+            /** @example dhaka-metro */
+            networkZone: string | null;
+            /** @example 90.4125 */
+            lng: number | null;
+            /** @example 23.8103 */
+            lat: number | null;
+            /**
+             * @description The role this person holds at the hub.
+             * @example OPERATOR
+             * @enum {string}
+             */
+            staffRole: "MANAGER" | "OPERATOR";
+        };
+        HubStaffDto: {
+            /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
+            id: string;
+            /** @example b2c3d4e5-f6a7-8901-bcde-f12345678901 */
+            userId: string;
+            /** @example c3d4e5f6-a7b8-9012-cdef-123456789012 */
+            hubId: string;
+            /**
+             * @example OPERATOR
+             * @enum {string}
+             */
+            role: "MANAGER" | "OPERATOR";
+            /**
+             * Format: date-time
+             * @example 2026-10-10T06:00:00.000Z
+             */
+            assignedAt: string;
+            /** @example d4e5f6a7-b8c9-0123-defa-234567890123 */
+            assignedBy: string;
+            /**
+             * Format: date-time
+             * @example null
+             */
+            revokedAt: string | null;
+        };
+        AssignStaffDto: {
+            /**
+             * Format: uuid
+             * @description The user id to assign. Must be an existing user.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            userId: string;
+            /**
+             * @description The staff role at the hub. MANAGER may assign/revoke staff; OPERATOR scans and reconciles only.
+             * @example OPERATOR
+             * @enum {string}
+             */
+            role: "MANAGER" | "OPERATOR";
         };
         LiveShipmentCountsDto: {
             /** @example 120 */
@@ -10758,6 +10871,351 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HubParcelsViewDto"];
                 };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubStaffController_myHub: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hub the caller works at, including the role they hold there. A person between hubs gets a 404 — that is a normal state, not an authentication failure. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyHubDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubStaffController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hub whose staff are listed. */
+                hubCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every person currently assigned to this hub, oldest assignment first. Only a manager at this hub (or a platform admin) may read it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubStaffDto"][];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubStaffController_assign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hub to assign the person to. */
+                hubCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignStaffDto"];
+            };
+        };
+        responses: {
+            /** @description The assignment as stored. A person already assigned elsewhere is refused by the database (one active hub per person). Only a manager at this hub (or platform admin) may assign. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubStaffDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    HubStaffController_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hub to revoke the assignment from. */
+                hubCode: string;
+                /** @description The person whose assignment is revoked. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The assignment is ended (revoked_at set, row kept for history). A person with no active assignment at this hub gets a 404, not a 403 — a 403 would confirm they once worked here. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation failed. Nothing was written. */
             400: {

@@ -294,3 +294,31 @@ export class RiderJobsDto {
   })
   deliveries!: RiderDeliveryJobDto[];
 }
+
+/** Server-truthful earnings projection for a rider, summed from completed deliveries. */
+export class RiderEarningsDto {
+  @MoneyMinor({
+    example: 250000,
+    description:
+      'Total earnings in integer minor units (poisha), summed from completed deliveries. ' +
+      'Projection from delivery count × base fee; never stored, rebuilt on every read.',
+  })
+  totalEarningsMinor!: number;
+
+  @ApiProperty({ example: 'BDT', description: 'Currency of the earnings.' })
+  currency!: string;
+
+  @ApiProperty({
+    example: 5,
+    description: 'Count of completed deliveries contributing to this total.',
+  })
+  completedDeliveries!: number;
+
+  @ApiProperty({
+    example: '2026-10-12T18:53:25.342Z',
+    description:
+      'Server timestamp when this projection was computed. Use this to detect stale ' +
+      'client-side cached figures.',
+  })
+  asOf!: Date;
+}

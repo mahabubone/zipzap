@@ -19,6 +19,7 @@ import { HubModule } from './modules/hub/hub.module.ts';
 import { DashboardModule } from './modules/dashboard/dashboard.module.ts';
 import { AnalyticsModule } from './modules/analytics/analytics.module.ts';
 import { RiderJobsModule } from './modules/rider/rider-jobs.module.ts';
+import { RiderEarningsModule } from './modules/rider/rider-earnings.module.ts';
 
 /**
  * The API process. Every domain module is imported once, here.
@@ -51,6 +52,7 @@ import { RiderJobsModule } from './modules/rider/rider-jobs.module.ts';
     DashboardModule,
     AnalyticsModule,
     RiderJobsModule,
+    RiderEarningsModule,
   ],
   controllers: [HealthController],
 })

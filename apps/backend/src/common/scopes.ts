@@ -17,6 +17,10 @@ export const API_SCOPES = [
   // when the principal arrives, not before.
   'hub:read',
   'hub:scan',
+  // Hub management: assign/revoke staff at a hub, approve discrepancies, view capacity.
+  // Distinct from `hub:scan` (which a line operator holds) so a scanner cannot enrol or
+  // revoke the person standing next to them. Held by HUB_MANAGER and PLATFORM_ADMIN only.
+  'hub:manage',
   // A rider's command queue is a day of somebody's work. A merchant is our client, not our network
   // partner — their staff have no business reading which parcel a named rider is holding, and the
   // queue also carries COD amounts. Platform, not tenant, so it is withheld from merchant roles.

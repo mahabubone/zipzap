@@ -18,6 +18,7 @@ allowBuilds:
   # report usage to a third party.
   '@scarf/scarf': false
   msgpackr-extract: true
+  electron: set this to true or false
 
 # React's types, pinned across every workspace package.
 #

@@ -166,6 +166,19 @@ async function seed() {
      VALUES ($1, $2, 'HUB_OPERATOR')`,
     [hubUserId, merchantId],
   );
+  // Assign the operator to the first hub so the console lands directly on it instead of a picker.
+  // Hubs are seeded by `seedProfile` above, so one exists here. The first hub by code is an
+  // arbitrary but stable choice — the point is that the demo login has somewhere to land.
+  const { rows: firstHub } = await client.query(
+    `SELECT id FROM hub.hubs ORDER BY code LIMIT 1`,
+  );
+  if (firstHub[0]) {
+    await client.query(
+      `INSERT INTO hub.staff (user_id, hub_id, role, assigned_by)
+       VALUES ($1, $2, 'OPERATOR', $1)`,
+      [hubUserId, firstHub[0].id],
+    );
+  }
   await client.query('COMMIT');
 
   // The operations account. There was none, which quietly made two thirds of the product
