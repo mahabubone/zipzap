@@ -351,20 +351,21 @@ site) · Tailwind CSS
 A list of names says nothing a search engine cannot. The table below is the part that is hard to
 find elsewhere, because most of these decisions are invisible until they go wrong.
 
-| Layer             | Choice                           | The reason, not the list                                                                                                                                                                        |
-| ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Runtime**       | Node 24 · pnpm 11 · Turbo 2.11   | Strict ESM and a workspace graph, so a package cannot import another's internals by accident                                                                                                    |
-| **Backend**       | NestJS 12                        | Dependency injection with real module boundaries — `forModule('identity', […])` scopes a connection per module, which makes a cross-schema query _fail at runtime_ rather than degrade silently |
-| **ORM**           | TypeORM 1.1                      | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration, and the rollback is part of the migration's story rather than an afterthought                        |
-| **Database**      | PostgreSQL 18 + PostGIS          | Coverage, service areas and routing are spatial. A healthcheck runs `SELECT postgis_version()`, because "accepts connections" is not "works"                                                    |
-| **Async**         | NATS JetStream · BullMQ · Redis  | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                       |
-| **Language**      | TypeScript 6.0                   | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                  |
-| **Web**           | React 19 · TanStack Router/Start | One codebase, SSR. The auth guard runs in `beforeLoad` _on the server_, so an unauthenticated visitor gets a 307 rather than a flash of console                                                 |
-| **Design system** | `packages/ui`                    | 39 components across atoms, molecules and organisms · 367 tests · Storybook. A screen that is not in the kit does not get built                                                                 |
-| **Web kit**       | `packages/web-kit`               | One place decides how a status is worded, how ৳1,250.50 is written and what a failed load says — because four copies drifted and the differences shipped                                        |
-| **Mobile**        | Expo / React Native              | Offline-first queue with per-command idempotency                                                                                                                                                |
-| **Docs**          | Astro 7                          | The API reference is generated from the same spec the typed client is generated from, so it cannot drift                                                                                        |
-| **Desktop**       | Electron                         | A kiosk shell for a depot machine, hardened against navigation and window opens — with `ELECTRON_START_URL` required, because guessing it produced a white window                               |
+| Layer             | Choice                           | The reason, not the list                                                                                                                                                                             |
+| ----------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**       | Node 24 · pnpm 11 · Turbo 2.11   | Strict ESM and a workspace graph, so a package cannot import another's internals by accident                                                                                                         |
+| **Backend**       | NestJS 12                        | Dependency injection with real module boundaries — `forModule('identity', […])` scopes a connection per module, which makes a cross-schema query _fail at runtime_ rather than degrade silently      |
+| **ORM**           | TypeORM 1.1                      | `synchronize: false` permanently. Every schema change is a reviewed, reversible migration, and the rollback is part of the migration's story rather than an afterthought                             |
+| **Database**      | PostgreSQL 18 + PostGIS          | Coverage, service areas and routing are spatial. A healthcheck runs `SELECT postgis_version()`, because "accepts connections" is not "works"                                                         |
+| **Async**         | NATS JetStream · BullMQ · Redis  | NATS says _what happened_; BullMQ _does the work_; Redis holds rate limits and idempotency and is **never** authoritative                                                                            |
+| **Language**      | TypeScript 6.0                   | Pinned deliberately. TypeScript 7 ships `tsc` only with no programmatic API, which breaks `@nestjs/cli` builds                                                                                       |
+| **Web**           | React 19 · TanStack Router/Start | One codebase, SSR. The auth guard runs in `beforeLoad` _on the server_, so an unauthenticated visitor gets a 307 rather than a flash of console                                                      |
+| **Design system** | `packages/ui`                    | 39 components across atoms, molecules and organisms · 367 tests · Storybook. A screen that is not in the kit does not get built                                                                      |
+| **Lexicon**       | `packages/lexicon`               | The words and the integer arithmetic every surface shares: how a status is named, what class of state it is, how an amount is written. No framework and no `Intl`, so the rider app can reach it too |
+| **Web kit**       | `packages/web-kit`               | The browser half: Dhaka time, and the sentence a failed load says — because only the merchant console's copy of the fetch hook had a message mapper                                                  |
+| **Mobile**        | Expo / React Native              | Offline-first queue with per-command idempotency                                                                                                                                                     |
+| **Docs**          | Astro 7                          | The API reference is generated from the same spec the typed client is generated from, so it cannot drift                                                                                             |
+| **Desktop**       | Electron                         | A kiosk shell for a depot machine, hardened against navigation and window opens — with `ELECTRON_START_URL` required, because guessing it produced a white window                                    |
 
 Full reasoning, with the alternatives that were rejected, lives in
 [`docs/architecture/overview.md`](docs/architecture/overview.md) and
@@ -377,7 +378,7 @@ Full reasoning, with the alternatives that were rejected, lives in
 ## 🧪 What proves it works
 
 ```bash
-pnpm verify               # boundaries → format → proofs → typecheck → 2,511 unit tests
+pnpm verify               # boundaries → format → proofs → typecheck → 2,539 unit tests
 pnpm test:integration     # 86 tests on real Postgres, Redis and NATS
 pnpm prove:stack          # six proofs against a running API: client, tokens, webhooks, proofs
 pnpm prove:browser        # three browser proofs against a running stack: map, login split, tracking
@@ -387,12 +388,12 @@ pnpm prove:browser        # three browser proofs against a running stack: map, l
 | --------------------------------------------- | ------------------------------------------- |
 | Domain modules, each owning a Postgres schema | **17**                                      |
 | HTTP operations in the generated OpenAPI spec | **94** across 84 paths                      |
-| Unit tests                                    | **2,511**                                   |
+| Unit tests                                    | **2,539**                                   |
 | Integration tests on live infrastructure      | **86** across 17 files                      |
 | Standalone proofs, reachable from a command   | **20** across four commands                 |
 | Reviewed, reversible migrations               | **51**                                      |
 | Architecture decision records                 | **17**, each with the alternatives rejected |
-| Workspaces in the graph                       | **12**                                      |
+| Workspaces in the graph                       | **13**                                      |
 | Documentation files                           | **77** markdown                             |
 | Screenshots, all regenerable by `pnpm shots`  | **42** across 6 apps                        |
 | Code                                          | ~84k lines of TypeScript, TSX and Astro     |
@@ -406,7 +407,7 @@ flowchart LR
     P --> F["💅 format:check"]
     P --> V["🧷 pnpm prove<br/><i>11 zero-dependency proofs</i>"]
     P --> T["🔍 typecheck"]
-    P --> U["🧪 2,511 unit tests"]
+    P --> U["🧪 2,539 unit tests"]
     P --> I["🔗 test:integration<br/><i>real PG / NATS / Redis</i>"]
 
     B --> G([✅ green])
@@ -607,9 +608,11 @@ Stated plainly, because a portfolio that only lists its strengths is telling you
 - **Support, admin and developer-portal consoles** are planned and absent — no packages exist.
 - **The rider's native bundle does not build.** `expo export --platform ios` fails inside
   `react-native-screens`; the web export used for these screenshots is the only bundle.
-- **The rider app ships its own component kit.** `apps/mobile-rider/src/components` is a second,
-  parallel design system: React Native cannot consume `@zipzap/ui`, but ten component names now
-  exist twice with different props.
+- **The rider app ships its own component kit.** React Native cannot consume `@zipzap/ui`, so
+  `apps/mobile-rider/src/components` is a second set of components with ten names in common. What _is_
+  shared is everything below the components: how a status is worded, what class of state it is, how an
+  amount is written and how old something is, all in `@zipzap/lexicon` — so the two kits cannot disagree
+  about the words even while they disagree about the pixels.
 - **Three of the six hub-console destinations are designed and empty** — riders, deliveries and
   pickups say "Not built yet" rather than pretending.
 - **The desktop shell is not packaged.** It builds, it is hardened, and there is no

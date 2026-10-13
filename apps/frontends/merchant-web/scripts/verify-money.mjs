@@ -114,14 +114,19 @@ for (const bad of ['abc', '1.005', '100000000']) {
 // The sign belongs outside the currency symbol. `Intl` puts it on the number, so prefixing the
 // symbol without taking the absolute value first rendered every correction as `৳-0.50` — the
 // format of every debit row on every statement, found by looking at a real one.
-check('a positive amount', formatMinor(125050, 'BDT'), '৳1,250.50');
-check('a negative amount signs the currency, not the number', formatMinor(-50, 'BDT'), '-৳0.50');
-check('zero has no sign', formatMinor(0, 'BDT'), '৳0.00');
-check('the symbol is never inside the digits', /৳-/.test(formatMinor(-1, 'BDT')), false);
-check('other currencies sign the same way', formatMinor(-12345, 'USD'), '-$123.45');
+// There is a space after the symbol. It was not there until the formatter moved to
+// `@zipzap/lexicon`, and the tie-break went to the space because the design system's `MoneyText` had
+// always rendered it and that component exists to make every amount on a screen agree: a package whose
+// rule forced it to be the sole violator would be arguing with its own design system. The rider's phone
+// and the prose here both moved to match.
+check('a positive amount', formatMinor(125050, 'BDT'), '৳ 1,250.50');
+check('a negative amount signs the currency, not the number', formatMinor(-50, 'BDT'), '-৳ 0.50');
+check('zero has no sign', formatMinor(0, 'BDT'), '৳ 0.00');
+check('the symbol is never inside the digits', /৳\s?-/.test(formatMinor(-1, 'BDT')), false);
+check('other currencies sign the same way', formatMinor(-12345, 'USD'), '-$ 123.45');
 // -0 compares equal to 0, so a refund of nothing must not print a minus.
-check('a refund of nothing prints no minus', formatMinor(-0, 'BDT'), '৳0.00');
-check('the sign survives a large debit', formatMinor(-9_999_999_999, 'BDT'), '-৳99,999,999.99');
+check('a refund of nothing prints no minus', formatMinor(-0, 'BDT'), '৳ 0.00');
+check('the sign survives a large debit', formatMinor(-9_999_999_999, 'BDT'), '-৳ 99,999,999.99');
 
 console.log(failures === 0 ? '\nmoney parsing ok' : `\n${failures} failure(s)`);
 process.exit(failures === 0 ? 0 : 1);

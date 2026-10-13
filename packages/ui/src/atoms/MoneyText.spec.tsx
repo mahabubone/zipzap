@@ -23,9 +23,16 @@ function exact(amountMinor: number, scale = 100): string {
   return `${sign}${major}.${minor}`;
 }
 
-/** Text content of the rendered span, minus the currency symbol the component prefixes. */
+/**
+ * Text content with the symbol and the spacing removed, keeping sign, digits, separators and the
+ * decimal point.
+ *
+ * Stripping "everything up to the first digit" used to work only because the sign used to sit after
+ * the symbol. It does now — `-৳ 0.50` — so a leading `-` would be stripped along with the symbol and a
+ * refund would be compared as a positive amount. Removed by character class instead, wherever it is.
+ */
 function amount(rendered: HTMLElement): string {
-  return (rendered.textContent ?? '').replace(/^[^\d-]+/, '').trim();
+  return (rendered.textContent ?? '').replace(/[^\d,.-]/g, '');
 }
 
 describe('MoneyText', () => {
@@ -51,16 +58,18 @@ describe('MoneyText', () => {
     expect(screen.getByText('৳ 0.00')).toBeInTheDocument();
   });
 
-  test('negatives carry the sign ahead of the grouped digits, after the symbol', () => {
-    // A refund ledger reads `৳ -1,250.50`. The symbol stays put; the sign moves in front of the
-    // number, so the two never read as `৳-` glued to a positive amount.
+  test('negatives carry the sign ahead of the symbol', () => {
+    // A refund reads `-৳ 1,250.50`. The sign used to sit after the symbol, because that is where
+    // `Intl` puts it and the component used `Intl` — which made it disagree with the prose formatter,
+    // which put the sign outside. `৳ -1,250.50` reads as a currency sign glued to a dash and then a
+    // positive number, and it is the format of every correction row on every statement.
     render(<MoneyText amountMinor={-125050} currency="BDT" />);
-    expect(screen.getByText('৳ -1,250.50')).toBeInTheDocument();
+    expect(screen.getByText('-৳ 1,250.50')).toBeInTheDocument();
   });
 
   test('negatives below one major unit do not borrow a leading zero', () => {
     render(<MoneyText amountMinor={-5} currency="BDT" />);
-    expect(screen.getByText('৳ -0.05')).toBeInTheDocument();
+    expect(screen.getByText('-৳ 0.05')).toBeInTheDocument();
   });
 
   test('groups thousands', () => {

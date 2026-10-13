@@ -15,6 +15,15 @@
  *
  * Every screen names a token. No screen has a hex value in it, and the checker that enforces the
  * equivalent rule for rules/ files is the reason this comment exists.
+ *
+ * ## What is not here
+ *
+ * A `STATUS_TONE` map used to be, at the bottom of this file, and nothing imported it. It was also a
+ * *fourth* answer to the same question — the jobs list, the detail screen and the home preview each had
+ * their own, and `OUT_FOR_DELIVERY` came out brand, neutral and brand respectively.
+ *
+ * The status vocabulary is now `src/status.ts`, which maps the product's shared classes of state onto
+ * this palette. This file is colour and nothing else.
  */
 
 export const colors = {
@@ -144,20 +153,3 @@ export const typography = {
     textTransform: 'uppercase' as const,
   },
 } as const;
-
-/** The status vocabulary, mapped to colour so a screen never decides one. */
-export const STATUS_TONE = {
-  /* delivery / pickup lifecycle */
-  ASSIGNED: 'info',
-  OUT_FOR_DELIVERY: 'brand',
-  DELIVERED: 'success',
-  FAILED: 'danger',
-  PICKED_UP: 'info',
-  CANCELLED: 'neutral',
-  /* offline queue */
-  QUEUED: 'warning',
-  PENDING: 'warning',
-  SETTLED: 'success',
-} as const;
-
-export type StatusTone = (typeof STATUS_TONE)[keyof typeof STATUS_TONE];

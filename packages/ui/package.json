@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@tanstack/react-table": "8.21.3",
+    "@zipzap/lexicon": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

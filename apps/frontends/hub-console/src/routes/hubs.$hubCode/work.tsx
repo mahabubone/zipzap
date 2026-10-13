@@ -4,7 +4,7 @@ import { ZipZapApiError, type HubScanKind, type ParcelPresence } from '@zipzap/a
 import { Badge, Button, EmptyState, ErrorState, Spinner } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
 import { useAsync } from '@zipzap/web-kit';
-import { formatAgo, formatClock, scanAction, statusLabel } from '@zipzap/web-kit';
+import { formatAge, formatClock, scanAction, statusLabel } from '@zipzap/web-kit';
 
 /**
  * The work list, and the only screen in this app that matters.
@@ -113,7 +113,7 @@ function WorkPage() {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{parcel.trackingCode}</p>
                   <p className="mt-0.5 truncate text-sm text-slate-500">
-                    {statusLabel(parcel.lastScan)} · {formatAgo(parcel.scannedAt)} at{' '}
+                    {statusLabel(parcel.lastScan)} · {formatAge(parcel.scannedAt)} at{' '}
                     {formatClock(parcel.scannedAt)}
                   </p>
                 </div>

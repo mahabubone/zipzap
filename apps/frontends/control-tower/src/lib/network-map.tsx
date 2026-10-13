@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './map.css';
 import type { MapHub, MapRider } from '@zipzap/api-client';
 import { Badge, Button } from '@zipzap/ui';
-import { formatAgo, humanStatus } from '@zipzap/web-kit';
+import { formatAge, humanStatus } from '@zipzap/web-kit';
 import { BOUNDS, isInBounds } from './map-projection.ts';
 
 /**
@@ -253,7 +253,7 @@ function MapContents({
               */}
             {humanStatus(rider.status)} ·{' '}
             {rider.lastSeenAt
-              ? `last seen ${formatAgo(rider.lastSeenAt)}`
+              ? `last seen ${formatAge(rider.lastSeenAt)}`
               : 'has never reported a position'}
           </Tooltip>
         </Marker>

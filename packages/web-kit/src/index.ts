@@ -1,16 +1,22 @@
+export { formatClock, formatWhen } from './format.ts';
+
+export { statusTone, TONE_BY_STATE, type BadgeTone } from './tone.ts';
+
 export {
-  formatAgo,
-  formatClock,
+  STATUS_STATES,
+  formatAge,
   formatMinor,
-  formatWhen,
   humanStatus,
   minorOf,
   scanAction,
   scanLabel,
+  splitMinor,
   statusLabel,
-  statusTone,
+  statusState,
+  statusesIn,
   zoneLabel,
-  type StatusTone,
-} from './format.ts';
+  type SplitMinor,
+  type StatusState,
+} from '@zipzap/lexicon';
 
 export { messageFor, useAsync, type Async } from './useAsync.ts';

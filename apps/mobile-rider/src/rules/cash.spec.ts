@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { formatMinor } from '@zipzap/lexicon';
 import {
   computeCashInHand,
   CASH_LIMIT_MINOR,
@@ -130,23 +131,37 @@ describe('the carry limit', () => {
 });
 
 describe('formatCash', () => {
+  // These five used to expect `৳237,555.00` and now expect `৳ 237,555.00`. The formatter moved to
+  // `@zipzap/lexicon` — it needed `Intl`, which Hermes does not fully provide, and it was the third
+  // implementation of a rule the other two had already disagreed with.
+  //
+  // What is asserted here is that this app still writes an amount the way the merchant's console does,
+  // which is the part that was not true before and is the part that matters: a rider reading
+  // `৳237,555.00` and a merchant reading `৳ 237,555.00` are looking at the same money written two ways.
+
   it('reads poisha as taka with two places', () => {
-    expect(formatCash(23_755_500)).toBe('৳237,555.00');
+    expect(formatCash(23_755_500)).toBe('৳ 237,555.00');
   });
 
   it('pads a single-digit remainder', () => {
-    expect(formatCash(12_305)).toBe('৳123.05');
+    expect(formatCash(12_305)).toBe('৳ 123.05');
   });
 
   it('reads a round taka figure without a stray decimal', () => {
-    expect(formatCash(25_000)).toBe('৳250.00');
+    expect(formatCash(25_000)).toBe('৳ 250.00');
   });
 
   it('reads zero', () => {
-    expect(formatCash(0)).toBe('৳0.00');
+    expect(formatCash(0)).toBe('৳ 0.00');
   });
 
   it('reads a negative as a shortage, not a minus sign', () => {
-    expect(formatCash(-5_000)).toBe('-৳50.00');
+    expect(formatCash(-5_000)).toBe('-৳ 50.00');
+  });
+
+  it('writes the same string the merchant console writes', () => {
+    // The assertion that makes the sharing worth having: compared through their public entry points, so
+    // a change made to one side and not the other fails here rather than in a screenshot.
+    expect(formatCash(12_305)).toBe(formatMinor(12_305, 'BDT'));
   });
 });

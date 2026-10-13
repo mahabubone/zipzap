@@ -22,7 +22,7 @@
  */
 
 import { HUB_SCAN_KINDS } from '../apps/backend/src/modules/hub/rules/scan.ts';
-import { scanLabel } from '../packages/web-kit/src/format.ts';
+import { scanLabel } from '../packages/lexicon/src/labels.ts';
 
 let failures = 0;
 
