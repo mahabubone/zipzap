@@ -132,6 +132,66 @@ describe('Button', () => {
     expect(button).toHaveAttribute('id', 'close-btn');
   });
 
+  test('asChild renders the child as the element, not a button around it', () => {
+    // The reason `asChild` exists. The landing page wrapped `<Button>` in `<a>` and `<Link>` four
+    // times, which is interactive content inside interactive content: two tab stops per call to
+    // action, and a screen reader announcing a link containing a button.
+    render(
+      <Button asChild>
+        <a href="/login">Sign in</a>
+      </Button>,
+    );
+
+    const link = screen.getByRole('link', { name: 'Sign in' });
+    expect(link).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  test("asChild keeps the variant classes and the child's own", () => {
+    // Appending rather than replacing: a caller who adds a class must not silently lose the variant,
+    // which is the failure mode of the naive clone.
+    render(
+      <Button asChild variant="secondary" className="w-full">
+        <a href="/track">Track</a>
+      </Button>,
+    );
+
+    const link = screen.getByRole('link', { name: 'Track' });
+    expect(link.className).toContain('border');
+    expect(link.className).toContain('w-full');
+  });
+
+  test("asChild keeps the child's own props, including its own handler", async () => {
+    const onNavigate = vi.fn((e: React.MouseEvent) => e.preventDefault());
+    const user = userEvent.setup();
+    render(
+      <Button asChild onClick={onNavigate}>
+        <a href="/console" onClick={onNavigate}>
+          Open console
+        </a>
+      </Button>,
+    );
+
+    await user.click(screen.getByRole('link', { name: 'Open console' }));
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  test('asChild writes no `type`, because a link has none', () => {
+    render(
+      <Button asChild>
+        <a href="/login">Sign in</a>
+      </Button>,
+    );
+    expect(screen.getByRole('link', { name: 'Sign in' })).not.toHaveAttribute('type');
+  });
+
+  test('asChild with no element child renders nothing rather than throwing', () => {
+    // A caller who forgets the child gets an empty page, not a crash on the landing page.
+    const { container } = render(<Button asChild>{null}</Button>);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.querySelector('button')).toBeNull();
+  });
+
   test('an icon-only button is still namable via aria-label', () => {
     render(
       <Button aria-label="Delete shipment">

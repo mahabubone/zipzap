@@ -3185,6 +3185,11 @@ export interface components {
         HubParcelsViewDto: {
             hub: components["schemas"]["HubSummaryDto"];
             parcels: components["schemas"]["ParcelPresenceDto"][];
+            /**
+             * @description When the server built this view, UTC ISO 8601. The list is a snapshot of a belt that moves while somebody reads it, so a screen that says "last updated" has to mean this rather than the time the browser painted. The console renders it in Asia/Dhaka, like every other timestamp here.
+             * @example 2026-10-13T04:20:11.512Z
+             */
+            timestamp: string;
         };
         MyHubDto: {
             /** @example a1b2c3d4-e5f6-7890-abcd-ef1234567890 */
@@ -11031,7 +11036,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. */
+            /** @description The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. `timestamp` is the instant the view was built, so a screen can say how old its numbers are. */
             200: {
                 headers: {
                     [name: string]: unknown;

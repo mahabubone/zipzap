@@ -20,6 +20,8 @@ export { StatCard, type StatCardProps } from './molecules/StatCard.tsx';
 export { SearchInput } from './molecules/SearchInput.tsx';
 export { EmptyState, type EmptyStateProps } from './molecules/EmptyState.tsx';
 export { ErrorState, type ErrorStateProps } from './molecules/ErrorState.tsx';
+export { NotFound, type NotFoundProps } from './molecules/NotFound.tsx';
+export { RouteError, routeErrorMessage, type RouteErrorProps } from './molecules/RouteError.tsx';
 export { Table, type TableColumn, type TableProps } from './molecules/Table.tsx';
 export { Timeline, type TimelineEvent } from './molecules/Timeline.tsx';
 export { Dialog, type DialogProps } from './molecules/Dialog.tsx';

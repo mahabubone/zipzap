@@ -21,18 +21,22 @@ export function HubLayout() {
   /**
    * The six destinations, in an operator's order.
    *
-   * `shipped: false` marks the three that are designed but empty. They are listed because removing
+   * `built: false` marks the three that are designed but empty. They are listed because removing
    * them would make the sidebar lie about what the console can do, and because a depot that asks
    * for riders will ask next week — but they say so, in the item, rather than opening onto a
    * paragraph describing a feature that does not exist.
+   *
+   * Positive for the reason the marker needs it: the condition reads `{!item.built && …}`. Written as
+   * `shipped: false` with a `{item.shipped ? … : null}` check, it renders nothing at all — the three
+   * items are marked unshipped and then the marker tests the opposite of what its name says.
    */
-  const navItems = [
-    { label: 'Overview', path: `/hubs/${hubCode}` },
-    { label: 'Work (Scan)', path: `/hubs/${hubCode}/work` },
-    { label: 'Riders', path: `/hubs/${hubCode}/riders`, shipped: false },
-    { label: 'Deliveries', path: `/hubs/${hubCode}/deliveries`, shipped: false },
-    { label: 'Pickups', path: `/hubs/${hubCode}/pickups`, shipped: false },
-    { label: 'Manifests', path: `/manifests` },
+  const navItems: ReadonlyArray<{ label: string; path: string; built?: boolean }> = [
+    { label: 'Overview', path: `/hubs/${hubCode}`, built: true },
+    { label: 'Work (Scan)', path: `/hubs/${hubCode}/work`, built: true },
+    { label: 'Riders', path: `/hubs/${hubCode}/riders`, built: false },
+    { label: 'Deliveries', path: `/hubs/${hubCode}/deliveries`, built: false },
+    { label: 'Pickups', path: `/hubs/${hubCode}/pickups`, built: false },
+    { label: 'Manifests', path: `/manifests`, built: true },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -113,7 +117,7 @@ export function HubLayout() {
                   }`}
                 >
                   {item.label}
-                  {item.shipped ? (
+                  {!item.built ? (
                     <span className="ml-1 text-xs font-normal text-slate-400">· soon</span>
                   ) : null}
                 </button>

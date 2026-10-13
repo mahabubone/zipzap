@@ -89,6 +89,15 @@ export class HubParcelsViewDto {
 
   @ApiProperty({ type: ParcelPresenceDto, isArray: true })
   parcels!: ParcelPresenceDto[];
+
+  @ApiProperty({
+    description:
+      'When the server built this view, UTC ISO 8601. The list is a snapshot of a belt that moves ' +
+      'while somebody reads it, so a screen that says "last updated" has to mean this rather than the ' +
+      'time the browser painted. The console renders it in Asia/Dhaka, like every other timestamp here.',
+    example: '2026-10-13T04:20:11.512Z',
+  })
+  timestamp!: string;
 }
 
 /** The hub a caller is assigned to, including the role they hold there. */

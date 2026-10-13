@@ -9622,7 +9622,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift.",
+            "description": "The hub, and the parcels waiting at it — most recently scanned first, each carrying the gesture it needs next, which is null once nothing further is required. An unknown hub code is a 404, not an empty list that reads as a quiet shift. `timestamp` is the instant the view was built, so a screen can say how old its numbers are.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14850,11 +14850,17 @@
             "items": {
               "$ref": "#/components/schemas/ParcelPresenceDto"
             }
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "When the server built this view, UTC ISO 8601. The list is a snapshot of a belt that moves while somebody reads it, so a screen that says \"last updated\" has to mean this rather than the time the browser painted. The console renders it in Asia/Dhaka, like every other timestamp here.",
+            "example": "2026-10-13T04:20:11.512Z"
           }
         },
         "required": [
           "hub",
-          "parcels"
+          "parcels",
+          "timestamp"
         ]
       },
       "MyHubDto": {

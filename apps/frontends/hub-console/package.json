@@ -7,7 +7,8 @@
     "dev": "vite dev",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.170.41",
@@ -25,6 +26,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
-    "vite": "^8.3.3"
+    "vite": "^8.3.3",
+    "vitest": "5.0.3"
   }
 }

@@ -1,4 +1,5 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import { HeadContent, Link, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import { Button, NotFound, RouteError } from '@zipzap/ui';
 import '@zipzap/ui/styles.css';
 
 export const Route = createRootRoute({
@@ -13,6 +14,29 @@ export const Route = createRootRoute({
       { name: 'robots', content: 'noindex' },
     ],
   }),
+  /**
+   * This is the app a recipient reaches from a text message, on a phone, often on a bad connection —
+   * and it is the app most likely to be opened with the wrong path, because a code is typed by hand
+   * and autocorrect is enthusiastic. A router default here is an unstyled page with a path on it,
+   * which on a phone reads as a phishing warning.
+   *
+   * So the miss says what a tracking code looks like and offers the form, which is the only thing a
+   * person who mistyped one actually wants.
+   */
+  notFoundComponent: () => (
+    <NotFound
+      subject="that page"
+      description="A tracking link looks like this one. If you have the code, you can look it up below."
+      action={
+        <Button asChild>
+          <Link to="/track">Enter a tracking code</Link>
+        </Button>
+      }
+    />
+  ),
+  errorComponent: ({ error, reset }) => (
+    <RouteError error={error} reset={reset} title="This parcel could not load" />
+  ),
   component: () => (
     <html lang="en">
       <head>

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useParams } from '@tanstack/react-router';
 import { Spinner, ErrorState, StatCard } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
-import { useAsync } from '@zipzap/web-kit';
+import { formatWhen, useAsync } from '@zipzap/web-kit';
 
 function OverviewPage() {
   const { hubCode } = useParams({ from: '/hubs/$hubCode' });
@@ -62,8 +62,13 @@ function OverviewPage() {
             <p className="font-semibold">{parcels.length}</p>
           </div>
           <div>
-            <p className="text-slate-600">Last Updated</p>
-            <p className="font-semibold text-xs">{new Date().toLocaleTimeString()}</p>
+            <p className="text-slate-600">Snapshot taken</p>
+            {/* The instant the data was fetched, not the instant this component rendered.
+                `new Date()` in render position answers "when did the browser paint", so the number
+                said the screen was fresh when what it described could be a minute old — and it moved
+                on every re-render, so a number that claimed to be a timestamp was in fact a clock. */}
+            <p className="font-semibold text-xs">{formatWhen(data.timestamp)}</p>
+            <p className="text-xs text-slate-400">Asia/Dhaka</p>
           </div>
         </div>
       </div>

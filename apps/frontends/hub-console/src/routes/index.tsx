@@ -2,6 +2,7 @@ import { createFileRoute, isRedirect, redirect } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
+import { landing } from '../lib/landing.ts';
 
 /**
  * Resolves the principal on the SERVER, from the request context the global middleware captured.
@@ -30,26 +31,18 @@ export const Route = createFileRoute('/')({
    * `/` is a router, not a screen: it has no UI of its own, it answers "you are signed in, go
    * somewhere" or "you are not, go and sign in".
    *
-   * The redirect to `/my-hub` is thrown OUTSIDE the try, which is the whole shape of this function.
-   * Inside it, the catch would swallow the redirect it was meant to pass on and replace it with a
-   * `/login` — and `redirect()` is a `Response`, not an `Error`, so the `e instanceof Error` test
-   * meant to recognise it could not fire. The result was a signed-in operator bouncing between `/`
-   * and `/login` forever, which reads as a broken session rather than a swallowed redirect: the login
-   * succeeds, the cookie is set, and the app still will not open.
+   * The decision lives in `lib/landing.ts`, which has a test suite, because the shape of this code
+   * *is* the bug it had. This version once caught every failure and asked `e instanceof Error` to
+   * recognise a redirect — but `redirect()` returns a `Response`, not an `Error`, so the guard could
+   * not fire and a signed-in operator bounced between `/` and `/login` forever. Nothing threw, no
+   * console showed an error, and the session looked correct from every tool that reports on it.
    *
-   * `isRedirect` is the router's own check, and it is used for the other half below for the same
-   * reason — a test written against the wrong shape of the thrown value fails open.
+   * `isRedirect` is the router's own check, passed in rather than imported, so the decision is
+   * testable without a router and a test written against the wrong shape of the thrown value fails
+   * loudly instead of failing open.
    */
   beforeLoad: async () => {
-    try {
-      await loadPrincipal();
-    } catch (e) {
-      if (isRedirect(e)) throw e;
-      // The cookie is missing, expired or revoked. See the note in merchant-web's `/app` guard for
-      // why it is not cleared here: it is `HttpOnly`, so no code on this page can reach it.
-      throw redirect({ to: '/login' });
-    }
-    // Outside the try, for the reason in the comment above.
-    throw redirect({ to: '/my-hub' });
+    const destination = await landing({ load: () => loadPrincipal(), isRedirect });
+    throw redirect({ to: destination.to });
   },
 });
