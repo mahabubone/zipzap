@@ -34,8 +34,25 @@ check('no filters sends only the limit', shipmentQuery(NO_FILTERS, null, 25), { 
 
 check(
   'every filter reaches the query',
-  shipmentQuery({ q: 'ZP-1', status: 'LOST,DAMAGED', zone: 'dhaka-metro', from: '2026-10-01', to: '2026-10-09' }, null, 25),
-  { limit: '25', status: 'LOST,DAMAGED', zone: 'dhaka-metro', q: 'ZP-1', from: '2026-10-01', to: '2026-10-09' },
+  shipmentQuery(
+    {
+      q: 'ZP-1',
+      status: 'LOST,DAMAGED',
+      zone: 'dhaka-metro',
+      from: '2026-10-01',
+      to: '2026-10-09',
+    },
+    null,
+    25,
+  ),
+  {
+    limit: '25',
+    status: 'LOST,DAMAGED',
+    zone: 'dhaka-metro',
+    q: 'ZP-1',
+    from: '2026-10-01',
+    to: '2026-10-09',
+  },
 );
 
 check(
@@ -102,7 +119,11 @@ for (const patch of [
   );
 }
 
-ok('a cursor changes the key', keyOf(NO_FILTERS, 'abc') !== keyOf(NO_FILTERS), 'paging would not refetch');
+ok(
+  'a cursor changes the key',
+  keyOf(NO_FILTERS, 'abc') !== keyOf(NO_FILTERS),
+  'paging would not refetch',
+);
 
 // The separator matters: without it these two collide.
 ok(
@@ -114,10 +135,25 @@ ok(
 // ---------------------------------------------------------------- date cross-clamping
 const from = '2026-10-09';
 const to = '2026-10-01';
-check('a backwards range is clamped', clampRange({ ...NO_FILTERS, from, to }), { ...NO_FILTERS, from, to: from });
-check('a forwards range is untouched', clampRange({ ...NO_FILTERS, from: to, to: from }), { ...NO_FILTERS, from: to, to: from });
-check('one-sided ranges are untouched', clampRange({ ...NO_FILTERS, from }), { ...NO_FILTERS, from });
-check('a single day is not a backwards range', clampRange({ ...NO_FILTERS, from: to, to }), { ...NO_FILTERS, from: to, to });
+check('a backwards range is clamped', clampRange({ ...NO_FILTERS, from, to }), {
+  ...NO_FILTERS,
+  from,
+  to: from,
+});
+check('a forwards range is untouched', clampRange({ ...NO_FILTERS, from: to, to: from }), {
+  ...NO_FILTERS,
+  from: to,
+  to: from,
+});
+check('one-sided ranges are untouched', clampRange({ ...NO_FILTERS, from }), {
+  ...NO_FILTERS,
+  from,
+});
+check('a single day is not a backwards range', clampRange({ ...NO_FILTERS, from: to, to }), {
+  ...NO_FILTERS,
+  from: to,
+  to,
+});
 check('neither bound is untouched', clampRange(NO_FILTERS), NO_FILTERS);
 
 // ---------------------------------------------------------------- the groups are real query values
@@ -144,14 +180,25 @@ for (const group of STATUS_GROUPS) {
 check('the first group is the empty "no filter" one', STATUS_GROUPS[0].value, '');
 
 // ---------------------------------------------------------------- the zones the picker shows come from the API
-const clientSrc = readFileSync(join(here, '..', 'src', 'routes', 'app', 'shipments.index.tsx'), 'utf8');
-ok('the zone picker reads zones from the server, not a hardcoded list', /\.zones\(\)|zones\(\)/.test(clientSrc), 'no zones() call in the route');
+const clientSrc = readFileSync(
+  join(here, '..', 'src', 'routes', 'app', 'shipments.index.tsx'),
+  'utf8',
+);
+ok(
+  'the zone picker reads zones from the server, not a hardcoded list',
+  /\.zones\(\)|zones\(\)/.test(clientSrc),
+  'no zones() call in the route',
+);
 ok(
   'no zone name is hardcoded in the route',
   !/['"]dhaka-metro['"]/.test(clientSrc),
   'a hardcoded zone goes stale the moment the network adds one',
 );
-ok('every status group reaches the UI', /STATUS_GROUPS/.test(clientSrc), 'the route never imports statusGroups');
+ok(
+  'every status group reaches the UI',
+  /STATUS_GROUPS/.test(clientSrc),
+  'the route never imports statusGroups',
+);
 ok('the filter bar is used, not rebuilt', /FilterBar/.test(clientSrc), 'no FilterBar in the route');
 
 // ---------------------------------------------------------------- a filter change resets the cursor stack
@@ -160,7 +207,11 @@ ok('the filter bar is used, not rebuilt', /FilterBar/.test(clientSrc), 'no Filte
 // merchant never asked for, and the header would agree with it.
 {
   const set = clientSrc.match(/const set = \(patch:[\s\S]*?\n  };/);
-  ok('the route has one set() for every filter change', set !== null, 'filters are applied from several places');
+  ok(
+    'the route has one set() for every filter change',
+    set !== null,
+    'filters are applied from several places',
+  );
   if (set) {
     ok('it resets the cursor stack', /setCursors\(FIRST_PAGE\)/.test(set[0]), set[0]);
     ok(
@@ -170,11 +221,19 @@ ok('the filter bar is used, not rebuilt', /FilterBar/.test(clientSrc), 'no Filte
     );
   }
   ok('the cursor still comes from the stack', /currentCursor\(cursors\)/.test(clientSrc));
-  ok('the useAsync key covers the filters', /queryKey\(filters, cursor\)/.test(clientSrc), 'the screen would keep showing the previous filter');
+  ok(
+    'the useAsync key covers the filters',
+    /queryKey\(filters, cursor\)/.test(clientSrc),
+    'the screen would keep showing the previous filter',
+  );
 }
 
 // ---------------------------------------------------------------- the columns the filters act on
-ok('the table shows the zone a row was filtered by', /zone/.test(clientSrc), 'a zone filter whose result column is invisible reads as if it covered the list');
+ok(
+  'the table shows the zone a row was filtered by',
+  /zone/.test(clientSrc),
+  'a zone filter whose result column is invisible reads as if it covered the list',
+);
 
 console.log(failures === 0 ? '\nfilters ok' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

@@ -67,9 +67,17 @@ export const Route = createFileRoute('/app')({
   component: ConsoleLayout,
 });
 
-/** One place decides which nav item is lit, so a new screen only adds a link. */
+/**
+ * One place decides which nav item is lit, so a new screen only adds a link.
+ *
+ * The first item was labelled "Control tower", which is also the name of a separate application on
+ * a separate port — the operations manager's network map. Two different screens answering to one
+ * name is how a screenshot of the merchant dashboard ends up filed as `ops_network_map`, and it
+ * tells a merchant looking for their parcels that they are somewhere else. This one is the
+ * merchant's own overview, so it says so.
+ */
 const LINKS = [
-  { label: 'Control tower', href: '/app' },
+  { label: 'Overview', href: '/app' },
   { label: 'Shipments', href: '/app/shipments' },
   { label: 'New shipment', href: '/app/shipments/new' },
   { label: 'Bulk import', href: '/app/shipments/bulk' },

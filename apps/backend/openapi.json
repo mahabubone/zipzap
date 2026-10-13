@@ -2516,6 +2516,115 @@
         ]
       }
     },
+    "/v1/shipments/counts": {
+      "get": {
+        "operationId": "ShipmentCountsController_counts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The status breakdown of your own shipments, complete — every status in the machine is present, at zero when you have none. This is the console landing screen's data source; it exists because the paginated list cannot be counted and the control tower's live-counts is the whole network's, not yours.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentCountsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but missing the required scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or belongs to another tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Honour `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure. The `request_id` identifies it in our logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Count your shipments by status",
+        "tags": [
+          "shipments"
+        ],
+        "x-required-scopes": [
+          "shipments:read"
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-rate-limit": [
+          {
+            "tier": "merchant",
+            "failClosed": false
+          }
+        ]
+      }
+    },
     "/v1/shipments/{id}": {
       "get": {
         "operationId": "ShipmentDetailController_detail",
@@ -11863,6 +11972,44 @@
         "required": [
           "data",
           "pagination"
+        ]
+      },
+      "ShipmentCountsDto": {
+        "type": "object",
+        "properties": {
+          "byStatus": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Your shipments per status. Every status in the machine is present, at zero when it has none, so a caller never has to know that an absent key means \"none\".",
+            "example": {
+              "CREATED": 2,
+              "IN_TRANSIT": 1,
+              "DELIVERED": 3
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Every shipment you own, in any status.",
+            "example": 6
+          },
+          "todayNew": {
+            "type": "number",
+            "description": "Shipments you created today, Asia/Dhaka calendar day. Counted in the same statement as the rest, so the two cannot disagree.",
+            "example": 2
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Snapshot instant, UTC ISO 8601.",
+            "example": "2026-10-13T04:20:00.000Z"
+          }
+        },
+        "required": [
+          "byStatus",
+          "total",
+          "todayNew",
+          "timestamp"
         ]
       },
       "TimelineEntryDto": {

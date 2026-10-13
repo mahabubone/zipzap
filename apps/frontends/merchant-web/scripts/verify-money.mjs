@@ -5,10 +5,14 @@
  * which `Math.round(Number(x) * 100)` rounded DOWN while `Math.round(Number(y) * 100)` rounded UP
  * for the same reason. If someone "simplifies" this back to that expression, these fail.
  *
+ * The formatter it imports moved to `@zipzap/web-kit` when four copies of it became one; the
+ * sweep stayed here because 200,000 cases is too slow for a unit-test run and this script is the
+ * thing `pnpm prove` executes.
+ *
  * Run: node apps/frontends/merchant-web/scripts/verify-money.mjs
  */
 import { parseAmount, parseAmountMinor } from '../src/lib/money.ts';
-import { formatMinor } from '../src/lib/format.ts';
+import { formatMinor } from '@zipzap/web-kit';
 
 let failures = 0;
 function check(label, actual, expected) {

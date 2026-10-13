@@ -215,6 +215,50 @@ export class ShipmentRepository {
     return new Map(rows.map((r) => [r.status, Number(r.count)]));
   }
 
+  /**
+   * The same counts, for one merchant.
+   *
+   * `countsByStatus` is the network's picture and the dashboard may have it. A merchant may not: the
+   * console's landing screen asked for it anyway and answered 403, because the endpoint is
+   * `network:read` on purpose — see the note in `common/scopes.ts`. This is the same query with the
+   * tenancy predicate the list endpoint already applies, so the numbers a merchant sees are their own
+   * shipments and nothing else.
+   *
+   * `todayNew` uses the same day boundaries as `countTodayShipments`, in one statement rather than
+   * two, so the figure on screen cannot disagree with itself between two queries.
+   */
+  async merchantCounts(
+    manager: EntityManager,
+    merchantId: string,
+  ): Promise<{ byStatus: Map<string, number>; total: number; todayNew: number }> {
+    // Raw rather than a query builder, and camelCased by hand for the reason
+    // `finance.findUnsettledCodEntries` documents: raw rows arrive snake_case and a caller reading
+    // entity-shaped fields would otherwise count `undefined`.
+    //
+    // The tenancy predicate is written once. A builder would need `andWhere`/`orWhere` gymnastics to
+    // combine "this merchant" with "all time", and that shape is exactly where a count silently
+    // becomes a count of everyone's.
+    const rows = (await manager.query(
+      `SELECT s.status AS "status",
+              COUNT(*)::int AS "count",
+              COUNT(*) FILTER (WHERE s.created_at >= $2)::int AS "todayNew"
+         FROM shipment.shipments s
+        WHERE s.merchant_id = $1
+        GROUP BY s.status`,
+      [merchantId, this.todayStart()],
+    )) as Array<{ status: string; count: number; todayNew: number }>;
+
+    const byStatus = new Map<string, number>();
+    let total = 0;
+    let todayNew = 0;
+    for (const row of rows) {
+      byStatus.set(row.status, row.count);
+      total += row.count;
+      todayNew += row.todayNew;
+    }
+    return { byStatus, total, todayNew };
+  }
+
   countByStatuses(manager: EntityManager, statuses: readonly ShipmentStatus[]): Promise<number> {
     return manager.getRepository(ShipmentEntity).count({ where: { status: In(statuses) } });
   }

@@ -51,8 +51,16 @@ check('no status is in two groups at once', dupes, []);
 check('"All statuses" sends no status filter', statusesOf(''), []);
 check('a group expands to its statuses', statusesOf('LOST,DAMAGED'), ['LOST', 'DAMAGED']);
 check('the first group is the empty one', STATUS_GROUPS[0].value, '');
-check('every group has a label', STATUS_GROUPS.every((g) => g.label !== ''), true);
-check('every group but the first is non-empty', STATUS_GROUPS.slice(1).every((g) => statusesOf(g.value).length > 0), true);
+check(
+  'every group has a label',
+  STATUS_GROUPS.every((g) => g.label !== ''),
+  true,
+);
+check(
+  'every group but the first is non-empty',
+  STATUS_GROUPS.slice(1).every((g) => statusesOf(g.value).length > 0),
+  true,
+);
 check(
   'group values are what the server receives, with no stray spaces',
   STATUS_GROUPS.slice(1).every((g) => g.value === statusesOf(g.value).join(',')),
@@ -62,7 +70,11 @@ check(
 // "Delivered" is the one status a merchant looks for by name; a merchant who
 // cannot filter to delivered will export the whole account and filter in Excel.
 check('delivered is reachable in one click', grouped.includes('DELIVERED'), true);
-check('the statuses that cost money are reachable', ['LOST', 'DAMAGED', 'CANCELLED'].every((s) => grouped.includes(s)), true);
+check(
+  'the statuses that cost money are reachable',
+  ['LOST', 'DAMAGED', 'CANCELLED'].every((s) => grouped.includes(s)),
+  true,
+);
 
 if (failures > 0) {
   console.error(`\nstatus groups: ${failures} assertion(s) failed`);

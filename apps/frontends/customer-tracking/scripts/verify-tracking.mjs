@@ -86,7 +86,7 @@ await page.goto(`${MERCHANT_WEB}/`);
 await page.waitForLoadState('networkidle');
 check(
   'landing links out to this app',
-  await page.locator(`a[href="${WEB}/track"]`).count() >= 1,
+  (await page.locator(`a[href="${WEB}/track"]`).count()) >= 1,
   true,
 );
 

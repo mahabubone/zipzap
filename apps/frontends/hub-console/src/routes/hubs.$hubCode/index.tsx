@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useParams } from '@tanstack/react-router';
 import { Spinner, ErrorState, StatCard } from '@zipzap/ui';
 import { apiClient } from '../../lib/api.ts';
@@ -9,7 +9,11 @@ function OverviewPage() {
   const workList = useAsync(() => apiClient().hubParcels(hubCode), hubCode);
 
   if (workList.loading) return <Spinner />;
-  if (workList.error) return <ErrorState message={String(workList.error)} />;
+  // `retry` because this screen is four counts and a list, and an operator whose network dropped
+  // mid-shift should not have to reload the tab to see the belt again.
+  if (workList.error) {
+    return <ErrorState message={workList.error} retry={workList.reload} />;
+  }
 
   const data = workList.data!;
   const parcels = data.parcels ?? [];
@@ -64,18 +68,34 @@ function OverviewPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/*
+        Quick actions that actually go somewhere.
+
+        These were two `div`s with `cursor-pointer` and no handler at all — the screen looked
+        tappable, said "Start Scanning", and did nothing. An affordance that lies is worse than an
+        absent one, because the operator learns to distrust the whole panel. Now they are links, so
+        they are reachable by keyboard, they show a focus ring, and they cannot be clicked without
+        navigating.
+      */}
       <div className="mt-8">
         <h3 className="mb-4 font-semibold text-slate-900">Quick Actions</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="cursor-pointer rounded border-2 border-dashed border-slate-300 p-6 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">
+          <Link
+            to="/hubs/$hubCode/work"
+            params={{ hubCode }}
+            className="rounded border-2 border-dashed border-slate-300 p-6 text-center transition-colors hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          >
             <p className="text-lg font-semibold text-slate-700">Start Scanning</p>
             <p className="mt-1 text-sm text-slate-500">Begin parcel processing</p>
-          </div>
-          <div className="cursor-pointer rounded border-2 border-dashed border-slate-300 p-6 text-center transition-colors hover:border-purple-400 hover:bg-purple-50">
+          </Link>
+          <Link
+            to="/hubs/$hubCode/riders"
+            params={{ hubCode }}
+            className="rounded border-2 border-dashed border-slate-300 p-6 text-center transition-colors hover:border-purple-400 hover:bg-purple-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          >
             <p className="text-lg font-semibold text-slate-700">View Riders</p>
             <p className="mt-1 text-sm text-slate-500">Manage assignments and positions</p>
-          </div>
+          </Link>
         </div>
       </div>
     </div>

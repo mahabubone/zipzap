@@ -379,6 +379,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/shipments/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count your shipments by status */
+        get: operations["ShipmentCountsController_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/shipments/{id}": {
         parameters: {
             query?: never;
@@ -1970,6 +1987,34 @@ export interface components {
         ShipmentPageDto: {
             data: components["schemas"]["ShipmentSummaryDto"][];
             pagination: components["schemas"]["CursorPaginationDto"];
+        };
+        ShipmentCountsDto: {
+            /**
+             * @description Your shipments per status. Every status in the machine is present, at zero when it has none, so a caller never has to know that an absent key means "none".
+             * @example {
+             *       "CREATED": 2,
+             *       "IN_TRANSIT": 1,
+             *       "DELIVERED": 3
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+            /**
+             * @description Every shipment you own, in any status.
+             * @example 6
+             */
+            total: number;
+            /**
+             * @description Shipments you created today, Asia/Dhaka calendar day. Counted in the same statement as the rest, so the two cannot disagree.
+             * @example 2
+             */
+            todayNew: number;
+            /**
+             * @description Snapshot instant, UTC ISO 8601.
+             * @example 2026-10-13T04:20:00.000Z
+             */
+            timestamp: string;
         };
         TimelineEntryDto: {
             /** @example ShipmentCreated */
@@ -5628,6 +5673,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreatedShipmentDto"];
+                };
+            };
+            /** @description Validation failed. Nothing was written. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description No valid credential was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Authenticated, but missing the required scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description The record does not exist, or belongs to another tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Rate limited. Honour `Retry-After`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description Unexpected failure. The `request_id` identifies it in our logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+            /** @description A required dependency is unreachable. Nothing was written. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelopeDto"];
+                };
+            };
+        };
+    };
+    ShipmentCountsController_counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status breakdown of your own shipments, complete — every status in the machine is present, at zero when you have none. This is the console landing screen's data source; it exists because the paginated list cannot be counted and the control tower's live-counts is the whole network's, not yours. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentCountsDto"];
                 };
             };
             /** @description Validation failed. Nothing was written. */

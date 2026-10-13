@@ -39,7 +39,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 // The backend's own pg, by default: it is already a workspace dependency there and adding it here
 // would put a database driver in a browser app's dependency tree.
-const pg = (await import(process.env.PG ?? '../../../backend/node_modules/pg/esm/index.mjs')).default;
+const pg = (await import(process.env.PG ?? '../../../backend/node_modules/pg/esm/index.mjs'))
+  .default;
 const { hashSecret } = await import(
   new URL('../../../backend/dist/common/secret.js', import.meta.url).pathname
 );
@@ -66,7 +67,11 @@ function check(label, ok, detail = '') {
   }
 }
 function eq(label, actual, expected) {
-  check(label, actual === expected, `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`);
+  check(
+    label,
+    actual === expected,
+    `got ${JSON.stringify(actual)} want ${JSON.stringify(expected)}`,
+  );
 }
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -165,7 +170,9 @@ const browser = await chromium.launch({
 async function settle(page) {
   await page.waitForLoadState('networkidle');
   // A click before React hydrates falls through to a native form submit.
-  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), { timeout: 15000 });
+  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), {
+    timeout: 15000,
+  });
   await page.waitForTimeout(250);
 }
 async function shoot(page, name) {
@@ -177,22 +184,29 @@ async function shoot(page, name) {
 const row = (page, code) => page.locator('main ul li', { hasText: code });
 /** One manifest cargo row. Scoped to the cargo list because the exception banner repeats the ids
  *  in a second <ul>, and an unscoped `main li` matches both. */
-const cargoRow = (page, id) =>
-  page.locator('main > ul li', { hasText: id.slice(0, 8) }).last();
+const cargoRow = (page, id) => page.locator('main > ul li', { hasText: id.slice(0, 8) }).last();
 
 const page = await browser.newPage({ viewport: PHONE, deviceScaleFactor: 2 });
 
 // --- sign in -----------------------------------------------------------------------------------
 await page.goto(`${WEB}/`);
 await settle(page);
-check('the console root sends an anonymous visitor to sign in', page.url().endsWith('/login'), page.url());
+check(
+  'the console root sends an anonymous visitor to sign in',
+  page.url().endsWith('/login'),
+  page.url(),
+);
 
 await page.fill('#email', email);
 await page.fill('#password', password);
 await page.click('button[type=submit]');
 await page.waitForURL(`${WEB}/`, { timeout: 15000 });
 await settle(page);
-eq('the hub operator lands on the hub picker', (await page.locator('h1').innerText()).trim(), 'Choose your hub');
+eq(
+  'the hub operator lands on the hub picker',
+  (await page.locator('h1').innerText()).trim(),
+  'Choose your hub',
+);
 
 // --- the picker ---------------------------------------------------------------------------------
 const hubs = (await api('/v1/hubs')).body;
@@ -204,7 +218,11 @@ const counts = (await page.locator('main ul li').allInnerTexts()).map((t) => {
   const m = t.match(/(\d+) waiting/);
   return m ? Number(m[1]) : -1;
 });
-check('every row states its count', counts.every((n) => n >= 0), JSON.stringify(counts));
+check(
+  'every row states its count',
+  counts.every((n) => n >= 0),
+  JSON.stringify(counts),
+);
 check(
   'the busiest hub is first, because that is the room you are standing in',
   counts.every((n, i) => i === 0 || counts[i - 1] >= n),
@@ -216,7 +234,11 @@ const busiest = hubs.reduce((a, b) => (b.countAtHub > a.countAtHub ? b : a));
 await page.locator(`main ul li a[href*="${busiest.code}"]`).first().click();
 await page.waitForURL(/\/hubs\//, { timeout: 15000 });
 await settle(page);
-eq('the chosen hub is the one on screen', (await page.locator('h1').innerText()).trim(), busiest.name);
+eq(
+  'the chosen hub is the one on screen',
+  (await page.locator('h1').innerText()).trim(),
+  busiest.name,
+);
 
 // --- exit check 4: gloves on a 5" phone -------------------------------------------------------
 const targets = await page.evaluate(() =>
@@ -252,7 +274,11 @@ const codeSize = await row(page, driven.code)
   .locator('p')
   .first()
   .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-check('the tracking code is at least 16px — read at a belt, not squinted at', codeSize >= 16, `${codeSize}px`);
+check(
+  'the tracking code is at least 16px — read at a belt, not squinted at',
+  codeSize >= 16,
+  `${codeSize}px`,
+);
 await shoot(page, 'worklist_phone');
 
 // --- exit check 2, part 1: the belt gestures, every one clicked in the UI ----------------------
@@ -269,24 +295,34 @@ const BELT = ['sort', 'outbound', 'departed'];
 const seen = [];
 for (const verb of BELT) {
   const button = row(page, driven.code).locator('button');
-  eq(`${driven.code} offers "Scan ${verb}" next`, (await button.innerText()).trim(), `Scan ${verb}`);
+  eq(
+    `${driven.code} offers "Scan ${verb}" next`,
+    (await button.innerText()).trim(),
+    `Scan ${verb}`,
+  );
   seen.push(verb);
   await button.click();
   await page.waitForTimeout(700);
 }
-check('every belt gesture was a distinct button', new Set(seen).size === BELT.length, JSON.stringify(seen));
+check(
+  'every belt gesture was a distinct button',
+  new Set(seen).size === BELT.length,
+  JSON.stringify(seen),
+);
 eq(
   'the parcel is in line-haul, which is what DEPARTED means',
-  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0].status,
+  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0]
+    .status,
   'IN_TRANSIT',
 );
 check(
-  'and it has left this hub\'s work list, because it left this building',
+  "and it has left this hub's work list, because it left this building",
   (await row(page, driven.code).count()) === 0,
 );
 // A parcel past its last hub gesture must read Done, not offer a button that will 409. `stale` is
 // the one that gets walked to the end.
-for (const kind of ['INBOUND', 'SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED']) await otherScan(stale.id, kind);
+for (const kind of ['INBOUND', 'SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED'])
+  await otherScan(stale.id, kind);
 await page.click('button[aria-label="Refresh work list"]');
 await page.waitForTimeout(700);
 check(
@@ -297,7 +333,11 @@ check(
 // --- exit check 1: an out-of-order scan, refused on screen -----------------------------------
 // The stale screen, made real. This work list was fetched before the line above walked `lagging` to
 // the far end on another tablet; its button still names a gesture the parcel has long since passed.
-eq('the stale screen still offers the old gesture', (await row(page, lagging.code).locator('button').innerText()).trim(), 'Scan sort');
+eq(
+  'the stale screen still offers the old gesture',
+  (await row(page, lagging.code).locator('button').innerText()).trim(),
+  'Scan sort',
+);
 for (const kind of ['SORT', 'OUTBOUND', 'DEPARTED', 'ARRIVED']) await otherScan(lagging.id, kind);
 
 await row(page, lagging.code).locator('button').click();
@@ -320,7 +360,10 @@ await shoot(page, 'refusal_phone');
 // Refreshing is the operator's next move, and it must clear the stale row.
 await page.click('button[aria-label="Refresh work list"]');
 await page.waitForTimeout(700);
-check('refreshing clears the stale gesture', (await row(page, lagging.code).innerText()).includes('Done'));
+check(
+  'refreshing clears the stale gesture',
+  (await row(page, lagging.code).innerText()).includes('Done'),
+);
 
 // The same parcel through the API, to prove the UI was not merely catching an error of its own.
 eq(
@@ -367,7 +410,10 @@ for (const label of EDGES) {
   await button.click();
   await page.waitForTimeout(600);
 }
-check('the manifest is now Received', (await page.locator('main').innerText()).includes('Received'));
+check(
+  'the manifest is now Received',
+  (await page.locator('main').innerText()).includes('Received'),
+);
 await shoot(page, 'manifest_received_phone');
 
 // --- exit check 2, part 2: the arrival gesture, from the screen that can still see it ----------
@@ -377,7 +423,8 @@ await cargoRow(page, driven.id).locator('button', { hasText: 'Record arrival' })
 await page.waitForTimeout(800);
 eq(
   'recording an arrival moves the parcel to the destination hub',
-  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0].status,
+  (await client.query(`SELECT status FROM shipment.shipments WHERE id = $1`, [driven.id])).rows[0]
+    .status,
   'AT_DESTINATION_HUB',
 );
 eq('and recording one leaves one', (await api(`/v1/manifests/${manifestId}`)).body.missingCount, 1);
@@ -404,7 +451,10 @@ check(
   /1 of 4 parcels have not arrived/.test(exceptionText),
   exceptionText.slice(0, 240),
 );
-check('the exception names the parcel that has not arrived', exceptionText.includes(absent.id.slice(0, 8)));
+check(
+  'the exception names the parcel that has not arrived',
+  exceptionText.includes(absent.id.slice(0, 8)),
+);
 check(
   'the cargo row offers an arrival rather than only counting the parcel',
   (await cargoRow(page, absent.id).innerText()).includes('Record arrival'),
@@ -419,7 +469,11 @@ check(
 await shoot(page, 'manifest_exception_phone');
 
 const reconcile = page.locator('main button', { hasText: 'Reconcile' });
-eq('reconcile is still offered, because the exception is a state not a verdict', await reconcile.count(), 1);
+eq(
+  'reconcile is still offered, because the exception is a state not a verdict',
+  await reconcile.count(),
+  1,
+);
 await reconcile.click();
 await page.waitForSelector('[role=alert]', { timeout: 10000 });
 check(

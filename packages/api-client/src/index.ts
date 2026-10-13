@@ -133,6 +133,12 @@ export type StatementLine = Schemas['StatementLineDto'];
 export type SettlementStatement = Schemas['SettlementStatementDto'];
 export type Coverage = Schemas['CoverageCheckDto'];
 export type LiveCounts = Schemas['LiveCountsDto'];
+
+/**
+ * GET /v1/shipments/counts. Every shipment status is present, at zero when there are none, so a
+ * caller never has to treat a missing key as a number.
+ */
+export type ShipmentCounts = Schemas['ShipmentCountsDto'];
 export type PublicTracking = Schemas['PublicTrackingViewDto'];
 export type BulkPreviewRow = Schemas['BulkPreviewRowDto'];
 export type BulkJob = Schemas['BulkJobViewDto'];
@@ -594,11 +600,23 @@ export class ZipZapClient {
     return data;
   }
 
-  /** GET /v1/control-tower/live-counts — the control tower snapshot. */
+  /** GET /v1/control-tower/live-counts — the control tower snapshot. Network scope, not a merchant's. */
   async liveCounts(): Promise<LiveCounts> {
     const { data } = await this.request<LiveCounts>('/v1/control-tower/live-counts', {
       method: 'GET',
     });
+    return data;
+  }
+
+  /**
+   * GET /v1/shipments/counts — your own shipments by status.
+   *
+   * The merchant landing screen's data source. `liveCounts` is deliberately `network:read` — it is
+   * every tenant's picture at once — so calling it from a merchant console answers 403, and the list
+   * endpoint cannot be counted because it is paginated.
+   */
+  async shipmentCounts(): Promise<ShipmentCounts> {
+    const { data } = await this.request<ShipmentCounts>('/v1/shipments/counts', { method: 'GET' });
     return data;
   }
 

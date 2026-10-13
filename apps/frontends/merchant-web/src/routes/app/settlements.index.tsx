@@ -131,7 +131,21 @@ function SettlementsScreen() {
         </div>
       )}
 
-      {errors.data && errors.data.data.length > 0 ? (
+      {/*
+        The review warning is money-blocking information: it is the reason the next settlement may
+        be refused. It used to be driven by `errors.data` alone, so a failed request rendered
+        nothing at all and the merchant read a clean list as "nothing is waiting". Silence is the
+        wrong answer to a question about money, so a failed check says so.
+      */}
+      {errors.error ? (
+        <p role="status" className="text-sm text-amber-700">
+          We could not check whether any collections need review.{' '}
+          <Link to="/app/cod" className="underline">
+            Open reconciliation
+          </Link>{' '}
+          to see the queue.
+        </p>
+      ) : errors.data && errors.data.data.length > 0 ? (
         <p className="text-sm text-slate-600">
           Your newest settlement is not the whole picture:{' '}
           <Link to="/app/cod" className="underline">

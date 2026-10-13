@@ -5,7 +5,8 @@ import { withRequestContext } from '../lib/request-context.ts';
 import { apiClient } from '../lib/api.ts';
 import { Button, ErrorState, Spinner } from '@zipzap/ui';
 import { useAsync } from '@zipzap/web-kit';
-import { NetworkList, NetworkMap } from '../lib/network-map.tsx';
+import { NetworkList } from '../lib/network-list.tsx';
+import { MapFrame } from '../lib/map-frame.tsx';
 
 /**
  * Resolves the principal on the SERVER, from the request context the global middleware captured.
@@ -121,7 +122,19 @@ function Network() {
             onRetry={() => setFallback(null)}
           />
         ) : (
-          <NetworkMap
+          /*
+            `MapFrame`, not `NetworkMap`.
+
+            `network-map.tsx` imports `react-leaflet`, and Leaflet reads `window` at module scope — so
+            the server threw `window is not defined` while rendering this route, TanStack Start
+            caught it, and the entire screen quietly fell back to client rendering. It looked fine in
+            a browser, which is why it survived: the only symptom was that a direct GET of the ops
+            console never server-rendered, and that symptom is invisible unless you read for it.
+
+            `MapFrame` renders the map's container and the counts — server-rendered, no Leaflet — and
+            swaps the real map in once the client has taken over.
+          */
+          <MapFrame
             hubs={network.data.hubs}
             riders={network.data.riders}
             onFallback={setFallback}

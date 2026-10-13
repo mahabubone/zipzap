@@ -76,6 +76,16 @@ function NewShipment() {
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
+  /**
+   * Why the estimate is missing, when it is missing because we could not fetch it.
+   *
+   * `null` means "not asked yet"; this means "asked, and it failed". The two render differently,
+   * because telling a merchant who has finished typing that their form is incomplete is a different
+   * and much worse lie than showing no estimate at all.
+   */
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  /** The coverage check failing is its own problem: it gates submission, so it must not read as "fine". */
+  const [coverageUnknown, setCoverageUnknown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [created, setCreated] = useState<{ trackingCode: string; id: string } | null>(null);
@@ -128,8 +138,19 @@ function NewShipment() {
     let live = true;
     apiClient()
       .coverage(form.zone)
-      .then((c) => live && setCoverage(c))
-      .catch(() => live && setCoverage(null));
+      .then((c) => {
+        if (!live) return;
+        setCoverage(c);
+        setCoverageUnknown(false);
+      })
+      .catch(() => {
+        if (!live) return;
+        setCoverage(null);
+        // The check that decides whether this zone can be served came back with nothing. Silently
+        // treating that as "serviceable" is the default everyone reaches for and nobody should:
+        // the submission is the thing that would be refused.
+        setCoverageUnknown(true);
+      });
     return () => {
       live = false;
     };
@@ -140,6 +161,9 @@ function NewShipment() {
   useEffect(() => {
     if (!draft) {
       setQuote(null);
+      // An incomplete draft is not a failed estimate — clearing the message here keeps the two
+      // states from bleeding into each other as the merchant types.
+      setEstimateError(null);
       return;
     }
     let live = true;
@@ -153,8 +177,16 @@ function NewShipment() {
           remoteArea: draft.remoteArea,
           fragile: draft.fragile,
         })
-        .then((q) => live && setQuote(q))
-        .catch(() => live && setQuote(null))
+        .then((q) => {
+          if (!live) return;
+          setQuote(q);
+          setEstimateError(null);
+        })
+        .catch((e: unknown) => {
+          if (!live) return;
+          setQuote(null);
+          setEstimateError(e instanceof Error ? e.message : 'The estimate could not be loaded.');
+        })
         .finally(() => live && setQuoting(false));
     }, 350);
     return () => {
@@ -391,6 +423,21 @@ function NewShipment() {
               <p role="alert" className="mt-2 text-sm text-red-600">
                 {coverage.reason ?? 'This zone is not serviceable.'}
               </p>
+            ) : estimateError ? (
+              /*
+                A failed estimate is not an empty form.
+
+                Both fetches here used to swallow their error and set `null`, and `null` is also
+                what "the merchant has not finished typing" looks like. So a 500 from the pricing
+                service produced the sentence "Fill in the parcel details to see a price" on a form
+                where every field was filled in — a screen telling the merchant their own input was
+                missing because our request failed. Same for the coverage check: its failure left
+                `blocked` false, which silently enabled submission for a zone the server had not
+                confirmed.
+              */
+              <p role="alert" className="mt-2 text-sm text-amber-700">
+                {estimateError} You can still create the parcel — the server prices it at creation.
+              </p>
             ) : quote ? (
               <>
                 <ul className="mt-3 flex flex-col gap-1 text-sm">
@@ -429,6 +476,22 @@ function NewShipment() {
             <p className="text-xs text-slate-500">
               Estimated delivery in {coverage.estimatedDays} day
               {coverage.estimatedDays === 1 ? '' : 's'}.
+            </p>
+          ) : null}
+
+          {/*
+            Said out loud, because the alternative is silence.
+
+            The coverage check is what decides whether a zone can be served, and it is the only
+            thing standing between a merchant and a 422 at creation. When it fails, submission stays
+            enabled — the parcel is still probably fine, and refusing to let anyone try would be a
+            worse failure than the one we are recovering from — but the merchant is told that this
+            screen does not currently know, so a refusal is not a surprise.
+          */}
+          {coverageUnknown ? (
+            <p role="status" className="text-xs text-amber-700">
+              We could not check delivery coverage for this zone. We will confirm it when the parcel
+              is created.
             </p>
           ) : null}
 

@@ -19,6 +19,7 @@ import { IdentityModule } from '../identity/identity.module.ts';
 import { NetworkModule } from '../network/network.module.ts';
 import { CreateShipmentController } from './create-shipment.controller.ts';
 import { ListShipmentsController } from './list-shipments.controller.ts';
+import { ShipmentCountsController } from './shipment-counts.controller.ts';
 import { ListShipmentsService } from './list-shipments.service.ts';
 import { ShipmentDetailController } from './shipment-detail.controller.ts';
 import { GetShipmentService } from './get-shipment.service.ts';
@@ -45,6 +46,7 @@ import { ShipmentAdvanceService } from './advance-shipment.service.ts';
   controllers: [
     CreateShipmentController,
     ListShipmentsController,
+    ShipmentCountsController,
     ShipmentDetailController,
     BulkImportController,
     ReportExceptionController,

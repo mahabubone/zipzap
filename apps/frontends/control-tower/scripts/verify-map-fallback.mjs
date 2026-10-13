@@ -50,7 +50,9 @@ const browser = await chromium.launch({
 
 async function settle(page) {
   await page.waitForLoadState('networkidle');
-  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), { timeout: 15000 });
+  await page.waitForFunction(() => !document.querySelector('main .animate-pulse'), {
+    timeout: 15000,
+  });
   await page.waitForTimeout(400);
 }
 
@@ -81,7 +83,10 @@ const hubMarkers = await ok.locator('[data-marker=hub]').count();
 const riderMarkers = await ok.locator('[data-marker=rider]').count();
 check('hubs are drawn', hubMarkers > 0, `${hubMarkers}`);
 check('riders with a position are drawn', riderMarkers > 0, `${riderMarkers}`);
-check('and it says so for a screen reader', /hubs, \d+ riders/.test(await ok.locator('svg[role=img]').getAttribute('aria-label') ?? ''));
+check(
+  'and it says so for a screen reader',
+  /hubs, \d+ riders/.test((await ok.locator('svg[role=img]').getAttribute('aria-label')) ?? ''),
+);
 await shot(ok, 'map');
 
 // --- the exit check: every tile dead -------------------------------------------------------
@@ -103,15 +108,29 @@ const listText = await dead.locator('main').innerText();
 // honestly; a list has no frame to be outside of, so it keeps them — and says how many those were.
 const hubHeading = /Hubs \((\d+)\)/.exec(listText);
 const listedHubs = hubHeading === null ? -1 : Number(hubHeading[1]);
-check('the fallback never loses data relative to the map', listedHubs >= hubMarkers, `list ${listedHubs}, map drew ${hubMarkers}`);
+check(
+  'the fallback never loses data relative to the map',
+  listedHubs >= hubMarkers,
+  `list ${listedHubs}, map drew ${hubMarkers}`,
+);
 check(
   'and when the map dropped markers, the list says so rather than silently differing',
   listedHubs === hubMarkers ? true : /could not be drawn/.test(listText),
   `list ${listedHubs}, map ${hubMarkers}, explained: ${/could not be drawn/.test(listText)}`,
 );
-check('the list shows every rider', listText.includes(`Riders (${riderMarkers})`), listText.slice(0, 200));
-check('with coordinates, because a row of names is not a position', /\d+\.\d{4}, \d+\.\d{4}/.test(listText));
-check('and a live/stale badge, so a stale rider does not read as live', /\b(live|stale)\b/.test(listText));
+check(
+  'the list shows every rider',
+  listText.includes(`Riders (${riderMarkers})`),
+  listText.slice(0, 200),
+);
+check(
+  'with coordinates, because a row of names is not a position',
+  /\d+\.\d{4}, \d+\.\d{4}/.test(listText),
+);
+check(
+  'and a live/stale badge, so a stale rider does not read as live',
+  /\b(live|stale)\b/.test(listText),
+);
 await shot(dead, 'fallback_list');
 
 // And it recovers: retry puts the map back, because the tiles are still dead it should not lie.
